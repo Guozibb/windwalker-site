@@ -3487,350 +3487,164 @@ function updateNav(items) {
         let composerPendingMedia = null, composerPendingType = null;
 
         // Community posts (Supabase)
+        // ============================================================
+        // 💬 社区功能 (Supabase 重构版 - 干净版本)
+        // ============================================================
         let communityPosts = [];
+
         async function loadPosts() {
-            const { data: posts } = await supabase.from('community_posts').select('*, author:author_id(username,avatar_url)').order('created_at', { ascending: false }).limit(100);
-            if (!posts) return [];
-            // Load likes and comments for each post
-            const result = await Promise.all(posts.map(async p => {
+            const { data } = await supabase.from('community_posts')
+                .select('*, author:author_id(username,avatar_url)').order('created_at', { ascending: false }).limit(100);
+            if (!data) return [];
+            const result = [];
+            for (const p of data) {
                 const { data: likes } = await supabase.from('post_likes').select('user_id').eq('post_id', p.id);
                 const { data: comments } = await supabase.from('post_comments').select('*, author:author_id(username)').eq('post_id', p.id).order('created_at', { ascending: true });
-                return {
-                    id: 'post_' + p.id,
-                    name: p.author ? p.author.username : '未知',
-                    avatar: p.author ? (p.author.avatar_url || '') : '',
-                    text: p.text,
-                    media: p.media_url,
-                    mediaType: p.media_type,
-                    mediaId: null,
-                    time: new Date(p.created_at).getTime(),
-                    likes: p.likes_count || 0,
-                    likedBy: (likes || []).map(l => l.user_id),
-                    comments: (comments || []).map(c => ({ name: c.author ? c.author.username : '', text: c.text, img: c.image_url }))
-                };
-            }));
+                result.push({
+                    id: 'post_' + p.id, name: p.author?.username || '未知', avatar: p.author?.avatar_url || '',
+                    text: p.text || '', media: p.media_url || '', mediaType: p.media_type || null,
+                    time: new Date(p.created_at).getTime(), likes: p.likes_count || 0,
+                    likedBy: (likes||[]).map(l => l.user_id),
+                    comments: (comments||[]).map(c => ({ name: c.author?.username||'', text: c.text||'' }))
+                });
+            }
             return result;
         }
-        async function savePostToDb(post) {
-            if (!currentUserId) { showToast('请先登录再发帖', true); return null; }
-            try {
-                // 先确保 profiles 行存在
-                const { data: pf } = await supabase.from('profiles').select('id').eq('id', currentUserId).maybeSingle();
-                if (!pf) {
-                    const username = currentUser?.username || 'user_' + Date.now() % 10000;
-                    const code = String(Math.floor(100000 + Math.random() * 900000));
-                    await supabase.from('profiles').upsert({ id: currentUserId, username, user_code: code });
-                }
 
-                const { data, error } = await supabase.from('community_posts').insert({
-                    author_id: currentUserId,
-                    text: post.text || '',
-                    media_url: post.media || '',
-                    media_type: post.mediaType || null,
-                    likes_count: 0
-                }).select('id').single();
-
-                if (error) {
-                    const msg = error.code === '42501' ? '权限不足（请确认已关闭RLS）' :
-                              error.code === '23503' ? '用户资料异常，请重新登录' :
-                              error.code === '42P01' ? '数据库表不存在，请重新运行schema.sql' :
-                              (error.message || '未知错误');
-                    showToast('发布失败: ' + msg, true);
-                    console.error('Post insert error:', error.code, error.message, error.details);
-                    return null;
-                }
-                return data.id;
-            } catch(e) {
-                showToast('发布失败: 网络异常，请重试', true);
-                console.error('Post exception:', e);
-                return null;
-            }
-        }
-
-        // Sync user profile to community
         function syncComposerAvatar() {
-            if (currentUser) {
-                if (currentUser.avatar_url) { composerAvatar.textContent = ''; composerAvatar.style.backgroundImage = `url(${currentUser.avatar_url})`; composerAvatar.style.backgroundSize = 'cover'; }
-                else composerAvatar.textContent = (currentUser.username || '风').charAt(0);
-            } else { composerAvatar.textContent = '😎'; }
+            composerAvatar.textContent = currentUser ? (currentUser.username||'风')[0] : '😎';
+            if (currentUser?.avatar_url) { composerAvatar.textContent = ''; composerAvatar.style.backgroundImage = `url(${currentUser.avatar_url})`; composerAvatar.style.backgroundSize = 'cover'; }
         }
 
-        // Open/close
-        btnOpenCommunity.addEventListener('click', () => {
-            communityOverlay.classList.add('open');
-            document.body.style.overflow = 'hidden';
-            syncComposerAvatar();
-            renderFeed();
-        });
-        communityClose.addEventListener('click', () => { communityOverlay.classList.remove('open'); document.body.style.overflow = ''; });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape' && communityOverlay.classList.contains('open')) { communityOverlay.classList.remove('open'); document.body.style.overflow = ''; }});
+        btnOpenCommunity.addEventListener('click', () => { communityOverlay.classList.add('open'); syncComposerAvatar(); renderFeed(); });
+        communityClose.addEventListener('click', () => { communityOverlay.classList.remove('open'); });
 
-        // Composer
-        composerInput.addEventListener('input', () => {
-            const has = composerInput.value.trim() || composerPendingMedia;
-            composerSubmit.disabled = !has;
-        });
-
+        composerInput.addEventListener('input', () => { composerSubmit.disabled = !(composerInput.value.trim() || composerPendingMedia); });
         btnComposerImage.addEventListener('click', () => composerImageInput.click());
         btnComposerVideo.addEventListener('click', () => composerVideoInput.click());
 
         let composerPendingFile = null;
         function setComposerMedia(file, type) {
             if (composerPendingMedia) URL.revokeObjectURL(composerPendingMedia);
-            composerPendingMedia = URL.createObjectURL(file);
-            composerPendingFile = file;
-            composerPendingType = type;
+            composerPendingMedia = URL.createObjectURL(file); composerPendingFile = file; composerPendingType = type;
             composerPreview.classList.add('show');
-            if (type === 'image') composerPreviewContent.innerHTML = `<img src="${composerPendingMedia}" alt="">`;
-            else composerPreviewContent.innerHTML = `<video src="${composerPendingMedia}" controls></video>`;
+            composerPreviewContent.innerHTML = type === 'image' ? `<img src="${composerPendingMedia}">` : `<video src="${composerPendingMedia}" controls></video>`;
             composerSubmit.disabled = false;
         }
-
         composerImageInput.addEventListener('change', () => { if (composerImageInput.files[0]) setComposerMedia(composerImageInput.files[0], 'image'); });
         composerVideoInput.addEventListener('change', () => { if (composerVideoInput.files[0]) setComposerMedia(composerVideoInput.files[0], 'video'); });
         composerPreviewRemove.addEventListener('click', () => {
             if (composerPendingMedia) URL.revokeObjectURL(composerPendingMedia);
-            composerPendingMedia = null; composerPendingType = null; composerPendingFile = null;
-            composerPreview.classList.remove('show');
-            composerPreviewContent.innerHTML = '';
-            composerSubmit.disabled = !composerInput.value.trim();
-            composerImageInput.value = ''; composerVideoInput.value = '';
+            composerPendingMedia = composerPendingType = composerPendingFile = null;
+            composerPreview.classList.remove('show'); composerPreviewContent.innerHTML = '';
+            composerSubmit.disabled = !composerInput.value.trim(); composerImageInput.value = composerVideoInput.value = '';
         });
 
-        // Submit post (with persistence)
+        // 发布帖子
         composerSubmit.addEventListener('click', async () => {
             if (!currentUserId) { showToast('请先登录', true); return; }
             const text = composerInput.value.trim();
             if (!text && !composerPendingMedia) return;
-
-            composerSubmit.disabled = true;
-            composerSubmit.textContent = '⏳...';
+            composerSubmit.disabled = true; composerSubmit.textContent = '⏳...';
 
             let mediaUrl = '';
-            let mediaType = composerPendingType || null;
-
-            // Upload media to Supabase Storage
             if (composerPendingFile) {
                 try {
-                    const bucket = 'community-media';
-                    const ext = composerPendingFile.name.split('.').pop() || 'jpg';
-                    const path = `${currentUserId}_${Date.now()}.${ext}`;
-                    const { error: uploadErr } = await supabase.storage.from(bucket).upload(path, composerPendingFile);
-                    if (!uploadErr) {
-                        const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(path);
-                        mediaUrl = publicUrl.publicUrl;
-                    } else {
-                        showToast('图片上传失败: ' + uploadErr.message, true);
-                    }
-                } catch(e) { showToast('图片上传异常: 请确认已创建 community-media 存储桶', true); }
+                    const ext = composerPendingFile.name.split('.').pop();
+                    const path = 'posts/' + Date.now() + '.' + ext;
+                    const { error: upErr } = await supabase.storage.from('community-media').upload(path, composerPendingFile);
+                    if (upErr) { showToast('图片上传失败: ' + upErr.message, true); composerSubmit.disabled = false; composerSubmit.textContent = '发布'; return; }
+                    const { data: pub } = supabase.storage.from('community-media').getPublicUrl(path);
+                    mediaUrl = pub.publicUrl;
+                } catch(e) { showToast('图片上传失败: 请确认 community-media 存储桶已创建', true); composerSubmit.disabled = false; composerSubmit.textContent = '发布'; return; }
             }
 
-            const dbId = await savePostToDb({ text, media: mediaUrl, mediaType });
+            const { data: newRow, error: insErr } = await supabase.from('community_posts')
+                .insert({ author_id: currentUserId, text, media_url: mediaUrl, media_type: composerPendingType, likes_count: 0 })
+                .select('id').single();
 
-            composerSubmit.textContent = '发布';
-            composerSubmit.disabled = true;
-            if (!dbId) return;
+            composerSubmit.textContent = '发布'; composerSubmit.disabled = true;
+            if (insErr) { showToast('发布失败: ' + insErr.message, true); return; }
 
-            // 立即添加到本地数组（不等 Supabase 同步），保证发帖后立刻显示
-            const newPost = {
-                id: 'post_' + dbId,
-                name: currentUser.username,
-                avatar: currentUser.avatar_url || '',
-                text: text,
-                media: mediaUrl,
-                mediaType: mediaType,
-                time: Date.now(),
-                likes: 0,
-                likedBy: [],
-                comments: []
-            };
-            communityPosts.unshift(newPost);
+            communityPosts.unshift({
+                id: 'post_' + newRow.id, name: currentUser.username, avatar: currentUser.avatar_url || '',
+                text, media: mediaUrl, mediaType: composerPendingType, time: Date.now(), likes: 0, likedBy: [], comments: []
+            });
 
-            // Reset
-            composerInput.value = '';
-            composerPendingMedia = null; composerPendingType = null; composerPendingFile = null;
-            composerPreview.classList.remove('show');
-            composerPreviewContent.innerHTML = '';
-            composerImageInput.value = ''; composerVideoInput.value = '';
-            renderFeed();
-            showToast('✅ 发布成功！');
+            composerInput.value = ''; composerPendingMedia = composerPendingType = composerPendingFile = null;
+            composerPreview.classList.remove('show'); composerPreviewContent.innerHTML = '';
+            composerImageInput.value = composerVideoInput.value = '';
+            renderFeed(); showToast('✅ 发布成功！');
         });
 
-        // Render feed
+        // 渲染 feed
         async function renderFeed() {
-            // 保存本地新增的帖子（尚未被 Supabase 同步的）
-            const localIds = new Set(communityPosts.map(p => p.id));
             const supabasePosts = await loadPosts();
             const supabaseIds = new Set(supabasePosts.map(p => p.id));
-            // 保留本地有但 Supabase 还没有的帖子
-            const localOnly = communityPosts.filter(p => !supabaseIds.has(p.id));
-            communityPosts = [...localOnly, ...supabasePosts];
-            if (!communityPosts.length) {
-                communityFeed.innerHTML = '<div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>';
-                return;
-            }
-            const uid = currentUser ? currentUser.username : 'user';
+            communityPosts = [...communityPosts.filter(p => !supabaseIds.has(p.id)), ...supabasePosts];
+
+            if (!communityPosts.length) { communityFeed.innerHTML = '<div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>'; return; }
+
             communityFeed.innerHTML = communityPosts.map(p => {
-                const isLiked = p.likedBy && p.likedBy.includes(uid);
-                const timeStr = new Date(p.time).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-                const avatarTag = p.avatar
-                    ? `<div class="post-avatar" style="background-image:url(${p.avatar});background-size:cover;"></div>`
-                    : `<div class="post-avatar">${p.name.charAt(0)}</div>`;
-                const mediaTag = p.media
-                    ? (p.mediaType === 'video'
-                        ? `<div class="post-media"><video src="${p.media}" controls></video></div>`
-                        : `<div class="post-media"><img src="${p.media}" alt=""></div>`)
-                    : '';
-                const canDel = p.name === uid;
-                const delBtn = canDel ? `<button class="post-delete" data-postid="${p.id}">删除</button>` : '';
-                const comments = p.comments || [];
-                const isAuthor = p.name === uid;
-                const commentList = comments.map((c, ci) => {
-                    const cImg = c.img ? `<img class="comment-img" src="${c.img}" alt="">` : '';
-                    const delBtn = (isAuthor || c.name === uid)
-                        ? `<button class="comment-delete" data-pid="${p.id}" data-cidx="${ci}">✕</button>`
-                        : '';
-                    return `<div class="comment-item"><span class="comment-name">${c.name}:</span><span class="comment-text">${c.text}${cImg}</span>${delBtn}</div>`;
-                }).join('');
-                return `
-                <div class="post-card" data-pid="${p.id}">
+                const liked = currentUserId && p.likedBy?.includes(currentUserId);
+                const isMine = p.name === currentUser?.username;
+                const timeStr = new Date(p.time).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                return `<div class="post-card">
                     <div class="post-header">
-                        ${avatarTag}
+                        ${p.avatar ? `<div class="post-avatar" style="background-image:url(${p.avatar});background-size:cover;"></div>` : `<div class="post-avatar">${(p.name||'?')[0]}</div>`}
                         <div class="post-meta"><div class="post-name">${p.name}</div><div class="post-time">${timeStr}</div></div>
-                        ${p.name !== uid ? `<button class="post-follow-btn" data-follow="${p.name}">${isFollowing(p.name) ? '已关注' : '+关注'}</button>` : ''}
+                        ${!isMine ? `<button class="post-follow-btn" data-follow="${p.name}">+关注</button>` : ''}
+                        ${isMine ? `<button class="post-delete" data-postid="${p.id}">✕</button>` : ''}
                     </div>
-                    ${p.text ? `<div class="post-content">${p.text}</div>` : ''}
-                    ${mediaTag}
+                    <div class="post-content">${p.text||''}</div>
+                    ${p.media ? (p.mediaType==='video' ? `<div class="post-media"><video src="${p.media}" controls></video></div>` : `<div class="post-media"><img src="${p.media}"></div>`) : ''}
                     <div class="post-actions">
-                        <button class="post-like${isLiked?' liked':''}" data-postid="${p.id}">❤ ${p.likes||0}</button>
-                        <button class="post-comment-btn" data-postid="${p.id}">💬 ${comments.length||0}</button>
-                        ${delBtn}
+                        <button class="post-like${liked?' liked':''}" data-postid="${p.id}">❤ ${p.likes||0}</button>
+                        <button class="post-comment-btn" data-postid="${p.id}">💬 评论</button>
                     </div>
                     <div class="comments-section" id="comments-${p.id}">
-                        ${commentList || '<div style="color:var(--text-muted);font-size:0.8rem;">暂无评论</div>'}
-                        <div class="comment-input-row">
-                            <input type="text" class="comment-input" data-postid="${p.id}" placeholder="写下评论..." maxlength="200">
-                            <button class="comment-img-btn" data-postid="${p.id}" title="图片">🖼</button>
-                            <input type="file" class="comment-img-input" data-postid="${p.id}" accept="image/*" style="display:none;">
-                            <button class="comment-submit" data-postid="${p.id}">发送</button>
-                        </div>
+                        ${(p.comments||[]).length ? p.comments.map(c => `<div class="comment-item"><span class="comment-name">${c.name}</span><span class="comment-text">${c.text||''}</span></div>`).join('') : '<div style="color:var(--text-muted);font-size:0.8rem;">暂无评论</div>'}
+                        <div class="comment-input-row"><input type="text" class="comment-input" data-postid="${p.id}" placeholder="写评论..." maxlength="200"><button class="comment-submit" data-postid="${p.id}">发送</button></div>
                     </div>
                 </div>`;
             }).join('');
 
-            // Follow handlers
-            communityFeed.querySelectorAll('.post-follow-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const target = btn.dataset.follow;
-                    const nowFollowing = toggleFollow(target);
-                    btn.textContent = nowFollowing ? '已关注' : '+关注';
-                    if (nowFollowing) showToast('已关注 ' + target);
-                    else showToast('已取消关注 ' + target);
-                });
-            });
-
-            // Like handlers
-            communityFeed.querySelectorAll('.post-like').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    try {
-                        const pid = btn.dataset.postid;
-                        const dbPostId = parseInt(pid.replace('post_', ''));
-                        if (!dbPostId) return;
-                        const post = communityPosts.find(p => p.id === pid);
-                        if (!post) return;
-                        const alreadyLiked = post.likedBy.includes(currentUserId || uid);
-                        if (alreadyLiked) {
-                            const { error: delErr } = await supabase.from('post_likes').delete().eq('post_id', dbPostId).eq('user_id', currentUserId);
-                            if (delErr) { console.warn('Unlike failed:', delErr.message); return; }
-                            post.likes = Math.max(0, (post.likes||1) - 1);
-                            post.likedBy = post.likedBy.filter(id => id !== currentUserId);
-                        } else {
-                            const { error: insErr } = await supabase.from('post_likes').insert({ post_id: dbPostId, user_id: currentUserId });
-                            if (insErr) { console.warn('Like failed:', insErr.message); showToast('点赞失败，请确认post_likes表已创建', true); return; }
-                            post.likes = (post.likes||0) + 1;
-                            post.likedBy.push(currentUserId);
-                        }
-                        await supabase.from('community_posts').update({ likes_count: post.likes }).eq('id', dbPostId);
-                        renderFeed();
-                    } catch(e) { console.warn('Like error:', e.message); }
-                });
-            });
-
+            // Follow
+            communityFeed.querySelectorAll('.post-follow-btn').forEach(b => b.addEventListener('click', async () => {
+                await toggleFollow(b.dataset.follow); renderFeed();
+            }));
+            // Like
+            communityFeed.querySelectorAll('.post-like').forEach(b => b.addEventListener('click', async () => {
+                const dbId = parseInt(b.dataset.postid.replace('post_','')); if (!dbId) return;
+                const post = communityPosts.find(p => p.id === b.dataset.postid); if (!post) return;
+                const liked = post.likedBy?.includes(currentUserId);
+                if (liked) { await supabase.from('post_likes').delete().eq('post_id',dbId).eq('user_id',currentUserId); post.likes=Math.max(0,post.likes-1); post.likedBy=post.likedBy.filter(id=>id!==currentUserId); }
+                else { await supabase.from('post_likes').insert({post_id:dbId,user_id:currentUserId}); post.likes++; post.likedBy=[...(post.likedBy||[]),currentUserId]; }
+                await supabase.from('community_posts').update({likes_count:post.likes}).eq('id',dbId);
+                renderFeed();
+            }));
             // Comment toggle
-            communityFeed.querySelectorAll('.post-comment-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const pid = btn.dataset.postid;
-                    const section = document.getElementById('comments-' + pid);
-                    if (section) section.classList.toggle('open');
-                });
-            });
-
-            // Comment image button
-            communityFeed.querySelectorAll('.comment-img-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const pid = btn.dataset.postid;
-                    const fileInput = communityFeed.querySelector(`.comment-img-input[data-postid="${pid}"]`);
-                    if (fileInput) fileInput.click();
-                });
-            });
-
-            // Comment image input change → store pending image
-            const commentPendingImgs = {};
-            communityFeed.querySelectorAll('.comment-img-input').forEach(inp => {
-                inp.addEventListener('change', () => {
-                    if (!inp.files[0]) return;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        commentPendingImgs[inp.dataset.postid] = reader.result;
-                        showToast('图片已选择，发送评论时附带');
-                    };
-                    reader.readAsDataURL(inp.files[0]);
-                });
-            });
-
-            // Comment submit (with image support)
-            communityFeed.querySelectorAll('.comment-submit').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    try {
-                        if (!currentUserId) return;
-                        const pid = btn.dataset.postid;
-                        const input = communityFeed.querySelector(`.comment-input[data-postid="${pid}"]`);
-                        if (!input) return;
-                        const text = input.value.trim();
-                        const img = commentPendingImgs[pid] || null;
-                        if (!text && !img) return;
-                        const dbPostId = parseInt(pid.replace('post_', ''));
-                        if (!dbPostId) return;
-                        const { error } = await supabase.from('post_comments').insert({
-                            post_id: dbPostId, author_id: currentUserId, text: text, image_url: img || ''
-                        });
-                        if (error) { showToast('评论失败: ' + error.message, true); return; }
-                        delete commentPendingImgs[pid];
-                        renderFeed();
-                    } catch(e) { console.warn('Comment error:', e.message); }
-                });
-            });
-
-            // Comment delete
-            communityFeed.querySelectorAll('.comment-delete').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const cid = btn.dataset.cid;
-                    if (cid) await supabase.from('post_comments').delete().eq('id', cid);
-                    renderFeed();
-                });
-            });
-
-            // Delete post
-            communityFeed.querySelectorAll('.post-delete').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const pid = btn.dataset.postid;
-                    const dbPostId = parseInt(pid.replace('post_', ''));
-                    if (dbPostId) await supabase.from('community_posts').delete().eq('id', dbPostId);
-                    renderFeed();
-                    showToast('已删除');
-                });
-            });
+            communityFeed.querySelectorAll('.post-comment-btn').forEach(b => b.addEventListener('click', () => {
+                document.getElementById('comments-'+b.dataset.postid)?.classList.toggle('open');
+            }));
+            // Comment submit
+            communityFeed.querySelectorAll('.comment-submit').forEach(b => b.addEventListener('click', async () => {
+                const input = communityFeed.querySelector(`.comment-input[data-postid="${b.dataset.postid}"]`);
+                if (!input?.value.trim()||!currentUserId) return;
+                const dbId = parseInt(b.dataset.postid.replace('post_','')); if (!dbId) return;
+                await supabase.from('post_comments').insert({post_id:dbId,author_id:currentUserId,text:input.value.trim()});
+                renderFeed();
+            }));
+            // Delete
+            communityFeed.querySelectorAll('.post-delete').forEach(b => b.addEventListener('click', async () => {
+                const dbId = parseInt(b.dataset.postid.replace('post_','')); if (!dbId) return;
+                await supabase.from('community_posts').delete().eq('id',dbId);
+                communityPosts = communityPosts.filter(p => p.id !== b.dataset.postid);
+                renderFeed(); showToast('已删除');
+            }));
         }
+
+        syncComposerAvatar();
 
         // ========== Following Feed ==========
         const followingOverlay = document.getElementById('followingOverlay');
