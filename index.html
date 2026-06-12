@@ -3077,35 +3077,31 @@ function updateNav(items) {
             document.getElementById('drawerFriendCount').textContent = getFriendCount();
         }
 
-        // Friend search preview
-        document.getElementById('friendSearchInput').addEventListener('input', () => {
+        // Friend search by username or ID code
+        document.getElementById('friendSearchInput').addEventListener('input', async () => {
             const q = document.getElementById('friendSearchInput').value.trim();
             const preview = document.getElementById('friendPreview');
             if (!q) { preview.style.display = 'none'; return; }
-            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
-            // Search by name or code
-            const byCode = Object.entries(accs).find(([, v]) => v.code === q);
-            const foundUser = accs[q] ? q : (byCode ? byCode[0] : null);
-            if (foundUser) {
-                const created = new Date(accs[foundUser].created).toLocaleDateString('zh-CN');
-                const code = accs[foundUser].code || '';
+            const { data } = await supabase.from('profiles').select('*').or(`username.ilike.%${q}%,user_code.ilike.%${q}%`).limit(1);
+            if (data && data.length) {
+                const p = data[0];
+                const { count } = await supabase.from('uploads').select('*', { count: 'exact', head: true }).eq('user_id', p.id);
                 preview.style.display = 'block'; preview.style.color = 'var(--accent)';
-                preview.innerHTML = `👤 <strong>${foundUser}</strong> · ID: ${code} · 注册于 ${created} · 作品 ${modelData.filter(m=>m.author===foundUser).length + uploadedItems.filter(m=>m.author===foundUser).length} 个`;
+                preview.innerHTML = `👤 <strong>${p.username}</strong> · ID: ${p.user_code} · ${new Date(p.created_at).toLocaleDateString('zh-CN')}加入 · ${count||0}作品`;
             } else {
-                preview.style.display = 'block';
-                preview.innerHTML = '❌ 用户不存在';
-                preview.style.color = 'var(--red)';
+                preview.style.display = 'block'; preview.innerHTML = '❌ 用户不存在（可输入用户名或ID码搜索）'; preview.style.color = 'var(--red)';
             }
         });
 
         // Add friend button
-        document.getElementById('btnAddFriend').addEventListener('click', () => {
+        document.getElementById('btnAddFriend').addEventListener('click', async () => {
             const target = document.getElementById('friendSearchInput').value.trim();
-            if (!target) { showToast('请输入用户名', true); return; }
-            // Check if user exists
-            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
-            if (!accs[target]) { showToast('用户不存在', true); return; }
-            if (sendFriendRequest(target)) {
+            if (!target) { showToast('请输入用户名或ID', true); return; }
+            // Search by username or code
+            const { data } = await supabase.from('profiles').select('username').or(`username.eq.${target},user_code.eq.${target}`).limit(1);
+            if (!data || !data.length) { showToast('用户不存在', true); return; }
+            const found = data[0].username;
+            if (await sendFriendRequest(found)) {
                 document.getElementById('friendSearchInput').value = '';
                 refreshFriendUI();
             }
@@ -3992,49 +3988,98 @@ function updateNav(items) {
         searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) renderUserSearchResults(); });
         document.addEventListener('click', e => { if (!e.target.closest('.search-wrapper')) searchUserDropdown.classList.remove('show'); });
 
-        function renderUserSearchResults() {
+        async function renderUserSearchResults() {
             const q = searchQ.toLowerCase().trim();
             searchUserDropdown.innerHTML = '';
             if (!q) { searchUserDropdown.classList.remove('show'); return; }
-            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
-            const matches = Object.keys(accs).filter(u => u.toLowerCase().includes(q) || (accs[u].code && accs[u].code.includes(q))).slice(0, 5);
-            if (!matches.length) { searchUserDropdown.classList.remove('show'); return; }
 
-            searchUserDropdown.innerHTML = matches.map(u => {
-                const works = modelData.filter(m => m.author === u).length + uploadedItems.filter(m => m.author === u).length;
-                const info = getUserInfoCard ? getUserInfoCard(u) : { works, created: accs[u] ? new Date(accs[u].created).toLocaleDateString('zh-CN') : '' };
-                const following = typeof isFollowing === 'function' ? isFollowing(u) : false;
-                return `<div class="search-user-card" data-username="${u}">
-                    <div class="search-user-avatar">${u.charAt(0)}</div>
+            // 搜索 Supabase profiles: 用户名或用户码匹配
+            const { data: matches } = await supabase.from('profiles')
+                .select('*').or(`username.ilike.%${q}%,user_code.ilike.%${q}%`).limit(6);
+            if (!matches || !matches.length) { searchUserDropdown.classList.remove('show'); return; }
+
+            const results = [];
+            for (const u of matches) {
+                const { count: works } = await supabase.from('uploads').select('*', { count: 'exact', head: true }).eq('user_id', u.id);
+                const isF = await isFollowing(u.username);
+                const created = u.created_at ? new Date(u.created_at).toLocaleDateString('zh-CN') : '';
+                results.push({ ...u, works: works || 0, isF, created });
+            }
+
+            searchUserDropdown.innerHTML = results.map(r => {
+                const avatar = r.avatar_url ? `<div class="search-user-avatar" style="background-image:url(${r.avatar_url});background-size:cover;"></div>` : `<div class="search-user-avatar">${(r.username||'?')[0]}</div>`;
+                return `<div class="search-user-card" data-username="${r.username}" data-uid="${r.id}">
+                    ${avatar}
                     <div class="search-user-info">
-                        <div class="search-user-name">${u}</div>
-                        <div class="search-user-stats">ID: ${accs[u]?.code||'---'} · 作品 ${info.works}</div>
+                        <div class="search-user-name">${r.username}</div>
+                        <div class="search-user-stats">ID: ${r.user_code||'---'} · 作品 ${r.works} · ${r.created}</div>
                     </div>
-                    <button class="search-user-follow" data-follow="${u}">${following ? '已关注' : '+关注'}</button>
+                    <button class="search-user-follow" data-follow="${r.username}">${r.isF ? '已关注' : '+关注'}</button>
                 </div>`;
             }).join('');
             searchUserDropdown.classList.add('show');
 
             // Follow buttons
             searchUserDropdown.querySelectorAll('.search-user-follow').forEach(b => {
-                b.addEventListener('click', e => {
+                b.addEventListener('click', async e => {
                     e.stopPropagation();
-                    const target = b.dataset.follow;
-                    if (typeof toggleFollow === 'function') {
-                        const nowFollowing = toggleFollow(target);
-                        b.textContent = nowFollowing ? '已关注' : '+关注';
-                    }
+                    await toggleFollow(b.dataset.follow);
+                    b.textContent = await isFollowing(b.dataset.follow) ? '已关注' : '+关注';
                 });
             });
-            // Click card → show toast with user info
+            // Click card → show user card
             searchUserDropdown.querySelectorAll('.search-user-card').forEach(card => {
-                card.addEventListener('click', () => {
+                card.addEventListener('click', async () => {
                     const u = card.dataset.username;
                     searchUserDropdown.classList.remove('show');
-                    searchInput.value = u;
-                    searchQ = u;
-                    renderGallery();
+                    // Show user info card
+                    const info = await getUserInfoCard(u);
+                    const isF = await isFollowing(u);
+                    const { data: profile } = await supabase.from('profiles').select('*').eq('username', u).single();
+                    const avatar = profile?.avatar_url || '';
+                    const avatarHtml = avatar ? `<div style="width:60px;height:60px;border-radius:50%;background-image:url(${avatar});background-size:cover;margin:0 auto 10px;border:3px solid var(--accent);"></div>` : `<div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;margin:0 auto 10px;">${u[0]}</div>`;
+                    showUserCard({
+                        username: u, avatarHtml, userId: profile?.id,
+                        code: profile?.user_code || '', works: info.works, created: info.created,
+                        isFollowing: isF, bio: profile?.bio || ''
+                    });
                 });
+            });
+        }
+
+        // 用户名片弹窗
+        function showUserCard(user) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;text-align:center;max-width:360px;width:90%;">
+                ${user.avatarHtml}
+                <h3 style="margin-bottom:2px;">${user.username}</h3>
+                <div style="font-size:0.75rem;color:var(--text-muted);">ID: ${user.code} · ${user.created}加入</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0;">${user.bio||'这个人很懒，什么也没写'}</div>
+                <div style="font-size:0.8rem;margin:8px 0;">作品 <strong style="color:var(--accent);">${user.works}</strong> 个</div>
+                <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+                    <button id="ucFollowBtn" style="background:${user.isFollowing?'var(--bg)':'var(--accent)'};color:${user.isFollowing?'var(--text)':'#fff'};border:1px solid var(--border);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.8rem;font-weight:600;">${user.isFollowing?'已关注':'+ 关注'}</button>
+                    <button id="ucMsgBtn" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.8rem;">✉ 私信</button>
+                    <button id="ucFriendBtn" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.8rem;">👥 加好友</button>
+                </div>
+                <button id="ucCloseBtn" style="margin-top:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;">关闭</button>
+            </div>`;
+            document.body.appendChild(overlay);
+
+            overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+            document.getElementById('ucCloseBtn').addEventListener('click', () => overlay.remove());
+            document.getElementById('ucFollowBtn').addEventListener('click', async () => {
+                await toggleFollow(user.username);
+                const isF = await isFollowing(user.username);
+                const btn = document.getElementById('ucFollowBtn');
+                btn.textContent = isF ? '已关注' : '+ 关注';
+                btn.style.background = isF ? 'var(--bg)' : 'var(--accent)';
+                btn.style.color = isF ? 'var(--text)' : '#fff';
+            });
+            document.getElementById('ucMsgBtn').addEventListener('click', () => { overlay.remove(); openChatWith(user.username); });
+            document.getElementById('ucFriendBtn').addEventListener('click', async () => {
+                await sendFriendRequest(user.username);
+                overlay.remove();
             });
         }
 
