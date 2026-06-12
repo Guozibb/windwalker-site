@@ -4001,7 +4001,7 @@ function updateNav(items) {
         });
 
         // Submit upload
-        btnSubmitUpload.addEventListener('click', () => {
+        btnSubmitUpload.addEventListener('click', async () => {
             if (!pendingFile || !uploadTitle.value.trim()) {
                 showToast('请选择文件并填写标题', true);
                 return;
