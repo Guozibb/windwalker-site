@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>风之旅人 · 登录</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #06080d;
+            --surface: #0c0f16;
+            --border: #1e2636;
+            --text: #e2e8f0;
+            --text-muted: #7c8aa0;
+            --accent: #38bdf8;
+            --accent2: #818cf8;
+            --accent-glow: rgba(56,189,248,0.2);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Ambient glow */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 50% 100%, rgba(129,140,248,0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* Canvas particles */
+        #particleCanvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ========== Phone Mockup ========== */
+        .phone-frame {
+            position: relative;
+            z-index: 1;
+            width: 380px;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            border-radius: 32px;
+            padding: 40px 28px 32px;
+            box-shadow:
+                0 0 0 6px #0a0d14,
+                0 0 0 8px var(--border),
+                0 20px 60px rgba(0,0,0,0.6);
+            animation: phoneUp 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            opacity: 0;
+            transform: translateY(40px);
+        }
+
+        @keyframes phoneUp {
+            0% { opacity: 0; transform: translateY(40px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Notch */
+        .phone-notch {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 24px;
+            background: #0a0d14;
+            border-radius: 0 0 16px 16px;
+        }
+
+        /* Status bar */
+        .phone-status {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 24px;
+            padding: 0 4px;
+        }
+
+        .btn-music-mini {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+            margin-left: 8px;
+        }
+        .btn-music-mini:hover { background: rgba(255,255,255,0.12); color: var(--accent); }
+        .btn-music-mini.muted { opacity: 0.4; }
+
+        /* ========== Splash inside phone ========== */
+        .phone-splash {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 0;
+            transition: opacity 0.5s ease, max-height 0.6s ease;
+            overflow: hidden;
+            max-height: 140px;
+        }
+
+        .phone-splash.hidden {
+            opacity: 0;
+            max-height: 0;
+            margin: 0;
+            padding: 0;
+            pointer-events: none;
+        }
+
+        .splash-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #0c1622, #162032);
+            border: 2px solid rgba(56,189,248,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            animation: logoPop 0.5s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            opacity: 0;
+            transform: scale(0);
+        }
+
+        @keyframes logoPop {
+            0% { opacity: 0; transform: scale(0) rotate(-20deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+
+        .splash-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-top: 12px;
+            letter-spacing: 1px;
+            animation: fadeUp 0.5s 0.35s ease forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        .splash-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            letter-spacing: 2px;
+            animation: fadeUp 0.5s 0.5s ease forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== Login Form ========== */
+        .login-section {
+            transition: opacity 0.5s ease 0.3s;
+        }
+
+        .login-section.waiting {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .login-header h2 {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        .login-header p {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Tab switch: password / SMS */
+        .login-tabs {
+            display: flex;
+            background: var(--bg);
+            border-radius: 10px;
+            padding: 3px;
+            margin-bottom: 20px;
+            gap: 2px;
+        }
+
+        .login-tab {
+            flex: 1;
+            text-align: center;
+            padding: 9px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: 0.3s;
+            border: none;
+            background: transparent;
+        }
+
+        .login-tab.active {
+            background: var(--surface);
+            color: var(--text);
+            font-weight: 600;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Phone input */
+        .phone-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .country-code {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 13px 12px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: 0.3s;
+            flex-shrink: 0;
+        }
+
+        .country-code:hover {
+            border-color: rgba(56,189,248,0.4);
+        }
+
+        .input-group {
+            flex: 1;
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 13px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.06);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255,255,255,0.18);
+        }
+
+        /* Code row */
+        .code-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-code {
+            flex-shrink: 0;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 13px 16px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            white-space: nowrap;
+        }
+
+        .btn-code:hover {
+            background: rgba(56,189,248,0.1);
+        }
+
+        .btn-code.counting {
+            border-color: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Login button */
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            letter-spacing: 1px;
+            margin-top: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px var(--accent-glow);
+        }
+
+        .btn-login:active {
+            transform: scale(0.98);
+        }
+
+        /* Agreement */
+        .agreement {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .agreement a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+        }
+
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* Social */
+        .social-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .social-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: 0.3s;
+        }
+
+        .social-btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(56,189,248,0.4);
+            transform: translateY(-2px);
+        }
+
+        /* ========== Toast ========== */
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(120px);
+            padding: 10px 22px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            z-index: 100;
+            opacity: 0;
+            transition: all 0.4s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.ok { background: #34d399; color: #000; }
+        .toast.err { background: #f87171; color: #fff; }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 440px) {
+            .phone-frame {
+                width: calc(100vw - 32px);
+                border-radius: 24px;
+                padding: 32px 20px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- ========== Phone Frame ========== -->
+    <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-status">
+            <span>9:41</span>
+            <span>📶 <button class="btn-music-mini" id="btnMusicMini" title="音乐">🔊</button> 🔋</span>
+        </div>
+
+        <!-- Splash -->
+        <div class="phone-splash" id="phoneSplash">
+            <div class="splash-logo">🔷</div>
+            <div class="splash-title">风之旅人</div>
+            <div class="splash-sub">3D MODEL HUB</div>
+        </div>
+
+        <!-- Login -->
+        <div class="login-section waiting" id="loginSection">
+            <div class="login-header">
+                <h2>欢迎回来</h2>
+                <p>登录你的模型资源库</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="login-tabs">
+                <button class="login-tab active" data-mode="password">账号登录</button>
+                <button class="login-tab" data-mode="register">注册账号</button>
+            </div>
+
+            <form id="loginForm" novalidate>
+                <!-- Username -->
+                <div class="input-group" style="margin-bottom:12px;">
+                    <input type="text" id="phoneInput" placeholder="请输入用户名" required>
+                </div>
+
+                <!-- Password mode -->
+                <div id="passwordMode">
+                    <div class="input-group">
+                        <input type="password" id="passwordInput" placeholder="请输入密码" required>
+                    </div>
+                </div>
+
+                <!-- SMS mode -->
+                <div id="registerMode" style="display:none;">
+                    <div class="input-group" style="margin-bottom:12px;">
+                        <input type="text" id="regUsername" placeholder="设置用户名 (3-16位)" maxlength="16">
+                    </div>
+                    <div class="input-group" style="margin-bottom:12px;">
+                        <input type="password" id="regPassword" placeholder="设置密码 (6-20位)" maxlength="20">
+                    </div>
+                    <div class="input-group" style="margin-bottom:12px;">
+                        <input type="password" id="regPassword2" placeholder="确认密码">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="btnSubmitMain">登 录</button>
+            </form>
+
+            <div class="agreement">
+                登录即表示同意 <a href="#">用户协议</a> 和 <a href="#">隐私政策</a>
+            </div>
+
+            <div class="divider">其他方式登录</div>
+
+            <div class="social-row">
+                <button class="social-btn">💬</button>
+                <button class="social-btn">🐧</button>
+                <button class="social-btn">📢</button>
+                <button class="social-btn">🍎</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    (function() {
+        // ========== Particle Canvas ==========
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let W, H;
+
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const pts = [];
+        const N = 70;
+        for (let i = 0; i < N; i++) {
+            pts.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                r: Math.random() * 2 + 0.5,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+            });
+        }
+
+        function drawPts() {
+            ctx.clearRect(0, 0, W, H);
+            pts.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = W;
+                if (p.x > W) p.x = 0;
+                if (p.y < 0) p.y = H;
+                if (p.y > H) p.y = 0;
+
+                // Connect nearby
+                pts.forEach(q => {
+                    const dx = p.x - q.x, dy = p.y - q.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < 100) {
+                        ctx.strokeStyle = `rgba(56,189,248,${0.06 * (1 - dist / 100)})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(q.x, q.y);
+                        ctx.stroke();
+                    }
+                });
+
+                ctx.fillStyle = 'rgba(129,140,248,0.5)';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            requestAnimationFrame(drawPts);
+        }
+        drawPts();
+
+        // ========== Splash → Login ==========
+        const phoneSplash = document.getElementById('phoneSplash');
+        const loginSection = document.getElementById('loginSection');
+
+        setTimeout(() => {
+            phoneSplash.classList.add('hidden');
+            loginSection.classList.remove('waiting');
+        }, 2200);
+
+        // ========== Tab switch ==========
+        const tabs = document.querySelectorAll('.login-tab');
+        const passwordMode = document.getElementById('passwordMode');
+        const registerMode = document.getElementById('registerMode');
+        const passwordInput = document.getElementById('passwordInput');
+        const phoneInput = document.getElementById('phoneInput');
+        const btnSubmitMain = document.getElementById('btnSubmitMain');
+        let loginMode = 'password';
+
+        tabs.forEach(t => {
+            t.addEventListener('click', () => {
+                tabs.forEach(x => x.classList.remove('active'));
+                t.classList.add('active');
+                loginMode = t.dataset.mode;
+                passwordMode.style.display = loginMode === 'password' ? 'block' : 'none';
+                registerMode.style.display = loginMode === 'register' ? 'block' : 'none';
+                btnSubmitMain.textContent = loginMode === 'register' ? '注 册' : '登 录';
+            });
+        });
+
+        // ========== Account store ==========
+        function getAccounts() {
+            try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e) { return {}; }
+        }
+        function saveAccounts(accs) {
+            localStorage.setItem('windwalker_accounts', JSON.stringify(accs));
+        }
+
+        // ========== Submit (login or register) ==========
+        const loginForm = document.getElementById('loginForm');
+        loginForm.addEventListener('submit', e => {
+            e.preventDefault();
+
+            if (loginMode === 'register') {
+                // ---- Register ----
+                const username = document.getElementById('regUsername').value.trim();
+                const pwd = document.getElementById('regPassword').value.trim();
+                const pwd2 = document.getElementById('regPassword2').value.trim();
+
+                if (username.length < 3) { showToast('用户名至少3个字符', 'err'); return; }
+                if (pwd.length < 6) { showToast('密码至少6位', 'err'); return; }
+                if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); return; }
+
+                const accounts = getAccounts();
+                if (accounts[username]) { showToast('用户名已存在', 'err'); return; }
+
+                // Generate unique 6-digit code
+                let code;
+                do { code = String(Math.floor(100000 + Math.random() * 900000)); }
+                while (Object.values(accounts).some(a => a.code === code));
+                accounts[username] = { password: pwd, created: Date.now(), code: code };
+                saveAccounts(accounts);
+
+                // Auto-login — preserve existing profile if same user had one
+                const existProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e) { return {}; } })();
+                localStorage.setItem('windwalker_profile', JSON.stringify({
+                    name: username,
+                    bio: existProfile.name === username ? (existProfile.bio || '') : '',
+                    avatar: existProfile.name === username ? (existProfile.avatar || '') : '',
+                }));
+                localStorage.setItem('windwalker_logged_user', username);
+                showToast('✅ 注册成功，正在跳转...', 'ok');
+                setTimeout(() => {
+                    document.body.style.transition = 'opacity 0.4s ease';
+                    document.body.style.opacity = '0';
+                    setTimeout(() => { window.location.href = 'index.html'; }, 400);
+                }, 600);
+            } else {
+                // ---- Login with username ----
+                const username = phoneInput.value.trim();
+                const pwd = passwordInput.value.trim();
+
+                if (!username) { showToast('请输入用户名', 'err'); return; }
+                if (!pwd) { showToast('请输入密码', 'err'); return; }
+
+                const accounts = getAccounts();
+
+                // Check registered accounts first
+                if (accounts[username]) {
+                    if (accounts[username].password !== pwd) {
+                        showToast('密码错误', 'err'); return;
+                    }
+                    // Preserve existing profile (avatar, bio) if same user
+                    const existProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e) { return {}; } })();
+                    localStorage.setItem('windwalker_profile', JSON.stringify({
+                        name: username,
+                        bio: existProfile.name === username ? (existProfile.bio || '') : '',
+                        avatar: existProfile.name === username ? (existProfile.avatar || '') : '',
+                    }));
+                    localStorage.setItem('windwalker_logged_user', username);
+                } else {
+                    // Demo fallback
+                    if (username === 'admin' && pwd === '123456') {
+                        const existProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e) { return {}; } })();
+                        localStorage.setItem('windwalker_profile', JSON.stringify({
+                            name: 'admin',
+                            bio: existProfile.name === 'admin' ? (existProfile.bio || '') : '',
+                            avatar: existProfile.name === 'admin' ? (existProfile.avatar || '') : '',
+                        }));
+                        localStorage.setItem('windwalker_logged_user', 'admin');
+                    } else {
+                        showToast('账号不存在，请先注册', 'err');
+                        return;
+                    }
+                }
+
+                showToast('✅ 登录成功，正在跳转...', 'ok');
+                setTimeout(() => {
+                    document.body.style.transition = 'opacity 0.4s ease';
+                    document.body.style.opacity = '0';
+                    setTimeout(() => { window.location.href = 'index.html'; }, 400);
+                }, 600);
+            }
+        });
+
+        // ========== Toast ==========
+        function showToast(msg, type) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + (type || 'ok');
+            t.classList.add('show');
+            clearTimeout(t._tid);
+            t._tid = setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        // ========== Pure Music Audio System (Login) ==========
+        const AudioSys = (function() {
+            let ctx = null, musicNodes = null, musicOn = true, musicVolume = 0.015;
+
+            function ensureCtx() {
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+
+            // Soft chime
+            function chime() {
+                try {
+                    const c = ensureCtx(), t = c.currentTime;
+                    const n = [523, 659, 784][Math.floor(Math.random() * 3)];
+                    const o = c.createOscillator(), g = c.createGain();
+                    o.type = 'sine'; o.frequency.value = n;
+                    g.gain.setValueAtTime(0, t);
+                    g.gain.linearRampToValueAtTime(0.05, t + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                    o.connect(g).connect(c.destination);
+                    o.start(t); o.stop(t + 0.35);
+                } catch(e){}
+            }
+
+            // Gentle pure music melody (slower, lower volume for login)
+            const MELODY = [
+                { n: 262, d: 1.2 },{ n: 330, d: 0.8 },{ n: 392, d: 1.0 },{ n: 330, d: 0.6 },
+                { n: 294, d: 0.8 },{ n: 262, d: 1.0 },{ n: 220, d: 0.7 },{ n: 262, d: 1.4 },
+                { n: 330, d: 0.9 },{ n: 294, d: 0.7 },{ n: 262, d: 1.0 },{ n: 196, d: 1.2 },
+            ];
+            let mIdx = 0, mTimer = null;
+
+            function playNote() {
+                if (!musicOn || !musicNodes) return;
+                try {
+                    const c = ensureCtx();
+                    const { n, d } = MELODY[mIdx];
+                    const o = c.createOscillator(), g = c.createGain();
+                    o.type = 'sine'; o.frequency.value = n;
+                    const dur = d * 0.7;
+                    g.gain.setValueAtTime(0, c.currentTime);
+                    g.gain.linearRampToValueAtTime(musicVolume * 3, c.currentTime + 0.08);
+                    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+                    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 800;
+                    o.connect(g).connect(f).connect(c.destination);
+                    o.start(); o.stop(c.currentTime + dur + 0.1);
+                    mIdx = (mIdx + 1) % MELODY.length;
+                    mTimer = setTimeout(playNote, d * 1000);
+                } catch(e){ mTimer = setTimeout(playNote, 800); }
+            }
+
+            function startMusic() {
+                if (musicNodes) return;
+                try {
+                    const c = ensureCtx();
+                    const pad = c.createOscillator(), pg = c.createGain();
+                    pad.type = 'sine'; pad.frequency.value = 55;
+                    pg.gain.value = musicVolume * 1.0;
+                    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 150;
+                    pad.connect(pg).connect(f).connect(c.destination);
+                    pad.start();
+                    musicNodes = { pad, pg, f };
+                    mIdx = 0; playNote();
+                } catch(e){}
+            }
+
+            function stopMusic() {
+                if (mTimer) { clearTimeout(mTimer); mTimer = null; }
+                if (!musicNodes) return;
+                try { Object.values(musicNodes).forEach(n => { try{n.stop?.()}catch(e){} try{n.disconnect?.()}catch(e){} }); } catch(e){}
+                musicNodes = null;
+            }
+
+            function setVolume(v) {
+                musicVolume = Math.max(0.003, Math.min(0.04, v));
+                if (musicNodes) musicNodes.pg.gain.value = musicVolume * 1.0;
+            }
+
+            function toggle() { musicOn = !musicOn; musicOn ? startMusic() : stopMusic(); return musicOn; }
+            function initOnTouch() { if (musicOn) startMusic(); }
+
+            return { chime, toggle, isOn: ()=>musicOn, initOnTouch, setVolume, startMusic, stopMusic };
+        })();
+
+        // Volume slider & toggle
+        const btnMusicMini = document.getElementById('btnMusicMini');
+        let volSliderEl = null;
+
+        btnMusicMini.addEventListener('click', e => {
+            e.stopPropagation();
+            const on = AudioSys.toggle();
+            btnMusicMini.textContent = on ? '🎵' : '🔇';
+            btnMusicMini.classList.toggle('muted', !on);
+        });
+
+        // Long press or right click for volume control
+        btnMusicMini.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            showVolumeSlider();
+        });
+        btnMusicMini.addEventListener('dblclick', e => {
+            e.stopPropagation();
+            showVolumeSlider();
+        });
+
+        function showVolumeSlider() {
+            if (volSliderEl) { volSliderEl.remove(); volSliderEl = null; return; }
+            volSliderEl = document.createElement('input');
+            volSliderEl.type = 'range';
+            volSliderEl.min = '0.3'; volSliderEl.max = '4'; volSliderEl.step = '0.1';
+            volSliderEl.value = '1.5';
+            volSliderEl.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;width:200px;accent-color:#38bdf8;';
+            volSliderEl.addEventListener('input', () => {
+                AudioSys.setVolume(parseFloat(volSliderEl.value) * 0.01);
+            });
+            document.body.appendChild(volSliderEl);
+            setTimeout(() => { if (volSliderEl) { volSliderEl.remove(); volSliderEl = null; } }, 5000);
+        }
+
+        document.addEventListener('click', function once() { AudioSys.initOnTouch(); }, { once: true });
+        document.addEventListener('click', e => {
+            if (e.target.closest('button') && !e.target.closest('#btnMusicMini') && !e.target.closest('input')) AudioSys.chime();
+        });
+
+        // ========== Social ==========
+        document.querySelectorAll('.social-btn').forEach(b => {
+            b.addEventListener('click', () => showToast('第三方登录开发中', 'err'));
+        });
+    })();
+    </script>
+</body>
+</html>

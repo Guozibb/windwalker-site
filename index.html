@@ -1,0 +1,4472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>风之旅人 · 3D模型资源库</title>
+    <style>
+        /* ========== Reset & Variables ========== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #06080d;
+            --surface: #0c0f16;
+            --surface2: #111620;
+            --border: #1e2636;
+            --text: #e2e8f0;
+            --text-muted: #7c8aa0;
+            --accent: #38bdf8;
+            --accent2: #818cf8;
+            --accent-glow: rgba(56,189,248,0.25);
+            --green: #34d399;
+            --orange: #fb923c;
+            --red: #f87171;
+            --radius: 12px;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body.light {
+            --bg: #f1f5f9;
+            --surface: #ffffff;
+            --surface2: #f8fafc;
+            --border: #cbd5e1;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --accent: #0284c7;
+            --accent2: #4f46e5;
+            --accent-glow: rgba(2,132,199,0.15);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.5s ease, color 0.5s ease;
+        }
+
+        body.light .grid-bg { opacity: 0.04; }
+        body.light .header { background: rgba(255,255,255,0.85); }
+        body.light .model-card { background: var(--surface); }
+        body.light .model-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+        body.light .lightbox { background: rgba(255,255,255,0.95); }
+        body.light .lightbox-close,
+        body.light .lb-nav { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #333; }
+        body.light .card-overlay { background: linear-gradient(transparent 45%, rgba(255,255,255,0.9) 100%); }
+        body.light .card-overlay .card-title { color: #1e293b; }
+
+        /* Subtle dot-grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(56,189,248,0.06) 0%, transparent 60%),
+                radial-gradient(circle at 80% 50%, rgba(129,140,248,0.04) 0%, transparent 50%);
+        }
+
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.12;
+            background-image:
+                linear-gradient(rgba(56,189,248,0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56,189,248,0.3) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at 50% 30%, black 30%, transparent 70%);
+        }
+
+        /* ========== Entrance Canvas ========== */
+        #entranceCanvas {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            pointer-events: none;
+            transition: opacity 0.8s ease;
+        }
+
+        #entranceCanvas.hidden {
+            opacity: 0;
+        }
+
+        /* ========== Header ========== */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(6,8,13,0.88);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-inner {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            gap: 16px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text);
+            flex-shrink: 0;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #0c1622, #162032);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            position: relative;
+        }
+
+        .brand-icon::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 10px;
+            padding: 1px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            opacity: 0.6;
+        }
+
+        .brand-text h2 {
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            line-height: 1.2;
+        }
+
+        .brand-text span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-wrapper {
+            position: relative;
+        }
+
+        .search-wrapper input {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 9px 16px 9px 38px;
+            color: var(--text);
+            font-size: 0.88rem;
+            width: 200px;
+            transition: var(--transition);
+        }
+
+        .search-wrapper input:focus {
+            outline: none;
+            border-color: var(--accent);
+            width: 260px;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .search-user-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; margin-top: 4px; display: none;
+            z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            max-height: 280px; overflow-y: auto;
+        }
+        .search-user-dropdown.show { display: block; }
+        .search-user-card {
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            cursor: pointer; transition: var(--transition); border-bottom: 1px solid var(--border);
+        }
+        .search-user-card:hover { background: rgba(128,128,128,0.06); }
+        .search-user-card:last-child { border-bottom: none; }
+        .search-user-avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; color: #fff; flex-shrink: 0;
+        }
+        .search-user-info { flex: 1; min-width: 0; }
+        .search-user-name { font-weight: 700; font-size: 0.88rem; }
+        .search-user-stats { font-size: 0.72rem; color: var(--text-muted); }
+        .search-user-follow {
+            background: var(--accent); color: #fff; border: none;
+            padding: 5px 12px; border-radius: 14px; cursor: pointer;
+            font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+        }
+
+        .search-wrapper .s-icon {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border: none;
+            padding: 9px 20px;
+            border-radius: 22px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 24px var(--accent-glow);
+        }
+
+        .btn-user {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .btn-user:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-music {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+
+        .btn-music:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); color: var(--accent); }
+        .btn-music.muted { opacity: 0.5; }
+
+        .btn-sfx {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; transition: var(--transition); flex-shrink: 0;
+        }
+        .btn-sfx:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); color: var(--accent); }
+        .btn-sfx.muted { opacity: 0.5; }
+
+        .btn-theme {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            flex-shrink: 0;
+        }
+        .btn-theme:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); }
+
+        /* Notification bell */
+        .btn-notify {
+            position: relative;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; transition: var(--transition); flex-shrink: 0;
+        }
+        .btn-notify:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); }
+        .notify-badge {
+            position: absolute; top: -3px; right: -3px;
+            background: #ef4444; color: #fff; font-size: 0.55rem;
+            font-weight: 700; min-width: 16px; height: 16px;
+            border-radius: 8px; display: none;
+            align-items: center; justify-content: center; padding: 0 4px;
+        }
+        .notify-badge.show { display: flex; }
+
+        /* Notify dropdown */
+        .notify-dropdown {
+            position: absolute; top: 50px; right: 0;
+            width: 320px; max-height: 350px; overflow-y: auto;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            display: none; z-index: 500;
+        }
+        .notify-dropdown.show { display: block; }
+        .notify-item {
+            padding: 10px 14px; border-bottom: 1px solid var(--border);
+            font-size: 0.82rem; cursor: pointer; transition: var(--transition);
+        }
+        .notify-item:hover { background: rgba(128,128,128,0.05); }
+        .notify-item.unread { border-left: 3px solid var(--accent); }
+        .notify-time { font-size: 0.68rem; color: var(--text-muted); }
+
+        .btn-community {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            padding: 9px 20px;
+            border-radius: 22px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: var(--transition);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-community:hover { transform: translateY(-1px); box-shadow: 0 4px 24px var(--accent-glow); }
+
+        /* ========== Community Panel ========== */
+        .community-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2500;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+        .community-overlay.open { opacity: 1; pointer-events: auto; }
+
+        .community-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+        .community-header h2 { font-size: 1.15rem; font-weight: 700; }
+        .community-close {
+            background: rgba(128,128,128,0.1);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px; height: 36px;
+            border-radius: 50%; cursor: pointer; font-size: 1rem;
+            transition: var(--transition);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .community-close:hover { background: rgba(128,128,128,0.2); }
+
+        /* Composer */
+        .community-composer {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            flex-shrink: 0;
+        }
+        .composer-row { display: flex; gap: 12px; align-items: flex-start; }
+        .composer-avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; flex-shrink: 0; color: #fff;
+        }
+        .composer-input {
+            flex: 1; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 14px; padding: 10px 14px; color: var(--text);
+            font-size: 0.9rem; font-family: inherit; resize: none;
+            min-height: 42px; max-height: 120px; transition: var(--transition);
+        }
+        .composer-input:focus { outline: none; border-color: var(--accent); }
+        .composer-actions {
+            display: flex; gap: 8px; margin-top: 10px; align-items: center;
+        }
+        .composer-btn {
+            background: rgba(128,128,128,0.08); border: 1px solid var(--border);
+            color: var(--text-muted); cursor: pointer; padding: 7px 14px;
+            border-radius: 18px; font-size: 0.8rem; transition: var(--transition);
+            display: flex; align-items: center; gap: 4px;
+        }
+        .composer-btn:hover { background: rgba(128,128,128,0.15); color: var(--accent); }
+        .composer-submit {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff; border: none; padding: 8px 22px; border-radius: 18px;
+            font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-left: auto;
+            transition: var(--transition);
+        }
+        .composer-submit:hover { box-shadow: 0 4px 20px var(--accent-glow); }
+        .composer-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+        .composer-preview { margin-top: 10px; position: relative; display: none; max-width: 300px; }
+        .composer-preview.show { display: inline-block; }
+        .composer-preview img, .composer-preview video {
+            max-width: 300px; max-height: 200px; border-radius: 10px; border: 1px solid var(--border);
+        }
+        .composer-preview-remove {
+            position: absolute; top: 4px; right: 4px;
+            background: rgba(0,0,0,0.7); color: #fff; border: none;
+            width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 0.6rem;
+        }
+
+        /* Feed */
+        .community-feed {
+            flex: 1; overflow-y: auto; padding: 12px 24px 40px;
+        }
+        .post-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; padding: 18px; margin-bottom: 14px;
+            transition: var(--transition);
+        }
+        .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .post-avatar {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; color: #fff; flex-shrink: 0;
+        }
+        .post-meta { flex: 1; }
+        .post-name { font-weight: 700; font-size: 0.9rem; }
+        .post-time { font-size: 0.72rem; color: var(--text-muted); }
+        .post-content { font-size: 0.9rem; line-height: 1.6; margin-bottom: 10px; word-break: break-word; }
+        .post-media { margin-bottom: 10px; }
+        .post-media img, .post-media video {
+            max-width: 100%; max-height: 400px; border-radius: 10px; border: 1px solid var(--border);
+        }
+        .post-actions { display: flex; gap: 16px; align-items: center; }
+        .post-like {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;
+            transition: var(--transition); padding: 5px 10px; border-radius: 14px;
+        }
+        .post-like:hover { background: rgba(239,68,68,0.08); color: #ef4444; }
+        .post-like.liked { color: #ef4444; font-weight: 600; }
+        .post-follow-btn {
+            background: rgba(56,189,248,0.1); border: 1px solid var(--accent);
+            color: var(--accent); cursor: pointer; padding: 3px 10px; border-radius: 12px;
+            font-size: 0.7rem; font-weight: 600; transition: var(--transition); white-space: nowrap;
+        }
+        .post-follow-btn:hover { background: var(--accent); color: #fff; }
+
+        .post-delete {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            font-size: 0.75rem; margin-left: auto; opacity: 0.5; transition: var(--transition);
+        }
+        .post-delete:hover { opacity: 1; color: var(--red); }
+
+        .post-comment-btn {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 0.85rem; padding: 5px 10px; border-radius: 14px;
+            transition: var(--transition); display: flex; align-items: center; gap: 5px;
+        }
+        .post-comment-btn:hover { background: rgba(128,128,128,0.08); color: var(--accent); }
+
+        .comments-section {
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+            display: none;
+        }
+        .comments-section.open { display: block; }
+
+        .comment-item {
+            padding: 6px 0; font-size: 0.84rem; display: flex; gap: 8px; align-items: flex-start;
+        }
+        .comment-name { font-weight: 600; color: var(--accent); white-space: nowrap; }
+        .comment-text { color: var(--text); word-break: break-word; }
+
+        .comment-input-row {
+            display: flex; gap: 6px; margin-top: 8px;
+        }
+        .comment-input-row input {
+            flex: 1; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 14px; color: var(--text); font-size: 0.82rem; font-family: inherit;
+        }
+        .comment-input-row input:focus { outline: none; border-color: var(--accent); }
+        .comment-submit {
+            background: var(--accent); color: #fff; border: none; padding: 7px 14px;
+            border-radius: 14px; cursor: pointer; font-size: 0.8rem; font-weight: 600; white-space: nowrap;
+        }
+
+        /* Chat bubbles */
+        .chat-bubble-row { display: flex; margin: 6px 0; }
+        .chat-bubble-row.me { justify-content: flex-end; }
+        .chat-bubble {
+            max-width: 75%; padding: 8px 12px; border-radius: 16px;
+            font-size: 0.84rem; word-break: break-word; line-height: 1.4;
+        }
+        .chat-bubble-row.me .chat-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+        .chat-bubble-row.other .chat-bubble { background: var(--surface2); color: var(--text); border-bottom-left-radius: 4px; }
+        .chat-bubble-img { max-width: 180px; max-height: 150px; border-radius: 10px; cursor: pointer; }
+        .chat-time { font-size: 0.6rem; color: var(--text-muted); margin: 2px 6px; }
+        .chat-bubble-row.me .chat-time { text-align: right; }
+        .comment-img-btn {
+            background: rgba(128,128,128,0.08); border: 1px solid var(--border);
+            color: var(--text-muted); cursor: pointer; padding: 7px 10px;
+            border-radius: 14px; font-size: 0.8rem; transition: var(--transition);
+        }
+        .comment-img-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .comment-img { max-width: 120px; max-height: 80px; border-radius: 8px; margin-top: 4px; display: block; }
+        .comment-delete {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            font-size: 0.65rem; opacity: 0; margin-left: 4px; transition: var(--transition);
+        }
+        .comment-item:hover .comment-delete { opacity: 0.6; }
+        .comment-item:hover .comment-delete:hover { opacity: 1; color: var(--red); }
+        .community-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+        @media (max-width: 480px) {
+            .composer-btn span.cb-label { display: none; }
+            .community-header { padding: 12px 16px; }
+            .community-composer { padding: 12px 16px; }
+            .community-feed { padding: 10px 16px 30px; }
+        }
+
+        .btn-user.has-avatar {
+            border-color: var(--accent);
+            border-width: 2px;
+        }
+
+        /* ========== User Drawer ========== */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: rgba(0,0,0,0.6);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .drawer-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 380px;
+            max-width: 90vw;
+            z-index: 3001;
+            background: var(--surface);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+            box-shadow: -8px 0 40px rgba(0,0,0,0.5);
+        }
+
+        .drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .drawer-close:hover {
+            background: rgba(255,255,255,0.15);
+            color: var(--text);
+            transform: rotate(90deg);
+        }
+
+        /* Profile header */
+        .drawer-profile {
+            padding: 36px 24px 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .avatar-wrapper {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 14px;
+            cursor: pointer;
+        }
+
+        .avatar-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .avatar-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(56,189,248,0.2), rgba(129,140,248,0.2));
+            border: 3px solid rgba(56,189,248,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            transition: var(--transition);
+        }
+
+        .avatar-edit-badge {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: 2px solid var(--surface);
+            color: #000;
+            font-size: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .avatar-wrapper:hover .avatar-placeholder,
+        .avatar-wrapper:hover .avatar-img {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .avatar-input {
+            display: none;
+        }
+
+        .drawer-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 6px;
+            transition: var(--transition);
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text);
+            text-align: center;
+            font-family: inherit;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .drawer-name:hover {
+            background: rgba(255,255,255,0.04);
+            border-color: var(--border);
+        }
+
+        .drawer-name:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .drawer-bio {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: var(--transition);
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-muted);
+            text-align: center;
+            font-family: inherit;
+            resize: none;
+            display: block;
+            margin: 6px auto 0;
+            width: 80%;
+            min-height: 36px;
+            line-height: 1.4;
+        }
+
+        .drawer-bio:hover {
+            background: rgba(255,255,255,0.04);
+            border-color: var(--border);
+        }
+
+        .drawer-bio:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.06);
+            color: var(--text);
+        }
+
+        .drawer-stats {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 12px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .drawer-stats strong {
+            color: var(--accent);
+        }
+
+        /* Works section */
+        .drawer-works {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 24px;
+        }
+
+        .drawer-tab {
+            flex: 1; text-align: center; padding: 7px 0; border: none;
+            background: transparent; color: var(--text-muted); cursor: pointer;
+            border-radius: 8px; font-size: 0.78rem; font-weight: 500; transition: var(--transition);
+        }
+        .drawer-tab.active { background: var(--surface); color: var(--accent); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+        .drawer-works-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .drawer-works-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .drawer-work-thumb {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .drawer-work-thumb:hover {
+            border-color: var(--accent);
+            transform: scale(1.03);
+        }
+
+        .drawer-work-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .drawer-work-thumb .work-type-icon {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .drawer-work-delete {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            font-size: 0.55rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .drawer-work-thumb:hover .drawer-work-delete {
+            display: flex;
+        }
+
+        .drawer-work-delete:hover {
+            background: var(--red);
+            border-color: var(--red);
+        }
+
+        .drawer-empty {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            padding: 32px 0;
+        }
+
+        /* Logout at bottom */
+        .drawer-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .btn-logout {
+            width: 100%;
+            padding: 11px;
+            background: transparent;
+            border: 1px solid rgba(248,113,113,0.3);
+            color: var(--red);
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-logout:hover {
+            background: rgba(248,113,113,0.1);
+            border-color: var(--red);
+        }
+
+        /* Drawer responsive */
+        @media (max-width: 480px) {
+            .drawer { width: 100vw; max-width: 100vw; }
+            .drawer-works-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+
+        /* ========== Stats Bar ========== */
+        .stats-bar {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .stats-bar strong {
+            color: var(--accent);
+        }
+
+        /* ========== Categories ========== */
+        .categories {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 4px 24px 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .cat-btn {
+            padding: 7px 18px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.84rem;
+            font-weight: 500;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .cat-btn:hover {
+            border-color: rgba(56,189,248,0.5);
+            color: var(--text);
+        }
+
+        .cat-btn.active {
+            background: rgba(56,189,248,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 600;
+            box-shadow: 0 0 12px rgba(56,189,248,0.1);
+        }
+
+        .cat-btn .count {
+            font-size: 0.72rem;
+            opacity: 0.7;
+            margin-left: 3px;
+        }
+
+        /* Type filter toggles */
+        .type-filters {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0 24px 8px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .type-filter-btn {
+            padding: 5px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+        .type-filter-btn:hover { border-color: rgba(56,189,248,0.5); color: var(--text); }
+        .type-filter-btn.active {
+            background: rgba(56,189,248,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Sub-categories */
+        .sub-categories {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0 24px 8px;
+            display: none;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .sub-categories.show { display: flex; }
+
+        .sub-cat-btn {
+            padding: 5px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 500;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+        .sub-cat-btn:hover { border-color: rgba(56,189,248,0.5); color: var(--text); }
+        .sub-cat-btn.active {
+            background: rgba(56,189,248,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-weight: 600;
+        }
+        }
+
+        /* ========== Gallery ========== */
+        .gallery {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 8px 24px 80px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* ========== Card ========== */
+        .model-card {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+            aspect-ratio: 16/11;
+            content-visibility: auto;
+            contain-intrinsic-size: 300px 206px;
+        }
+
+        .model-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+            box-shadow: 0 8px 32px rgba(56,189,248,0.12);
+        }
+
+        .model-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .model-card:hover img {
+            transform: scale(1.04);
+        }
+
+        /* Video card */
+        .model-card.video-card {
+            background: var(--surface2);
+        }
+
+        .video-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text-muted);
+        }
+
+        .video-placeholder .play-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(56,189,248,0.15);
+            border: 2px solid rgba(56,189,248,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            transition: var(--transition);
+        }
+
+        .model-card:hover .play-icon {
+            background: rgba(56,189,248,0.25);
+            border-color: var(--accent);
+            box-shadow: 0 0 30px var(--accent-glow);
+            transform: scale(1.08);
+        }
+
+        .video-placeholder .video-dur {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        /* Card overlay */
+        .card-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(transparent 45%, rgba(0,0,0,0.9) 100%);
+            opacity: 0;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 18px;
+            pointer-events: none;
+        }
+
+        .model-card:hover .card-overlay {
+            opacity: 1;
+        }
+
+        .card-overlay .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-overlay .card-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Card quick actions (like/bookmark on hover) */
+        .card-quick-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            opacity: 0;
+            transform: translateX(8px);
+            transition: var(--transition);
+        }
+        .model-card:hover .card-quick-actions { opacity: 1; transform: translateX(0); }
+
+        .card-quick-btn {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex; align-items: center; justify-content: center;
+            transition: var(--transition);
+        }
+        .card-quick-btn:hover { background: rgba(0,0,0,0.8); transform: scale(1.15); }
+        .card-quick-btn.liked { background: rgba(239,68,68,0.7); border-color: #ef4444; }
+        .card-quick-btn.bookmarked { background: rgba(251,191,36,0.7); border-color: #fbbf24; }
+
+        /* Lightbox social bar */
+        .lightbox-social {
+            display: flex; gap: 8px; align-items: center; justify-content: center;
+            padding: 8px 0;
+        }
+        .lb-social-btn {
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+            color: #fff; cursor: pointer; padding: 6px 14px; border-radius: 16px;
+            font-size: 0.8rem; transition: var(--transition); display: flex; align-items: center; gap: 4px;
+        }
+        .lb-social-btn:hover { background: rgba(255,255,255,0.14); }
+        .lb-social-btn.liked { background: rgba(239,68,68,0.3); border-color: #ef4444; color: #fca5a5; }
+        .lb-social-btn.bookmarked { background: rgba(251,191,36,0.3); border-color: #fbbf24; color: #fde68a; }
+
+        /* Reward modal */
+        .reward-qr {
+            width: 180px; height: 180px; object-fit: contain; border-radius: 10px; margin: 12px auto; display: block;
+        }
+
+        /* Lightbox comments */
+        .lb-comments {
+            max-height: 200px; overflow-y: auto; margin-top: 8px; text-align: left;
+            padding: 0 4px;
+        }
+        .lb-comment-item { font-size: 0.8rem; padding: 4px 0; color: #ccc; }
+        .lb-comment-item strong { color: var(--accent); }
+        .lb-comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
+        .lb-comment-input-row input {
+            flex: 1; padding: 6px 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 14px; color: #fff; font-size: 0.78rem; font-family: inherit;
+        }
+        .lb-comment-input-row input:focus { outline:none; border-color: var(--accent); }
+        .lb-comment-submit {
+            background: var(--accent); color: #000; border: none; padding: 6px 14px; border-radius: 14px;
+            cursor: pointer; font-weight: 600; font-size: 0.78rem;
+        }
+
+        .card-type-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+        }
+
+        .badge-image { background: rgba(52,211,153,0.2); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+        .badge-video { background: rgba(251,146,60,0.2); color: var(--orange); border: 1px solid rgba(251,146,60,0.3); }
+
+        .card-format {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.6);
+            padding: 3px 7px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        /* ========== No Results ========== */
+        .no-results {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .no-results .empty-icon {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+
+        /* ========== Lightbox ========== */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0,0,0,0.94);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .lightbox.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .lightbox-topbar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            z-index: 10;
+        }
+
+        .lightbox-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+        }
+
+        .lightbox-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lb-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lb-btn:hover {
+            background: rgba(255,255,255,0.16);
+            border-color: var(--accent);
+        }
+
+        .lb-btn.download-btn {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .lb-btn.download-btn:hover {
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lightbox-close:hover {
+            background: rgba(255,255,255,0.2);
+            transform: rotate(90deg);
+        }
+
+        .lightbox-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 90vw;
+            max-height: 80vh;
+        }
+
+        .lightbox-content img {
+            max-width: 90vw;
+            max-height: 80vh;
+            object-fit: contain;
+            border-radius: 6px;
+            box-shadow: 0 0 60px rgba(56,189,248,0.1);
+        }
+
+        .lightbox-content video {
+            max-width: 90vw;
+            max-height: 80vh;
+            border-radius: 6px;
+            box-shadow: 0 0 60px rgba(56,189,248,0.1);
+            outline: none;
+        }
+
+        /* Lightbox nav arrows */
+        .lb-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #fff;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            z-index: 10;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lb-nav:hover {
+            background: rgba(255,255,255,0.16);
+            border-color: var(--accent);
+        }
+
+        .lb-prev { left: 20px; }
+        .lb-next { right: 20px; }
+
+        /* ========== Footer ========== */
+        .site-footer {
+            text-align: center;
+            padding: 40px 24px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 2;
+        }
+
+        .site-footer .creator {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .site-footer .divider-dot {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--accent);
+            margin: 0 8px;
+            vertical-align: middle;
+        }
+
+        /* ========== Toast ========== */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(120px);
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px 26px;
+            border-radius: 10px;
+            font-weight: 500;
+            font-size: 0.88rem;
+            z-index: 2000;
+            opacity: 0;
+            transition: all 0.4s ease;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.error { border-color: var(--red); color: var(--red); }
+
+        /* ========== Scrollbar ========== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ========== Douyin Floating Button ========== */
+        .douyin-float {
+            position: fixed;
+            bottom: 28px;
+            right: 24px;
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .douyin-float:hover .douyin-circle {
+            transform: scale(1.08);
+            box-shadow: 0 6px 28px rgba(255,0,80,0.35);
+        }
+
+        .douyin-circle {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff0050, #00f2ea);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            color: #fff;
+            transition: var(--transition);
+            box-shadow: 0 4px 20px rgba(255,0,80,0.25);
+            animation: douyinPulse 2.5s ease-in-out infinite;
+        }
+
+        @keyframes douyinPulse {
+            0%, 100% { box-shadow: 0 4px 20px rgba(255,0,80,0.25); }
+            50% { box-shadow: 0 4px 32px rgba(255,0,80,0.45); }
+        }
+
+        .douyin-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #ff0050;
+            letter-spacing: 0.5px;
+            background: rgba(0,0,0,0.7);
+            padding: 3px 8px;
+            border-radius: 8px;
+        }
+
+        /* Douyin QR Modal */
+        .douyin-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 4000;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .douyin-modal.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .douyin-qr-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            text-align: center;
+            max-width: 360px;
+            width: 90%;
+        }
+
+        .douyin-qr-card img {
+            width: 220px;
+            height: 220px;
+            object-fit: contain;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+
+        .douyin-qr-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .douyin-qr-card p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .douyin-qr-close {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 28px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: var(--transition);
+        }
+
+        .douyin-qr-close:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        /* ========== Animations for cards ========== */
+        .gallery.animate-in .model-card {
+            animation: cardUp 0.45s ease forwards;
+        }
+
+        @keyframes cardUp {
+            0% { opacity: 0; transform: translateY(36px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== Upload Modal ========== */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            width: 90%;
+            max-width: 520px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(20px);
+            transition: transform 0.35s ease;
+        }
+
+        .modal-overlay.open .modal-card {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            background: rgba(255,255,255,0.15);
+            transform: rotate(90deg);
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 14px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(56,189,248,0.06);
+            box-shadow: 0 0 20px rgba(56,189,248,0.08);
+        }
+
+        .drop-zone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .drop-zone p {
+            color: var(--text-muted);
+            font-size: 0.88rem;
+        }
+
+        .drop-zone .browse-link {
+            color: var(--accent);
+            font-weight: 600;
+            text-decoration: underline;
+        }
+
+        .drop-zone input[type="file"] {
+            display: none;
+        }
+
+        /* Upload preview */
+        .upload-preview {
+            display: none;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .upload-preview.show {
+            display: block;
+        }
+
+        .upload-preview img,
+        .upload-preview video {
+            width: 100%;
+            max-height: 280px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .upload-preview .preview-remove {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: var(--transition);
+        }
+
+        .upload-preview .preview-remove:hover {
+            background: var(--red);
+        }
+
+        .preview-fileinfo {
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Upload form */
+        .upload-form .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .upload-form label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text-muted);
+        }
+
+        .upload-form input,
+        .upload-form select {
+            width: 100%;
+            padding: 11px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.88rem;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+
+        .upload-form input:focus,
+        .upload-form select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .upload-form select option {
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .btn-submit-upload {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            letter-spacing: 0.5px;
+        }
+
+        .btn-submit-upload:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px var(--accent-glow);
+        }
+
+        .btn-submit-upload:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Cover image upload for 3D models */
+        .cover-upload-row {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .cover-upload-row.show { display: flex; }
+
+        .cover-upload-btn {
+            padding: 10px 18px;
+            background: rgba(255,255,255,0.04);
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.82rem;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+        .cover-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        .cover-thumb {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--border);
+            display: none;
+        }
+        .cover-thumb.show { display: block; }
+
+        .cover-remove {
+            background: none;
+            border: none;
+            color: var(--red);
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: none;
+        }
+        .cover-remove.show { display: inline; }
+
+        /* Upload modal responsive */
+        @media (max-width: 480px) {
+            .modal-card { padding: 20px; }
+            .upload-form .form-row { grid-template-columns: 1fr; }
+            .drop-zone { padding: 28px 16px; }
+        }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 768px) {
+            .header-inner { height: 56px; }
+            .brand-text h2 { font-size: 1rem; }
+            .brand-text span { font-size: 0.65rem; }
+
+            .search-wrapper input { width: 120px; }
+            .search-wrapper input:focus { width: 160px; }
+
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 12px;
+            }
+
+            .btn-upload { padding: 8px 14px; font-size: 0.78rem; }
+            .btn-upload .ulabel { display: none; }
+
+            .lb-prev { left: 8px; }
+            .lb-next { right: 8px; }
+
+            .lightbox-topbar { padding: 10px 16px; }
+            .lightbox-title { font-size: 0.85rem; }
+            .lb-btn { padding: 6px 14px; font-size: 0.78rem; }
+        }
+
+        @media (max-width: 480px) {
+            .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .cat-btn { padding: 5px 12px; font-size: 0.76rem; }
+            .search-wrapper input { width: 90px; }
+            .search-wrapper input:focus { width: 130px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Grid background -->
+    <div class="grid-bg"></div>
+
+    <!-- Entrance canvas -->
+    <canvas id="entranceCanvas"></canvas>
+
+    <!-- ========== Header ========== -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="#" class="brand">
+                <div class="brand-icon">🔷</div>
+                <div class="brand-text">
+                    <h2>风之旅人</h2>
+                    <span>3D Model Hub</span>
+                </div>
+            </a>
+            <div class="header-actions">
+                <div class="search-wrapper" style="position:relative;">
+                    <span class="s-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="搜索模型或用户...">
+                    <div class="search-user-dropdown" id="searchUserDropdown"></div>
+                </div>
+                <button class="btn-notify" id="btnNotify" title="通知">
+                    🔔<span class="notify-badge" id="notifyBadge">0</span>
+                </button>
+                <button class="btn-music" id="btnMusicToggle" title="音乐开关">🎵</button>
+                <button class="btn-sfx" id="btnSfxToggle" title="音效开关">🔔</button>
+                <button class="btn-theme" id="btnThemeToggle" title="切换主题">🌙</button>
+                <button class="btn-community" id="btnOpenFollowing" style="background:linear-gradient(135deg,#f97316,#ec4899);">👁 关注</button>
+                <button class="btn-community" id="btnOpenCommunity">💬 社区</button>
+                <button class="btn-upload" id="btnOpenUpload">
+                    ⬆ <span class="ulabel">上传</span>
+                </button>
+                <button class="btn-user" id="btnOpenUser" title="个人中心">👤</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="notify-dropdown" id="notifyDropdown"></div>
+
+    <!-- ========== Stats Bar ========== -->
+    <div class="stats-bar" id="statsBar">
+        共 <strong id="statTotal">0</strong> 个资源 ·
+        图片 <strong id="statImages">0</strong> 张 ·
+        视频 <strong id="statVideos">0</strong> 个
+    </div>
+
+    <!-- ========== Categories ========== -->
+    <div class="categories" id="categories"></div>
+    <div class="type-filters" id="typeFilters">
+        <button class="type-filter-btn active" data-type="">全部</button>
+        <button class="type-filter-btn" data-type="image">🖼 图片</button>
+        <button class="type-filter-btn" data-type="video">🎬 视频</button>
+    </div>
+    <div class="sub-categories" id="subCategories"></div>
+
+    <!-- ========== Gallery ========== -->
+    <main class="gallery" id="gallery">
+        <div class="gallery-grid" id="galleryGrid"></div>
+    </main>
+
+    <!-- ========== Lightbox ========== -->
+    <div class="lightbox" id="lightbox">
+        <div class="lightbox-topbar">
+            <span class="lightbox-title" id="lightboxTitle"></span>
+            <div class="lightbox-actions">
+                <button class="lb-btn download-btn" id="lightboxDownload">⬇ 下载</button>
+            </div>
+            <button class="lightbox-close" id="lightboxClose">✕</button>
+        </div>
+        <button class="lb-nav lb-prev" id="lightboxPrev">‹</button>
+        <button class="lb-nav lb-next" id="lightboxNext">›</button>
+        <div class="lightbox-content" id="lightboxContent"></div>
+        <div class="lightbox-social" id="lightboxSocial" style="display:none;">
+            <button class="lb-social-btn" id="lbLikeBtn">❤ 点赞</button>
+            <button class="lb-social-btn" id="lbBookmarkBtn">🔖 收藏</button>
+            <button class="lb-social-btn" id="lbCommentToggle">💬 评论</button>
+        </div>
+        <div class="lb-comments" id="lbComments" style="display:none;"></div>
+        <div class="lb-comment-input-row" id="lbCommentInputRow" style="display:none;max-width:500px;margin:0 auto;">
+            <input type="text" id="lbCommentInput" placeholder="写评论..." maxlength="200">
+            <button class="lb-comment-submit" id="lbCommentSubmit">发送</button>
+        </div>
+    </div>
+
+    <!-- ========== Following Feed Panel ========== -->
+    <div class="community-overlay" id="followingOverlay">
+        <div class="community-header">
+            <h2>👁 关注动态</h2>
+            <button class="community-close" id="followingClose">✕</button>
+        </div>
+        <div class="community-feed" id="followingFeed">
+            <div class="community-empty">你还没有关注任何人<br>去社区或搜索关注创作者吧！</div>
+        </div>
+    </div>
+
+    <!-- ========== Community Panel ========== -->
+    <!-- ========== Horizontal Chat Panel ========== -->
+    <div id="chatPanel" style="position:fixed;bottom:0;right:20px;width:380px;max-width:95vw;z-index:2500;
+        background:var(--surface);border:1px solid var(--border);border-bottom:none;border-radius:16px 16px 0 0;
+        display:none;flex-direction:column;box-shadow:0 -4px 20px rgba(0,0,0,0.4);max-height:450px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;" id="chatPanelHeader">
+            <strong id="chatPanelTitle" style="font-size:0.9rem;">✉ 私信</strong>
+            <div style="display:flex;gap:6px;">
+                <button id="chatPanelBack" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;display:none;">← 列表</button>
+                <button id="chatPanelClose" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;">✕</button>
+            </div>
+        </div>
+        <div id="chatPanelBody" style="flex:1;overflow-y:auto;padding:8px;min-height:200px;max-height:250px;font-size:0.85rem;"></div>
+        <div id="chatPanelPreview" style="display:none;padding:0 8px;"></div>
+        <div style="display:flex;gap:4px;padding:8px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap;">
+            <input type="text" id="chatPanelTarget" placeholder="收件人" style="width:70px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:0.78rem;font-family:inherit;" readonly>
+            <button id="chatPanelImgBtn" style="background:none;border:none;cursor:pointer;font-size:1rem;">🖼</button>
+            <input type="file" id="chatPanelImgInput" accept="image/*" style="display:none;">
+            <input type="text" id="chatPanelInput" placeholder="消息..." style="flex:1;min-width:80px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:0.8rem;font-family:inherit;">
+            <button id="chatPanelSend" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:14px;cursor:pointer;font-weight:600;font-size:0.78rem;">发送</button>
+        </div>
+    </div>
+
+    <div class="community-overlay" id="communityOverlay">
+        <div class="community-header">
+            <h2>💬 社区</h2>
+            <button class="community-close" id="communityClose">✕</button>
+        </div>
+        <div class="community-composer">
+            <div class="composer-row">
+                <div class="composer-avatar" id="composerAvatar">😎</div>
+                <textarea class="composer-input" id="composerInput" placeholder="分享你的想法..." rows="1"></textarea>
+            </div>
+            <div class="composer-preview" id="composerPreview">
+                <button class="composer-preview-remove" id="composerPreviewRemove">✕</button>
+                <div id="composerPreviewContent"></div>
+            </div>
+            <div class="composer-actions">
+                <button class="composer-btn" id="btnComposerImage">🖼 <span class="cb-label">图片</span></button>
+                <button class="composer-btn" id="btnComposerVideo">🎬 <span class="cb-label">视频</span></button>
+                <input type="file" id="composerImageInput" accept="image/*" style="display:none;">
+                <input type="file" id="composerVideoInput" accept="video/*" style="display:none;">
+                <button class="composer-submit" id="composerSubmit" disabled>发布</button>
+            </div>
+        </div>
+        <div class="community-feed" id="communityFeed">
+            <div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>
+        </div>
+    </div>
+
+    <!-- ========== Douyin Floating Button ========== -->
+    <div class="douyin-float" id="douyinFloat" title="作者抖音">
+        <div class="douyin-circle">🎵</div>
+        <span class="douyin-label" id="douyinLabel">抖音: 风之旅人</span>
+    </div>
+
+    <!-- ========== Douyin QR Modal ========== -->
+    <div class="douyin-modal" id="douyinModal">
+        <div class="douyin-qr-card">
+            <img id="douyinQRImg" src="douyin-qr.png" alt="作者抖音二维码"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+            <div style="display:none;width:220px;height:220px;margin:0 auto 16px;background:var(--bg);border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.85rem;">
+                将二维码图片命名为<br>douyin-qr.png 放入文件夹
+            </div>
+            <h3>🎵 作者抖音</h3>
+            <p>扫码关注，查看更多作品动态</p>
+            <button class="douyin-qr-close" id="douyinQRClose">关闭</button>
+        </div>
+    </div>
+
+    <!-- ========== Footer ========== -->
+    <footer class="site-footer">
+        <span class="creator">风之旅人</span>
+        <span class="divider-dot"></span>
+        3D 模型资源库
+        <span class="divider-dot"></span>
+        © 2026
+        <br>
+        <span style="font-size:0.75rem;opacity:0.6;">高质量模型资源 · 持续更新中</span>
+        <br>
+        <span style="cursor:pointer;color:var(--accent);font-size:0.8rem;" id="footerDouyin">🎵 作者抖音</span>
+    </footer>
+
+    <!-- ========== User Drawer ========== -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <div class="drawer" id="userDrawer">
+        <button class="drawer-close" id="drawerClose">✕</button>
+
+        <!-- Profile -->
+        <div class="drawer-profile">
+            <div class="avatar-wrapper" id="avatarWrapper" title="点击更换头像">
+                <div class="avatar-placeholder" id="avatarPlaceholder">😎</div>
+                <img class="avatar-img" id="avatarImg" src="" alt="" style="display:none;">
+                <span class="avatar-edit-badge">✎</span>
+                <input type="file" class="avatar-input" id="avatarInput" accept="image/*">
+            </div>
+            <input class="drawer-name" id="drawerName" value="风之旅人" maxlength="20" placeholder="你的昵称">
+            <textarea class="drawer-bio" id="drawerBio" placeholder="写一句个人简介..." maxlength="80" rows="1">3D 模型创作者</textarea>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">ID: <strong id="drawerUserCode">------</strong></div>
+            <div class="drawer-stats" style="gap:16px;flex-wrap:wrap;justify-content:center;">
+                <span class="drawer-stat-click" data-show="following" style="cursor:pointer;">关注 <strong id="drawerFollowing">0</strong></span>
+                <span class="drawer-stat-click" data-show="followers" style="cursor:pointer;">粉丝 <strong id="drawerFollowers">0</strong></span>
+                <span class="drawer-stat-click" data-show="friends" style="cursor:pointer;">好友 <strong id="drawerFriendCount">0</strong></span>
+                <span>作品 <strong id="drawerWorkCount">0</strong></span>
+                <span>上传 <strong id="drawerUploadCount">0</strong></span>
+            </div>
+            <div id="drawerSocialDetail" style="display:none;font-size:0.78rem;padding:4px 0;max-height:120px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- Works -->
+        <div class="drawer-works">
+            <div style="display:flex;gap:2px;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:10px;">
+                <button class="drawer-tab active" data-dtab="works">📁 我的作品</button>
+                <button class="drawer-tab" data-dtab="likes">❤ 点赞</button>
+                <button class="drawer-tab" data-dtab="bookmarks">🔖 收藏</button>
+            </div>
+            <div class="drawer-works-grid" id="drawerWorksGrid">
+                <div class="drawer-empty">暂无作品<br>点击 ⬆ 上传 添加</div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="drawer-friends" style="border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="drawer-works-title" style="margin:0;">✉ 私信</span>
+                <button class="comment-submit" id="btnOpenMessages" style="font-size:0.7rem;padding:4px 10px;">查看</button>
+            </div>
+            <div id="msgUnread" style="font-size:0.72rem;color:var(--accent);"></div>
+        </div>
+
+        <!-- Add Friend -->
+        <div class="drawer-friends" id="drawerFriends">
+            <div style="display:flex;gap:6px;">
+                <input type="text" id="friendSearchInput" placeholder="输入用户名添加好友..." style="flex:1;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:0.78rem;font-family:inherit;">
+                <button class="comment-submit" id="btnAddFriend" style="font-size:0.75rem;">➕ 添加</button>
+            </div>
+            <div id="friendPreview" style="font-size:0.78rem;color:var(--accent);margin:4px 0;display:none;"></div>
+        </div>
+
+        <!-- Logout -->
+        <div class="drawer-footer">
+            <button class="btn-logout" id="btnLogout">🚪 退出登录</button>
+        </div>
+    </div>
+
+    <!-- ========== Upload Modal ========== -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>⬆ 上传资源</h3>
+                <button class="modal-close" id="modalClose">✕</button>
+            </div>
+
+            <!-- Drop zone -->
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">📁</div>
+                <p>拖拽文件到此处，或 <span class="browse-link">点击浏览</span></p>
+                <p style="font-size:0.72rem;margin-top:4px;">支持 JPG / PNG / MP4 / GLB / FBX</p>
+                <input type="file" id="fileInput" accept="image/*,video/*,.glb,.fbx,.obj,.gltf">
+            </div>
+
+            <!-- Preview -->
+            <div class="upload-preview" id="uploadPreview">
+                <button class="preview-remove" id="previewRemove">✕</button>
+                <div id="previewContent"></div>
+                <div class="preview-fileinfo">
+                    <span id="previewName"></span>
+                    <span id="previewSize"></span>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <div class="upload-form">
+                <div class="form-row">
+                    <div>
+                        <label>标题 *</label>
+                        <input type="text" id="uploadTitle" placeholder="为你的作品命名...">
+                    </div>
+                    <div>
+                        <label>分类</label>
+                        <select id="uploadCategory"></select>
+                    </div>
+                </div>
+                <div class="form-row" id="uploadSubCatRow" style="display:none;">
+                    <div>
+                        <label>子分类</label>
+                        <select id="uploadSubCategory"></select>
+                    </div>
+                </div>
+                <!-- Cover image for 3D models -->
+                <div class="cover-upload-row" id="coverUploadRow">
+                    <button type="button" class="cover-upload-btn" id="btnCoverUpload">🖼 选择封面图</button>
+                    <img class="cover-thumb" id="coverThumb" src="" alt="">
+                    <button type="button" class="cover-remove" id="coverRemove">✕ 移除</button>
+                    <input type="file" id="coverInput" accept="image/*" style="display:none;">
+                </div>
+                <button class="btn-submit-upload" id="btnSubmitUpload" disabled>
+                    确认上传到画廊
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Toast ========== -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+    (function() {
+        // ============================================================
+        //  📦 资源数据 — 所有文件默认归入「作者作品」
+        //  拖入新文件后可在数组中添加条目，或使用页面上传功能
+        // ============================================================
+        const modelData = [
+            // ======== 3D模型 — 人物 ========
+            { file: "11b1f0934f6411a6a900968d9eb7e5d1.png", type: "image", cat: "3D模型", subCat: "人物", title: "角色模型 01" },
+            { file: "1c7581fd597696e2d22a8be3b841db23.png", type: "image", cat: "3D模型", subCat: "人物", title: "角色模型 02" },
+            { file: "3236882f9afea685bfa12ea409e35b42.png", type: "image", cat: "3D模型", subCat: "人物", title: "角色模型 03" },
+            { file: "33e3836a5377a5fb7dc090e8e75dbbb6.png", type: "image", cat: "3D模型", subCat: "人物", title: "角色模型 04" },
+            // ======== 3D模型 — 场景 ========
+            { file: "39a32cebd13fe01bef6ea71d0108b201.png", type: "image", cat: "3D模型", subCat: "场景", title: "场景模型 01" },
+            { file: "6b88850ec2d131d87ea08fbc3278aaff.png", type: "image", cat: "3D模型", subCat: "场景", title: "场景模型 02" },
+            // ======== 3D模型 — 汽车 ========
+            { file: "9bceb61c1feb5ab8835f85a96ecb6a94.png", type: "image", cat: "3D模型", subCat: "汽车", title: "载具模型 01" },
+            { file: "9bdce1922faf135de9f42f43f6801085.png", type: "image", cat: "3D模型", subCat: "汽车", title: "载具模型 02" },
+            // ======== 3D模型 — 建筑 ========
+            { file: "aa25c7b82a76e401b9329bb4acad8a03.png", type: "image", cat: "3D模型", subCat: "建筑", title: "建筑模型 01" },
+            { file: "cb5f2b6482f1bda0c2c786cfb14ccb9a.png", type: "image", cat: "3D模型", subCat: "建筑", title: "建筑模型 02" },
+            // ======== 3D模型 — 游戏素材 ========
+            { file: "de1fdff896e1bb71884769c28b9dfcfb.png", type: "image", cat: "3D模型", subCat: "游戏素材", title: "游戏素材 01" },
+            { file: "8076e51aa7c29ab6a8a5e44ed45721dc.png", type: "image", cat: "3D模型", subCat: "游戏素材", title: "游戏素材 02" },
+            // ======== 3D模型 — 视频 ========
+            { file: "33ea4677255dc34cda1604eb32c008f5_raw.mp4", type: "video", cat: "3D模型", subCat: "人物", title: "角色动画预览 01" },
+            { file: "b4b52e12fd2c3a3cdc54697412a85b8d_raw.mp4", type: "video", cat: "3D模型", subCat: "人物", title: "角色动画预览 02" },
+            { file: "ca190fed84a363048cfe469a48f11a05_raw.mp4", type: "video", cat: "3D模型", subCat: "场景", title: "场景漫游预览" },
+            // ======== 灵感相册 ========
+            { file: "c69a3d92c57f26f51ee39517a782b3e5.png", type: "image", cat: "灵感相册", title: "灵感参考 01" },
+            { file: "ee8797bdd9a0b86d56e7f263616dd550.png", type: "image", cat: "灵感相册", title: "灵感参考 02" },
+            { file: "face80389bc00e495648859b46b9aa7e.png", type: "image", cat: "灵感相册", title: "灵感参考 03" },
+            // ======== 贴图 ========
+            { file: "2e889ef86bf246d8ab479842400bf294.jpg", type: "image", cat: "贴图", title: "材质贴图 01" },
+            { file: "7dbbc228f02eac0b0388fc468741d65e.jpg", type: "image", cat: "贴图", title: "材质贴图 02" },
+            { file: "e6ae0978d10e6c6cf99927a39244c5cc.png", type: "image", cat: "贴图", title: "材质贴图 03" },
+            { file: "3eeb38378e22d2e2b06d24ebc1a6229a.png", type: "image", cat: "贴图", title: "材质贴图 04" },
+        ];
+
+        // Assign unique IDs
+        modelData.forEach((m, i) => { m.id = i; });
+
+        // ========== Build category list (全部 4 个分类，空分类也显示) ==========
+        const ALL_CATEGORIES = ['3D模型', '灵感相册', '作者作品', '贴图', 'UE5专区'];
+        const SUB_CATEGORIES_3D = ['人物', '建筑', '场景', '小模型', '工业', '汽车', '家具', '游戏素材'];
+        const CATEGORIES = ['全部', ...ALL_CATEGORIES];
+
+        // ========== State ==========
+        let activeCat = '全部';
+        let activeSubCat = '';
+        let typeFilter = ''; // '' | 'image' | 'video'
+        let searchQ = '';
+        let lightboxIdx = -1;
+
+        // ========== DOM ==========
+        const galleryGrid = document.getElementById('galleryGrid');
+        const categoriesEl = document.getElementById('categories');
+        const searchInput = document.getElementById('searchInput');
+        const gallery = document.getElementById('gallery');
+        const statsBar = document.getElementById('statsBar');
+        const statTotal = document.getElementById('statTotal');
+        const statImages = document.getElementById('statImages');
+        const statVideos = document.getElementById('statVideos');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxContent = document.getElementById('lightboxContent');
+        const lightboxTitle = document.getElementById('lightboxTitle');
+        const lightboxClose = document.getElementById('lightboxClose');
+        const lightboxPrev = document.getElementById('lightboxPrev');
+        const lightboxNext = document.getElementById('lightboxNext');
+        const lightboxDownload = document.getElementById('lightboxDownload');
+        const toast = document.getElementById('toast');
+        const entranceCanvas = document.getElementById('entranceCanvas');
+        const ctx = entranceCanvas.getContext('2d');
+
+        // ========== Filter ==========
+        function allItems() { return [...modelData, ...uploadedItems]; }
+
+        function filtered() {
+            return allItems().filter(m => {
+                const matchCat = activeCat === '全部' || m.cat === activeCat;
+                const matchType = !typeFilter || m.type === typeFilter;
+                const matchSub = !activeSubCat || (m.subCat === activeSubCat);
+                const q = searchQ.toLowerCase().trim();
+                const matchSearch = !q || m.title.toLowerCase().includes(q) || m.cat.toLowerCase().includes(q) || (m.file||'').toLowerCase().includes(q) || (m.author||'').toLowerCase().includes(q);
+                return matchCat && matchType && matchSub && matchSearch;
+            });
+        }
+
+        // ========== Update stats ==========
+        function updateStats() {
+            const f = filtered();
+            statTotal.textContent = f.length;
+            statImages.textContent = f.filter(m => m.type === 'image').length;
+            statVideos.textContent = f.filter(m => m.type === 'video' || m.type === 'model').length;
+        }
+
+        // ========== Render categories ==========
+        const subCategoriesEl = document.getElementById('subCategories');
+
+        function renderCategories() {
+            const all = allItems();
+            categoriesEl.innerHTML = CATEGORIES.map(c => {
+                const count = c === '全部' ? all.length : all.filter(m => m.cat === c).length;
+                const active = activeCat === c ? ' active' : '';
+                return `<button class="cat-btn${active}" data-cat="${c}">${c}<span class="count">(${count})</span></button>`;
+            }).join('');
+
+            categoriesEl.querySelectorAll('.cat-btn').forEach(b => {
+                b.addEventListener('click', () => {
+                    activeCat = b.dataset.cat;
+                    activeSubCat = '';
+                    renderCategories();
+                    renderSubCategories();
+                    renderGallery();
+                    updateStats();
+                });
+            });
+
+            // Type filter buttons
+            document.querySelectorAll('.type-filter-btn').forEach(b => {
+                b.addEventListener('click', () => {
+                    typeFilter = b.dataset.type;
+                    document.querySelectorAll('.type-filter-btn').forEach(x => x.classList.remove('active'));
+                    b.classList.add('active');
+                    renderGallery();
+                    updateStats();
+                });
+            });
+
+            renderSubCategories();
+        }
+
+        function renderSubCategories() {
+            if (activeCat === '3D模型') {
+                const all = allItems().filter(m => m.cat === '3D模型');
+                subCategoriesEl.innerHTML = SUB_CATEGORIES_3D.map(s => {
+                    const cnt = all.filter(m => m.subCat === s).length;
+                    const act = activeSubCat === s ? ' active' : '';
+                    return `<button class="sub-cat-btn${act}" data-sub="${s}">${s}<span class="count">(${cnt})</span></button>`;
+                }).join('');
+                subCategoriesEl.classList.add('show');
+                subCategoriesEl.querySelectorAll('.sub-cat-btn').forEach(b => {
+                    b.addEventListener('click', () => {
+                        activeSubCat = activeSubCat === b.dataset.sub ? '' : b.dataset.sub;
+                        renderSubCategories();
+                        renderGallery();
+                        updateStats();
+                    });
+                });
+            } else {
+                subCategoriesEl.classList.remove('show');
+                activeSubCat = '';
+            }
+        }
+
+        // ========== Render gallery ==========
+        function renderGallery() {
+            const items = filtered();
+            updateStats();
+
+            if (!items.length) {
+                galleryGrid.innerHTML = `<div class="no-results"><div class="empty-icon">📦</div><p>没有找到匹配的模型资源</p><p style="font-size:0.82rem;margin-top:4px;color:var(--text-muted);">试试调整筛选条件或搜索关键词</p></div>`;
+                return;
+            }
+
+            galleryGrid.innerHTML = items.map(m => {
+                if (m.type === 'video') {
+                    return `
+                    <div class="model-card video-card" data-id="${m.id}">
+                        <div class="video-placeholder">
+                            <div class="play-icon">▶</div>
+                            <div class="video-dur">点击播放预览</div>
+                        </div>
+                        <div class="card-type-badge badge-video">视频</div>
+                        <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
+                        <div class="card-overlay">
+                            <div class="card-title">${m.title}</div>
+                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                        </div>
+                    </div>`;
+                }
+                if (m.type === 'model') {
+                    const hasCover = m.cover;
+                    return `
+                    <div class="model-card" data-id="${m.id}" style="cursor:pointer;">
+                        ${hasCover
+                            ? `<img src="${m.cover}" alt="${m.title}" loading="lazy" style="object-fit:cover;">`
+                            : `<div class="video-placeholder"><div style="font-size:3rem;">🧊</div><div class="video-dur">3D 模型文件</div></div>`
+                        }
+                        <div class="card-type-badge badge-image">3D</div>
+                        <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
+                        <div class="card-overlay">
+                            <div class="card-title">${m.title}</div>
+                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                        </div>
+                    </div>`;
+                }
+                const isLiked = UserActions.isLiked(m.id);
+                const isBooked = UserActions.isBookmarked(m.id);
+                return `
+                <div class="model-card" data-id="${m.id}">
+                    <img src="${m.file}" alt="${m.title}" loading="lazy">
+                    <div class="card-quick-actions">
+                        <button class="card-quick-btn${isLiked?' liked':''}" data-action="like" data-id="${m.id}" title="点赞">❤</button>
+                        <button class="card-quick-btn${isBooked?' bookmarked':''}" data-action="bookmark" data-id="${m.id}" title="收藏">🔖</button>
+                    </div>
+                    <div class="card-type-badge badge-image">模型</div>
+                    <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
+                    <div class="card-overlay">
+                        <div class="card-title">${m.title}</div>
+                        <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Click → lightbox (handle both string and numeric IDs); quick actions
+            galleryGrid.querySelectorAll('.model-card').forEach(card => {
+                card.addEventListener('click', e => {
+                    const actionBtn = e.target.closest('[data-action]');
+                    if (actionBtn) {
+                        e.stopPropagation();
+                        const aid = actionBtn.dataset.id;
+                        const act = actionBtn.dataset.action;
+                        const id = aid.startsWith('upload_') ? aid : parseInt(aid);
+                        if (act === 'like') UserActions.toggleLike(id);
+                        if (act === 'bookmark') UserActions.toggleBookmark(id);
+                        renderGallery(); // refresh to update button states
+                        return;
+                    }
+                    const id = card.dataset.id;
+                    openLightbox(id.startsWith('upload_') ? id : parseInt(id));
+                });
+            });
+        }
+
+        // ========== Lightbox ==========
+        function openLightbox(id) {
+            const items = filtered();
+            lightboxIdx = items.findIndex(m => m.id === id);
+            if (lightboxIdx === -1) return;
+            showInLightbox(items[lightboxIdx]);
+            lightbox.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            updateNav(items);
+        }
+
+        function showInLightbox(m) {
+            lightboxTitle.textContent = m.title;
+            const sid = String(m.id);
+            if (m.type === 'video') {
+                lightboxContent.innerHTML = `<video src="${m.file}" controls autoplay style="max-width:90vw;max-height:75vh;border-radius:6px;" id="lbVideo"></video>`;
+            } else if (m.type === 'model') {
+                lightboxContent.innerHTML = `<div style="text-align:center;font-size:5rem;padding:60px;">🧊<p style="font-size:1rem;color:var(--text-muted);margin-top:16px;">3D 模型文件<br>${m.fileName||''}</p><p style="font-size:0.8rem;color:var(--text-muted);">可在本地 3D 软件中打开</p></div>`;
+            } else {
+                lightboxContent.innerHTML = `<img src="${m.file}" alt="${m.title}">`;
+            }
+            lightboxDownload.onclick = () => downloadFile(m);
+
+            // Social bar
+            const socialBar = document.getElementById('lightboxSocial');
+            const lbLike = document.getElementById('lbLikeBtn');
+            const lbBookmark = document.getElementById('lbBookmarkBtn');
+            socialBar.style.display = 'flex';
+            const liked = UserActions.isLiked(m.id);
+            const booked = UserActions.isBookmarked(m.id);
+            lbLike.textContent = liked ? '❤ 已赞' : '🤍 点赞';
+            lbLike.className = 'lb-social-btn' + (liked ? ' liked' : '');
+            lbBookmark.textContent = booked ? '🔖 已收藏' : '🔖 收藏';
+            lbBookmark.className = 'lb-social-btn' + (booked ? ' bookmarked' : '');
+
+            lbLike.onclick = () => { UserActions.toggleLike(m.id); showInLightbox(m); };
+            lbBookmark.onclick = () => { UserActions.toggleBookmark(m.id); showInLightbox(m); };
+
+            // Comments
+            const lbComments = document.getElementById('lbComments');
+            const lbCommentInputRow = document.getElementById('lbCommentInputRow');
+            let showComments = false;
+            document.getElementById('lbCommentToggle').onclick = () => {
+                showComments = !showComments;
+                lbComments.style.display = showComments ? 'block' : 'none';
+                lbCommentInputRow.style.display = showComments ? 'flex' : 'none';
+                if (showComments) renderItemComments(m.id);
+            };
+            lbComments.style.display = 'none';
+            lbCommentInputRow.style.display = 'none';
+
+            document.getElementById('lbCommentSubmit').onclick = () => {
+                const inp = document.getElementById('lbCommentInput');
+                const txt = inp.value.trim();
+                if (!txt) return;
+                const p = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
+                UserActions.addComment(m.id, p.name || '用户', txt);
+                inp.value = '';
+                renderItemComments(m.id);
+                updateStats();
+            };
+        }
+
+        function renderItemComments(id) {
+            const cmts = UserActions.getComments(id);
+            const lbComments = document.getElementById('lbComments');
+            lbComments.innerHTML = cmts.length
+                ? cmts.map(c => `<div class="lb-comment-item"><strong>${c.name}:</strong> ${c.text}</div>`).join('')
+                : '<div style="color:#888;font-size:0.78rem;">暂无评论</div>';
+        }
+
+        function closeLightbox() {
+            const vid = document.getElementById('lbVideo');
+            if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); }
+            lightboxContent.innerHTML = '';
+            lightbox.classList.remove('open');
+            document.getElementById('lightboxSocial').style.display = 'none';
+            document.getElementById('lbComments').style.display = 'none';
+            document.getElementById('lbCommentInputRow').style.display = 'none';
+            document.body.style.overflow = '';
+            lightboxIdx = -1;
+        }
+
+function updateNav(items) {
+            lightboxPrev.style.display = lightboxIdx > 0 ? 'flex' : 'none';
+            lightboxNext.style.display = lightboxIdx < items.length - 1 ? 'flex' : 'none';
+        }
+
+        function navLightbox(dir) {
+            const items = filtered();
+            const ni = lightboxIdx + dir;
+            if (ni < 0 || ni >= items.length) return;
+            // Clean previous video
+            const vid = document.getElementById('lbVideo');
+            if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); }
+            lightboxIdx = ni;
+            showInLightbox(items[lightboxIdx]);
+            updateNav(items);
+        }
+
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+        lightboxPrev.addEventListener('click', e => { e.stopPropagation(); navLightbox(-1); });
+        lightboxNext.addEventListener('click', e => { e.stopPropagation(); navLightbox(1); });
+
+        document.addEventListener('keydown', e => {
+            if (!lightbox.classList.contains('open')) return;
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') navLightbox(-1);
+            if (e.key === 'ArrowRight') navLightbox(1);
+        });
+
+        // ========== Download ==========
+        function downloadFile(m) {
+            const a = document.createElement('a');
+            a.href = m.file;
+            a.download = m.fileName || m.title || m.file.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('⬇ 正在下载: ' + m.title);
+        }
+
+        // ========== User Drawer ==========
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        const userDrawer = document.getElementById('userDrawer');
+        const btnOpenUser = document.getElementById('btnOpenUser');
+        const drawerClose = document.getElementById('drawerClose');
+        const avatarWrapper = document.getElementById('avatarWrapper');
+        const avatarPlaceholder = document.getElementById('avatarPlaceholder');
+        const avatarImg = document.getElementById('avatarImg');
+        const avatarInput = document.getElementById('avatarInput');
+        const drawerName = document.getElementById('drawerName');
+        const drawerBio = document.getElementById('drawerBio');
+        const drawerWorkCount = document.getElementById('drawerWorkCount');
+        const drawerUploadCount = document.getElementById('drawerUploadCount');
+        const drawerWorksGrid = document.getElementById('drawerWorksGrid');
+        const btnLogout = document.getElementById('btnLogout');
+
+        // Load profile from localStorage
+        function loadProfile() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('windwalker_profile') || '{}');
+                if (saved.name) drawerName.value = saved.name;
+                if (saved.bio) drawerBio.value = saved.bio;
+                if (saved.avatar) {
+                    avatarImg.src = saved.avatar;
+                    avatarImg.style.display = 'block';
+                    avatarPlaceholder.style.display = 'none';
+                    btnOpenUser.classList.add('has-avatar');
+                }
+                // Display user code
+                const accs = JSON.parse(localStorage.getItem('windwalker_accounts') || '{}');
+                const code = (accs[saved.name] && accs[saved.name].code) ? accs[saved.name].code : '------';
+                document.getElementById('drawerUserCode').textContent = code;
+            } catch (e) { /* ignore */ }
+        }
+
+        function saveProfile() {
+            const newName = drawerName.value.trim();
+            const oldProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
+            // Check duplicate username against registered accounts
+            if (newName && newName !== oldProfile.name) {
+                const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
+                if (accs[newName]) {
+                    showToast('该用户名已被注册，请换一个', true);
+                    drawerName.value = oldProfile.name || '';
+                    return;
+                }
+                // Update account key if user is registered
+                if (oldProfile.name && accs[oldProfile.name]) {
+                    accs[newName] = accs[oldProfile.name];
+                    delete accs[oldProfile.name];
+                    localStorage.setItem('windwalker_accounts', JSON.stringify(accs));
+                    localStorage.setItem('windwalker_logged_user', newName);
+                }
+            }
+            const data = { name: newName, bio: drawerBio.value.trim(), avatar: avatarImg.style.display !== 'none' ? avatarImg.src : '' };
+            try {
+                localStorage.setItem('windwalker_profile', JSON.stringify(data));
+            } catch(e) {
+                // localStorage full — try to save without avatar (base64)
+                if (data.avatar) {
+                    showToast('存储空间不足，头像较大已转为临时保存', true);
+                    const smallData = { name: data.name, bio: data.bio, avatar: '' };
+                    try { localStorage.setItem('windwalker_profile', JSON.stringify(smallData)); } catch(e2) {
+                        showToast('保存失败，请清理浏览器存储空间', true);
+                    }
+                } else {
+                    showToast('保存失败: ' + e.message, true);
+                }
+            }
+            if (data.avatar) btnOpenUser.classList.add('has-avatar');
+            else btnOpenUser.classList.remove('has-avatar');
+            updateUserButton();
+            // Refresh user code display
+            const accs2 = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
+            document.getElementById('drawerUserCode').textContent = (accs2[newName] && accs2[newName].code) ? accs2[newName].code : '------';
+        }
+
+        function updateUserButton() {
+            if (avatarImg.style.display !== 'none' && avatarImg.src) {
+                btnOpenUser.innerHTML = `<img src="${avatarImg.src}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            } else {
+                btnOpenUser.textContent = drawerName.value.trim().charAt(0) || '👤';
+            }
+        }
+
+        // Open / close
+        function openDrawer() {
+            drawerOverlay.classList.add('open');
+            userDrawer.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            refreshDrawerWorks();
+            updateDrawerStats();
+        }
+
+        function closeDrawer() {
+            drawerOverlay.classList.remove('open');
+            userDrawer.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        // Drawer tab switching
+        document.querySelectorAll('.drawer-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.drawer-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                drawerActiveTab = tab.dataset.dtab;
+                refreshDrawerWorks();
+            });
+        });
+
+        // Stat click → show detail
+        document.querySelectorAll('.drawer-stat-click').forEach(s => {
+            s.addEventListener('click', () => {
+                const type = s.dataset.show;
+                const me = getCurrentUser();
+                const social = getSocialData();
+                const detail = document.getElementById('drawerSocialDetail');
+                let list = [];
+                if (type === 'following') list = (social.following&&social.following[me])||[];
+                else if (type === 'followers') list = (social.followers&&social.followers[me])||[];
+                else if (type === 'friends') list = (social.friends&&social.friends[me])||[];
+                if (!list.length) { detail.style.display='block'; detail.innerHTML=`<span style="opacity:0.5;">暂无</span>`; return; }
+                detail.style.display='block';
+                detail.innerHTML = list.map(u => {
+                    const info = getUserInfoCard(u);
+                    return `<span style="display:inline-block;background:var(--bg);padding:3px 8px;border-radius:8px;margin:2px;font-size:0.75rem;cursor:pointer;" class="social-user-tag" data-user="${u}">👤 ${u} · ${info.works}作品</span>`;
+                }).join('');
+                detail.querySelectorAll('.social-user-tag').forEach(tag => {
+                    tag.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const u = tag.dataset.user;
+                        const info = getUserInfoCard(u);
+                        const prof = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile')||'{}'); } catch(e){ return {}; }})();
+                        const isF = isFollowing(u);
+                        detail.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
+                            <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;margin:0 auto 6px;">${u.charAt(0)}</div>
+                            <strong>${u}</strong>
+                            <div style="font-size:0.75rem;color:var(--text-muted);">作品 ${info.works} · ${info.created}</div>
+                            <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
+                                <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;" id="cardFollowBtn">${isF?'已关注':'+ 关注'}</button>
+                                <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);" id="cardMsgBtn">✉ 私信</button>
+                                <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);" id="cardSearchBtn">🔍 作品</button>
+                            </div>
+                            <button style="margin-top:6px;font-size:0.65rem;color:var(--text-muted);background:none;border:none;cursor:pointer;" id="cardCloseBtn">关闭</button>
+                        </div>`;
+                        document.getElementById('cardFollowBtn').addEventListener('click', () => {
+                            toggleFollow(u);
+                            document.getElementById('cardFollowBtn').textContent = isFollowing(u) ? '已关注' : '+ 关注';
+                        });
+                        document.getElementById('cardMsgBtn').addEventListener('click', () => {
+                            detail.style.display='none';
+                            openChatWith(u);
+                            document.getElementById('messagesModal').classList.add('open');
+                            document.body.style.overflow = 'hidden';
+                        });
+                        document.getElementById('cardSearchBtn').addEventListener('click', () => {
+                            searchInput.value = u; searchQ = u;
+                            renderGallery(); detail.style.display='none';
+                        });
+                        document.getElementById('cardCloseBtn').addEventListener('click', () => { detail.style.display='none'; });
+                    });
+                });
+            });
+        });
+
+        btnOpenUser.addEventListener('click', openDrawer);
+        drawerClose.addEventListener('click', closeDrawer);
+        drawerOverlay.addEventListener('click', closeDrawer);
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && userDrawer.classList.contains('open')) {
+                closeDrawer();
+            }
+        });
+
+        // Avatar upload - save immediately
+        avatarWrapper.addEventListener('click', () => avatarInput.click());
+        avatarInput.addEventListener('change', () => {
+            const f = avatarInput.files[0];
+            if (!f || !f.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                avatarImg.src = reader.result;
+                avatarImg.style.display = 'block';
+                avatarPlaceholder.style.display = 'none';
+                saveProfile(); // save immediately
+                updateUserButton();
+            };
+            reader.readAsDataURL(f);
+        });
+
+        // Name / bio edit → save on blur
+        drawerName.addEventListener('blur', saveProfile);
+        drawerName.addEventListener('keydown', e => { if (e.key === 'Enter') drawerName.blur(); });
+        drawerBio.addEventListener('blur', saveProfile);
+        // Auto-resize bio textarea
+        drawerBio.addEventListener('input', () => {
+            drawerBio.style.height = 'auto';
+            drawerBio.style.height = drawerBio.scrollHeight + 'px';
+        });
+
+        // Refresh works grid
+        let drawerActiveTab = 'works';
+
+        function refreshDrawerWorks() {
+            const all = allItems();
+            const liked = UserActions.getLikedItems(all);
+            const booked = UserActions.getBookmarkedItems(all);
+            drawerWorkCount.textContent = all.length;
+            drawerUploadCount.textContent = uploadedItems.length;
+
+            // Update only work/like/book counts (don't overwrite follow/fans/friends)
+            drawerWorkCount.textContent = all.length;
+            drawerUploadCount.textContent = uploadedItems.length;
+
+            // Select items based on active tab
+            const myWorks = uploadedItems.filter(m => m.isUpload);
+            let showItems;
+            if (drawerActiveTab === 'likes') showItems = liked;
+            else if (drawerActiveTab === 'bookmarks') showItems = booked;
+            else showItems = myWorks;
+
+            const emptyMsgs = { works: '还没有上传作品<br>点击 ⬆ 上传 发布你的第一个作品', likes: '还没有点赞的作品<br>去资源中心逛逛吧', bookmarks: '还没有收藏的作品<br>去资源中心逛逛吧' };
+
+            if (!showItems.length) {
+                drawerWorksGrid.innerHTML = `<div class="drawer-empty">${emptyMsgs[drawerActiveTab]}</div>`;
+                return;
+            }
+
+            drawerWorksGrid.innerHTML = showItems.slice(0, 30).map(m => {
+                const isUploaded = m.isUpload;
+                const delBtn = isUploaded ? `<button class="drawer-work-delete" data-delete="${m.id}" title="删除">✕</button>` : '';
+                if (m.type === 'video') {
+                    return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}<div class="work-type-icon">▶</div></div>`;
+                }
+                if (m.type === 'model') {
+                    const c = m.cover ? `<img src="${m.cover}" alt="${m.title}" loading="lazy">` : '<div class="work-type-icon">🧊</div>';
+                    return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}${c}</div>`;
+                }
+                return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}<img src="${m.file}" alt="${m.title}" loading="lazy"></div>`;
+            }).join('');
+
+            // Click to open lightbox
+            drawerWorksGrid.querySelectorAll('.drawer-work-thumb').forEach(thumb => {
+                thumb.addEventListener('click', e => {
+                    if (e.target.closest('.drawer-work-delete')) return;
+                    const wid = thumb.dataset.wid;
+                    const id = wid && wid.startsWith('upload_') ? wid : parseInt(wid);
+                    const item = allItems().find(m => String(m.id) === String(id));
+                    if (item) {
+                        closeDrawer();
+                        setTimeout(() => openLightbox(id), 300);
+                    }
+                });
+            });
+
+            // Delete handlers
+            drawerWorksGrid.querySelectorAll('.drawer-work-delete').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const id = btn.dataset.delete;
+                    const idx = uploadedItems.findIndex(m => String(m.id) === String(id));
+                    if (idx !== -1) {
+                        if (uploadedItems[idx].file && uploadedItems[idx].file.startsWith('blob:')) {
+                            URL.revokeObjectURL(uploadedItems[idx].file);
+                        }
+                        uploadedItems.splice(idx, 1);
+                        refreshDrawerWorks();
+                        updateDrawerStats();
+                        renderGallery();
+                        updateStats();
+                        showToast('已删除');
+                    }
+                });
+            });
+        }
+
+        function updateDrawerStats() {
+            drawerUploadCount.textContent = uploadedItems.length;
+            drawerWorkCount.textContent = allItems().length;
+            document.getElementById('drawerFollowing').textContent = getFollowingCount();
+            document.getElementById('drawerFollowers').textContent = getFollowerCount();
+            document.getElementById('drawerFriendCount').textContent = getFriendCount();
+        }
+
+        // ========== Notification System ==========
+        function getNotifs() {
+            try { return JSON.parse(localStorage.getItem('windwalker_notifs') || '[]'); } catch(e) { return []; }
+        }
+        function saveNotifs(ns) { localStorage.setItem('windwalker_notifs', JSON.stringify(ns)); }
+
+        function addNotif(type, from, text) {
+            const me = getCurrentUser();
+            if (from === me) return; // Don't notify self
+            const ns = getNotifs();
+            ns.unshift({ type, from, text, time: Date.now(), read: false });
+            if (ns.length > 50) ns.length = 50;
+            saveNotifs(ns);
+            updateNotifyBadge();
+        }
+
+        function updateNotifyBadge() {
+            const me = getCurrentUser();
+            const ns = getNotifs();
+            const unread = ns.filter(n => !n.read).length;
+            const badge = document.getElementById('notifyBadge');
+            badge.textContent = unread;
+            badge.classList.toggle('show', unread > 0);
+        }
+
+        function renderNotifs() {
+            const ns = getNotifs();
+            const dd = document.getElementById('notifyDropdown');
+            if (!ns.length) {
+                dd.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">暂无通知</div>';
+                return;
+            }
+            const icons = { follow:'🔔', like:'❤', comment:'💬', message:'✉', friend:'👥' };
+            dd.innerHTML = ns.map(n => {
+                const time = new Date(n.time).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                return `<div class="notify-item${n.read?'':' unread'}" data-idx="${ns.indexOf(n)}">
+                    <strong>${icons[n.type]||'📢'} ${n.from}</strong> ${n.text}
+                    <div class="notify-time">${time}</div>
+                </div>`;
+            }).join('');
+            // Mark read on click
+            dd.querySelectorAll('.notify-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const idx = parseInt(item.dataset.idx);
+                    const updated = getNotifs();
+                    if (updated[idx]) updated[idx].read = true;
+                    saveNotifs(updated);
+                    renderNotifs();
+                    updateNotifyBadge();
+                });
+            });
+        }
+
+        // Notification bell toggle
+        const btnNotify = document.getElementById('btnNotify');
+        const notifyDropdown = document.getElementById('notifyDropdown');
+        btnNotify.addEventListener('click', e => {
+            e.stopPropagation();
+            const show = !notifyDropdown.classList.contains('show');
+            notifyDropdown.classList.toggle('show', show);
+            if (show) renderNotifs();
+        });
+        document.addEventListener('click', () => notifyDropdown.classList.remove('show'));
+
+        updateNotifyBadge();
+
+        // ========== Friend & Follow System ==========
+        function getSocialData() {
+            try { return JSON.parse(localStorage.getItem('windwalker_social') || '{}'); } catch(e) { return {}; }
+        }
+        function saveSocialData(data) { localStorage.setItem('windwalker_social', JSON.stringify(data)); }
+
+        function getCurrentUser() {
+            try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}').name || ''; } catch(e) { return ''; }
+        }
+
+        // Follow/unfollow
+        function toggleFollow(targetUser) {
+            const me = getCurrentUser();
+            if (!me || me === targetUser) return;
+            const social = getSocialData();
+            if (!social.following) social.following = {};
+            if (!social.followers) social.followers = {};
+
+            if (!social.following[me]) social.following[me] = [];
+            const idx = social.following[me].indexOf(targetUser);
+            if (idx >= 0) {
+                social.following[me].splice(idx, 1);
+            } else {
+                social.following[me].push(targetUser);
+            }
+            // Rebuild all followers from following data (prevents stale counts)
+            social.followers = {};
+            for (const [user, following] of Object.entries(social.following)) {
+                following.forEach(f => {
+                    if (!social.followers[f]) social.followers[f] = [];
+                    if (!social.followers[f].includes(user)) social.followers[f].push(user);
+                });
+            }
+            saveSocialData(social);
+            if (idx < 0) addNotif('follow', me, '关注了你');
+            return idx < 0;
+        }
+
+        function isFollowing(targetUser) {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            return social.following && social.following[me] && social.following[me].includes(targetUser);
+        }
+
+        // Friend request
+        function sendFriendRequest(targetUser) {
+            const me = getCurrentUser();
+            if (!me || me === targetUser) { showToast('无法添加自己', true); return false; }
+            const social = getSocialData();
+            if (!social.friends) social.friends = {};
+            if (!social.friendRequests) social.friendRequests = {};
+            if (!social.friendRequests[targetUser]) social.friendRequests[targetUser] = [];
+            if (social.friendRequests[targetUser].includes(me)) { showToast('已发送过请求', true); return false; }
+            social.friendRequests[targetUser].push(me);
+            saveSocialData(social);
+            addNotif('friend', me, '请求添加你为好友');
+            showToast('已发送好友请求给 ' + targetUser);
+            return true;
+        }
+
+        function acceptFriendRequest(fromUser) {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            if (!social.friendRequests || !social.friendRequests[me]) return;
+            const idx = social.friendRequests[me].indexOf(fromUser);
+            if (idx < 0) return;
+            social.friendRequests[me].splice(idx, 1);
+            if (!social.friends) social.friends = {};
+            if (!social.friends[me]) social.friends[me] = [];
+            if (!social.friends[fromUser]) social.friends[fromUser] = [];
+            if (!social.friends[me].includes(fromUser)) social.friends[me].push(fromUser);
+            if (!social.friends[fromUser].includes(me)) social.friends[fromUser].push(me);
+            saveSocialData(social);
+            refreshFriendUI();
+            showToast('已添加 ' + fromUser + ' 为好友');
+        }
+
+        function getFriendCount() {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            return (social.friends && social.friends[me]) ? social.friends[me].length : 0;
+        }
+        function getFollowerCount() {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            return (social.followers && social.followers[me]) ? social.followers[me].length : 0;
+        }
+        function getFollowingCount() {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            return (social.following && social.following[me]) ? social.following[me].length : 0;
+        }
+
+        function getUserInfoCard(username) {
+            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
+            const works = modelData.filter(m => m.author === username).length + uploadedItems.filter(m => m.author === username).length;
+            const created = accs[username] ? new Date(accs[username].created).toLocaleDateString('zh-CN') : '未知';
+            return { works, created };
+        }
+
+        function refreshFriendUI() {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            const friends = (social.friends && social.friends[me]) ? social.friends[me] : [];
+            const requests = (social.friendRequests && social.friendRequests[me]) ? social.friendRequests[me] : [];
+            const friendList = document.getElementById('friendList');
+            let html = '';
+            if (requests.length) {
+                html += '<div style="font-weight:600;margin-bottom:4px;">📩 待处理请求:</div>';
+                html += requests.map(r => {
+                    const info = getUserInfoCard(r);
+                    return `<div style="display:flex;align-items:center;gap:8px;background:rgba(56,189,248,0.08);padding:6px 10px;border-radius:10px;margin:4px 0;border:1px solid rgba(56,189,248,0.2);">
+                        <span style="font-size:1.2rem;">👤</span>
+                        <div style="flex:1;font-size:0.75rem;">
+                            <strong>${r}</strong>
+                            <div style="color:var(--text-muted);">作品 ${info.works} · ${info.created}</div>
+                        </div>
+                        <button style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:3px 10px;cursor:pointer;font-size:0.7rem;font-weight:600;" data-accept="${r}">✓ 接受</button>
+                        <button style="background:rgba(248,113,113,0.2);color:var(--red);border:none;border-radius:12px;padding:3px 10px;cursor:pointer;font-size:0.7rem;" data-reject="${r}">✕</button>
+                    </div>`;
+                }).join('');
+            }
+            if (friends.length) {
+                html += '<div style="font-weight:600;margin:8px 0 4px;">✅ 好友:</div>';
+                html += friends.map(f => {
+                    const info = getUserInfoCard(f);
+                    return `<div style="display:flex;align-items:center;gap:6px;background:rgba(52,211,153,0.06);padding:4px 10px;border-radius:10px;margin:2px 0;font-size:0.78rem;">
+                        <span>👤</span> <strong>${f}</strong>
+                        <span style="color:var(--text-muted);font-size:0.7rem;">作品 ${info.works}</span>
+                    </div>`;
+                }).join('');
+            }
+            if (!html) html = '<span style="opacity:0.5;">暂无好友，搜索用户名添加</span>';
+            friendList.innerHTML = html;
+
+            // Accept buttons
+            friendList.querySelectorAll('[data-accept]').forEach(b => {
+                b.addEventListener('click', () => acceptFriendRequest(b.dataset.accept));
+            });
+            // Reject buttons
+            friendList.querySelectorAll('[data-reject]').forEach(b => {
+                b.addEventListener('click', () => {
+                    const fromUser = b.dataset.reject;
+                    const soc = getSocialData();
+                    if (soc.friendRequests && soc.friendRequests[me]) {
+                        soc.friendRequests[me] = soc.friendRequests[me].filter(u => u !== fromUser);
+                        saveSocialData(soc);
+                        refreshFriendUI();
+                        showToast('已拒绝');
+                    }
+                });
+            });
+
+            document.getElementById('drawerFollowing').textContent = getFollowingCount();
+            document.getElementById('drawerFollowers').textContent = getFollowerCount();
+            document.getElementById('drawerFriendCount').textContent = getFriendCount();
+        }
+
+        // Friend search preview
+        document.getElementById('friendSearchInput').addEventListener('input', () => {
+            const q = document.getElementById('friendSearchInput').value.trim();
+            const preview = document.getElementById('friendPreview');
+            if (!q) { preview.style.display = 'none'; return; }
+            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
+            // Search by name or code
+            const byCode = Object.entries(accs).find(([, v]) => v.code === q);
+            const foundUser = accs[q] ? q : (byCode ? byCode[0] : null);
+            if (foundUser) {
+                const created = new Date(accs[foundUser].created).toLocaleDateString('zh-CN');
+                const code = accs[foundUser].code || '';
+                preview.style.display = 'block'; preview.style.color = 'var(--accent)';
+                preview.innerHTML = `👤 <strong>${foundUser}</strong> · ID: ${code} · 注册于 ${created} · 作品 ${modelData.filter(m=>m.author===foundUser).length + uploadedItems.filter(m=>m.author===foundUser).length} 个`;
+            } else {
+                preview.style.display = 'block';
+                preview.innerHTML = '❌ 用户不存在';
+                preview.style.color = 'var(--red)';
+            }
+        });
+
+        // Add friend button
+        document.getElementById('btnAddFriend').addEventListener('click', () => {
+            const target = document.getElementById('friendSearchInput').value.trim();
+            if (!target) { showToast('请输入用户名', true); return; }
+            // Check if user exists
+            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
+            if (!accs[target]) { showToast('用户不存在', true); return; }
+            if (sendFriendRequest(target)) {
+                document.getElementById('friendSearchInput').value = '';
+                refreshFriendUI();
+            }
+        });
+
+        // Refresh friend UI on drawer open
+        const origOpenDrawer = openDrawer;
+        openDrawer = function() {
+            origOpenDrawer();
+            refreshFriendUI();
+            updateMsgUnread();
+        };
+
+        // ========== Horizontal Chat Panel ==========
+        let chatPartner = '';
+        const chatPanel = document.getElementById('chatPanel');
+        const chatPanelTitle = document.getElementById('chatPanelTitle');
+        const chatPanelBody = document.getElementById('chatPanelBody');
+        const chatPanelTarget = document.getElementById('chatPanelTarget');
+        const chatPanelInput = document.getElementById('chatPanelInput');
+        const chatPanelBack = document.getElementById('chatPanelBack');
+
+        function getMessages() { try { return JSON.parse(localStorage.getItem('windwalker_messages') || '[]'); } catch(e) { return []; }}
+        function saveMessages(msgs) { localStorage.setItem('windwalker_messages', JSON.stringify(msgs)); }
+
+        function updateMsgUnread() {
+            const me = getCurrentUser();
+            const unread = getMessages().filter(m => m.to === me && !m.read).length;
+            document.getElementById('msgUnread').textContent = unread ? `${unread} 条未读` : '';
+        }
+
+        document.getElementById('btnOpenMessages').addEventListener('click', () => { chatPanel.style.display='flex'; openChatList(); });
+        document.getElementById('chatPanelClose').addEventListener('click', () => { chatPanel.style.display='none'; });
+        document.getElementById('chatPanelHeader').addEventListener('click', function(e) {
+            if (!e.target.closest('button')) { if (chatPartner) openChatList(); }
+        });
+        chatPanelBack.addEventListener('click', () => { chatPartner=''; openChatList(); });
+
+        function openChatList() {
+            chatPartner = ''; chatPanelBack.style.display='none'; chatPanelTitle.textContent='✉ 私信';
+            const me = getCurrentUser();
+            const msgs = getMessages();
+            const partners = new Set();
+            msgs.forEach(m => { if (m.from===me) partners.add(m.to); if (m.to===me) partners.add(m.from); });
+            chatPanelBody.innerHTML = !partners.size
+                ? '<div style="text-align:center;color:var(--text-muted);padding:30px;">暂无私信<br>在社区搜索用户发送</div>'
+                : [...partners].map(p => {
+                    const conv = msgs.filter(m => (m.from===me&&m.to===p)||(m.from===p&&m.to===me));
+                    const last = conv[conv.length-1];
+                    const unread = conv.filter(m => m.to===me&&!m.read).length;
+                    return `<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;" class="chat-list-item" data-p="${p}">
+                        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.8rem;">${p.charAt(0)}</div>
+                        <div style="flex:1;"><strong>${p}</strong>${unread?` <span style="color:#ef4444;font-size:0.7rem;">${unread}未读</span>`:''}
+                        <div style="font-size:0.72rem;color:var(--text-muted);">${(last.img?'[图片] ':'')+(last.text||'').substring(0,25)}</div></div>
+                    </div>`;
+                }).join('');
+            chatPanelBody.querySelectorAll('.chat-list-item').forEach(item => {
+                item.addEventListener('click', () => openChatWith(item.dataset.p));
+            });
+            chatPanelTarget.value = '';
+        }
+
+        function openChatWith(partner) {
+            chatPartner = partner; chatPanelBack.style.display='inline'; chatPanelTitle.textContent = `💬 ${partner}`;
+            chatPanelTarget.value = partner;
+            const me = getCurrentUser();
+            const msgs = getMessages();
+            const updated = msgs.map(m => m.from===partner&&m.to===me ? {...m,read:true} : m);
+            saveMessages(updated);
+            renderChatBubbles();
+            updateMsgUnread();
+        }
+
+        function renderChatBubbles() {
+            const me = getCurrentUser();
+            const msgs = getMessages().filter(m => (m.from===me&&m.to===chatPartner)||(m.from===chatPartner&&m.to===me));
+            chatPanelBody.innerHTML = !msgs.length ? '<div style="text-align:center;color:var(--text-muted);padding:30px;">开始聊天吧！</div>'
+                : msgs.map(m => {
+                    const isMe = m.from===me;
+                    const time = new Date(m.time).toLocaleString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+                    const imgTag = m.img ? `<img class="chat-bubble-img" src="${m.img}" style="max-width:120px;max-height:100px;border-radius:8px;cursor:pointer;" onclick="window.open('${m.img}')">` : '';
+                    return `<div class="chat-bubble-row ${isMe?'me':'other'}"><div><div class="chat-bubble">${imgTag}${m.text||''}</div><div class="chat-time">${time}</div></div></div>`;
+                }).join('');
+            chatPanelBody.scrollTop = chatPanelBody.scrollHeight;
+        }
+
+        // Emoji bar
+        const EMOJIS = ['😀','😂','😍','🥰','😎','🤩','😢','😡','👍','👎','🎉','💪','🙏','🔥','💯','❤','💔','✨','🌟','🎵','🎬','📸','🎮','🖼','📁','💡','🌈','🍕','☕','🎁'];
+        const emojiBar = document.createElement('div');
+        emojiBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;padding:0 8px 4px;';
+        emojiBar.innerHTML = EMOJIS.map(e => `<span style="cursor:pointer;font-size:0.9rem;" data-emoji="${e}">${e}</span>`).join('');
+        emojiBar.querySelectorAll('span').forEach(s => s.addEventListener('click',()=>{chatPanelInput.value+=s.dataset.emoji;chatPanelInput.focus();}));
+        chatPanel.querySelector('div:last-child').before(emojiBar);
+
+        // Send
+        let chatPImg = null;
+        document.getElementById('chatPanelImgBtn').addEventListener('click',()=>document.getElementById('chatPanelImgInput').click());
+        document.getElementById('chatPanelImgInput').addEventListener('change',function(){
+            const f=this.files[0];if(!f||!f.type.startsWith('image/'))return;
+            const r=new FileReader();r.onload=()=>{chatPImg=r.result;showToast('图片已选择');};r.readAsDataURL(f);
+        });
+        function sendChat() {
+            const me=getCurrentUser(),text=chatPanelInput.value.trim();
+            if(!chatPartner){showToast('请先选择联系人',true);return;}
+            if(!text&&!chatPImg)return;
+            const msgs=getMessages(),msg={from:me,to:chatPartner,text,time:Date.now(),read:false};
+            if(chatPImg)msg.img=chatPImg;
+            msgs.push(msg);saveMessages(msgs);
+            chatPanelInput.value='';chatPImg=null;document.getElementById('chatPanelImgInput').value='';
+            renderChatBubbles();updateMsgUnread();
+        }
+        document.getElementById('chatPanelSend').addEventListener('click',sendChat);
+        chatPanelInput.addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+        // Open chat for a user
+        function openChatWithUser(user) {
+            chatPanel.style.display='flex';
+            openChatWith(user);
+        }
+
+        updateMsgUnread();
+
+        // ========== Logout ==========
+        btnLogout.addEventListener('click', () => {
+            if (confirm('确定要退出登录吗？')) {
+                document.body.style.transition = 'opacity 0.4s ease';
+                document.body.style.opacity = '0';
+                setTimeout(() => { window.location.href = 'login.html'; }, 400);
+            }
+        });
+
+        // Init profile
+        loadProfile();
+        updateUserButton();
+
+        // ============================================================
+        // ============================================================
+        //  ❤️ User Actions (like, bookmark, comment per item)
+        // ============================================================
+        const UserActions = (function() {
+            let likes = new Set(), bookmarks = new Set(), itemComments = {};
+
+            function load() {
+                try {
+                    likes = new Set(JSON.parse(localStorage.getItem('wa_likes') || '[]'));
+                    bookmarks = new Set(JSON.parse(localStorage.getItem('wa_bookmarks') || '[]'));
+                    itemComments = JSON.parse(localStorage.getItem('wa_comments') || '{}');
+                } catch(e) { likes = new Set(); bookmarks = new Set(); itemComments = {}; }
+            }
+            function saveLikes() { localStorage.setItem('wa_likes', JSON.stringify([...likes])); }
+            function saveBookmarks() { localStorage.setItem('wa_bookmarks', JSON.stringify([...bookmarks])); }
+            function saveComments() { localStorage.setItem('wa_comments', JSON.stringify(itemComments)); }
+
+            function isLiked(id) { return likes.has(String(id)); }
+            function isBookmarked(id) { return bookmarks.has(String(id)); }
+
+            function toggleLike(id) {
+                const sid = String(id);
+                likes.has(sid) ? likes.delete(sid) : likes.add(sid);
+                saveLikes();
+            }
+            function toggleBookmark(id) {
+                const sid = String(id);
+                bookmarks.has(sid) ? bookmarks.delete(sid) : bookmarks.add(sid);
+                saveBookmarks();
+            }
+
+            function getComments(id) { return itemComments[String(id)] || []; }
+            function addComment(id, name, text) {
+                const sid = String(id);
+                if (!itemComments[sid]) itemComments[sid] = [];
+                itemComments[sid].push({ name, text, time: Date.now() });
+                saveComments();
+            }
+
+            function getLikedItems(all) { return all.filter(m => likes.has(String(m.id))); }
+            function getBookmarkedItems(all) { return all.filter(m => bookmarks.has(String(m.id))); }
+
+            load();
+            return { isLiked, isBookmarked, toggleLike, toggleBookmark, getComments, addComment, getLikedItems, getBookmarkedItems, load };
+        })();
+
+        // ============================================================
+        //  🎵 Pure Music Audio System
+        // ============================================================
+        const AudioSys = (function() {
+            let ctx = null, musicNodes = null, musicOn = true, sfxOn = true, musicVolume = 0.03;
+
+            function ensureCtx() {
+                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+
+            function chime() {
+                if (!sfxOn) return;
+                try {
+                    const f = [523, 659, 784, 1047][Math.floor(Math.random() * 4)];
+                    playPianoNote(f, 0.35, 0.06);
+                } catch(e){}
+            }
+
+            function douyinChime() {
+                if (!sfxOn) return;
+                try {
+                    [523, 659, 784, 1047].forEach((f, i) => {
+                        const c = ensureCtx(), t = c.currentTime;
+                        const osc = c.createOscillator(), gain = c.createGain();
+                        osc.type = 'sine'; osc.frequency.value = f;
+                        gain.gain.setValueAtTime(0, t + i * 0.12);
+                        gain.gain.linearRampToValueAtTime(0.06, t + i * 0.12 + 0.03);
+                        gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.5);
+                        osc.connect(gain).connect(c.destination);
+                        osc.start(t + i * 0.12); osc.stop(t + i * 0.12 + 0.5);
+                    });
+                } catch(e){}
+            }
+
+            // 🎹 Piano melody loop
+            const MELODY = [
+                { n: 262, d: 0.9 },{ n: 330, d: 0.5 },{ n: 392, d: 0.9 },{ n: 330, d: 0.4 },
+                { n: 294, d: 0.6 },{ n: 262, d: 0.8 },{ n: 220, d: 0.6 },{ n: 262, d: 1.2 },
+                { n: 330, d: 0.7 },{ n: 392, d: 0.5 },{ n: 440, d: 0.8 },{ n: 392, d: 0.5 },
+                { n: 330, d: 0.6 },{ n: 294, d: 0.7 },{ n: 262, d: 0.8 },{ n: 294, d: 1.4 },
+            ];
+            let melodyIdx = 0, melodyTimer = null;
+
+            function playPianoNote(freq, dur, vol) {
+                const c = ensureCtx();
+                const t = c.currentTime;
+                const harmonics = [
+                    { mult: 1, amp: 1.0 },
+                    { mult: 2, amp: 0.5 },
+                    { mult: 3, amp: 0.25 },
+                    { mult: 4, amp: 0.12 },
+                    { mult: 5, amp: 0.06 },
+                ];
+                harmonics.forEach(h => {
+                    const osc = c.createOscillator(), gain = c.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq * h.mult;
+                    // Piano envelope: fast attack, sustain, long decay
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(vol * h.amp, t + 0.02);
+                    gain.gain.setValueAtTime(vol * h.amp * 0.7, t + dur * 0.4);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+                    osc.connect(gain).connect(c.destination);
+                    osc.start(t); osc.stop(t + dur + 0.1);
+                });
+            }
+
+            function playMelodyNote() {
+                if (!musicOn || !musicNodes) return;
+                try {
+                    const { n, d } = MELODY[melodyIdx];
+                    const dur = d * 0.65;
+                    playPianoNote(n, dur, musicVolume * 1.6);
+                    melodyIdx = (melodyIdx + 1) % MELODY.length;
+                    melodyTimer = setTimeout(playMelodyNote, d * 950);
+                } catch(e){ melodyTimer = setTimeout(playMelodyNote, 500); }
+            }
+
+            function startMusic() {
+                if (musicNodes) return;
+                try {
+                    const c = ensureCtx();
+                    const pad = c.createOscillator(), pg = c.createGain();
+                    pad.type = 'sine'; pad.frequency.value = 65.4;
+                    pg.gain.value = musicVolume * 0.8;
+                    const filt2 = c.createBiquadFilter();
+                    filt2.type = 'lowpass'; filt2.frequency.value = 300; filt2.Q.value = 0.3;
+                    const pg2 = c.createGain(); pg2.gain.value = musicVolume * 0.3;
+                    const pad2 = c.createOscillator(); pad2.type = 'sine'; pad2.frequency.value = 98;
+                    pad.connect(pg).connect(filt2);
+                    pad2.connect(pg2).connect(filt2);
+                    filt2.connect(c.destination);
+                    pad.start(); pad2.start();
+                    musicNodes = { pad, pad2, pg, pg2, filt2 };
+                    melodyIdx = 0;
+                    playMelodyNote();
+                } catch(e){}
+            }
+
+            function stopMusic() {
+                if (melodyTimer) { clearTimeout(melodyTimer); melodyTimer = null; }
+                if (!musicNodes) return;
+                try { Object.values(musicNodes).forEach(n => { try { n.stop?.(); } catch(e){} try { n.disconnect?.(); } catch(e){} }); } catch(e){}
+                musicNodes = null;
+            }
+
+            function setVolume(v) { musicVolume = Math.max(0.005, Math.min(0.1, v)); if (musicNodes) musicNodes.padGain.gain.value = musicVolume * 1.2; }
+
+            function toggle() {
+                musicOn = !musicOn;
+                musicOn ? startMusic() : stopMusic();
+                return musicOn;
+            }
+
+            function initOnTouch() { if (musicOn) startMusic(); }
+
+            function sfxToggle() { sfxOn = !sfxOn; return sfxOn; }
+            function isSfxOn() { return sfxOn; }
+            return { chime, douyinChime, toggle, isOn: ()=>musicOn, sfxToggle, isSfxOn, initOnTouch, setVolume, startMusic, stopMusic };
+        })();
+
+        // ========== Music + SFX Toggle ==========
+        const btnMusicToggle = document.getElementById('btnMusicToggle');
+        btnMusicToggle.addEventListener('click', () => {
+            const on = AudioSys.toggle();
+            btnMusicToggle.textContent = on ? '🎵' : '🔇';
+            btnMusicToggle.classList.toggle('muted', !on);
+        });
+        const btnSfxToggle = document.getElementById('btnSfxToggle');
+        btnSfxToggle.addEventListener('click', () => {
+            const on = AudioSys.sfxToggle();
+            btnSfxToggle.textContent = on ? '🔔' : '🔕';
+            btnSfxToggle.classList.toggle('muted', !on);
+        });
+        document.addEventListener('click', function initA() { AudioSys.initOnTouch(); }, { once: true });
+        document.addEventListener('click', e => {
+            if (e.target.closest('button,.cat-btn,.model-card') && !e.target.closest('#btnMusicToggle,#btnSfxToggle')) AudioSys.chime();
+        });
+
+        // ========== Theme Toggle ==========
+        const btnThemeToggle = document.getElementById('btnThemeToggle');
+        function applyTheme(isLight) {
+            document.body.classList.toggle('light', isLight);
+            btnThemeToggle.textContent = isLight ? '☀️' : '🌙';
+            localStorage.setItem('windwalker_theme', isLight ? 'light' : 'dark');
+        }
+        btnThemeToggle.addEventListener('click', () => {
+            applyTheme(!document.body.classList.contains('light'));
+        });
+        // Load saved theme
+        if (localStorage.getItem('windwalker_theme') === 'light') applyTheme(true);
+
+        // ========== Community ==========
+        const communityOverlay = document.getElementById('communityOverlay');
+        const btnOpenCommunity = document.getElementById('btnOpenCommunity');
+        const communityClose = document.getElementById('communityClose');
+        const composerInput = document.getElementById('composerInput');
+        const composerSubmit = document.getElementById('composerSubmit');
+        const composerPreview = document.getElementById('composerPreview');
+        const composerPreviewContent = document.getElementById('composerPreviewContent');
+        const composerPreviewRemove = document.getElementById('composerPreviewRemove');
+        const composerAvatar = document.getElementById('composerAvatar');
+        const btnComposerImage = document.getElementById('btnComposerImage');
+        const btnComposerVideo = document.getElementById('btnComposerVideo');
+        const composerImageInput = document.getElementById('composerImageInput');
+        const composerVideoInput = document.getElementById('composerVideoInput');
+        const communityFeed = document.getElementById('communityFeed');
+        let composerPendingMedia = null, composerPendingType = null;
+
+        // Load posts from localStorage
+        function loadPosts() {
+            try { return JSON.parse(localStorage.getItem('windwalker_community') || '[]'); } catch(e) { return []; }
+        }
+        function savePosts(posts) {
+            try { localStorage.setItem('windwalker_community', JSON.stringify(posts)); } catch(e) { showToast('存储空间不足', true); }
+        }
+        let communityPosts = loadPosts();
+
+        // Sync user profile to community
+        function syncComposerAvatar() {
+            try {
+                const p = JSON.parse(localStorage.getItem('windwalker_profile') || '{}');
+                if (p.avatar) { composerAvatar.textContent = ''; composerAvatar.style.backgroundImage = `url(${p.avatar})`; composerAvatar.style.backgroundSize = 'cover'; }
+                else composerAvatar.textContent = (p.name || '风').charAt(0);
+            } catch(e){ composerAvatar.textContent = '😎'; }
+        }
+
+        // Open/close
+        btnOpenCommunity.addEventListener('click', () => {
+            communityOverlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            syncComposerAvatar();
+            renderFeed();
+        });
+        communityClose.addEventListener('click', () => { communityOverlay.classList.remove('open'); document.body.style.overflow = ''; });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && communityOverlay.classList.contains('open')) { communityOverlay.classList.remove('open'); document.body.style.overflow = ''; }});
+
+        // Composer
+        composerInput.addEventListener('input', () => {
+            const has = composerInput.value.trim() || composerPendingMedia;
+            composerSubmit.disabled = !has;
+        });
+
+        btnComposerImage.addEventListener('click', () => composerImageInput.click());
+        btnComposerVideo.addEventListener('click', () => composerVideoInput.click());
+
+        let composerPendingFile = null;
+        function setComposerMedia(file, type) {
+            if (composerPendingMedia) URL.revokeObjectURL(composerPendingMedia);
+            composerPendingMedia = URL.createObjectURL(file);
+            composerPendingFile = file;
+            composerPendingType = type;
+            composerPreview.classList.add('show');
+            if (type === 'image') composerPreviewContent.innerHTML = `<img src="${composerPendingMedia}" alt="">`;
+            else composerPreviewContent.innerHTML = `<video src="${composerPendingMedia}" controls></video>`;
+            composerSubmit.disabled = false;
+        }
+
+        composerImageInput.addEventListener('change', () => { if (composerImageInput.files[0]) setComposerMedia(composerImageInput.files[0], 'image'); });
+        composerVideoInput.addEventListener('change', () => { if (composerVideoInput.files[0]) setComposerMedia(composerVideoInput.files[0], 'video'); });
+        composerPreviewRemove.addEventListener('click', () => {
+            if (composerPendingMedia) URL.revokeObjectURL(composerPendingMedia);
+            composerPendingMedia = null; composerPendingType = null; composerPendingFile = null;
+            composerPreview.classList.remove('show');
+            composerPreviewContent.innerHTML = '';
+            composerSubmit.disabled = !composerInput.value.trim();
+            composerImageInput.value = ''; composerVideoInput.value = '';
+        });
+
+        // Submit post (with persistence)
+        composerSubmit.addEventListener('click', async () => {
+            const text = composerInput.value.trim();
+            if (!text && !composerPendingMedia) return;
+            const profile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
+            const post = {
+                id: 'post_' + Date.now(),
+                name: profile.name || '风之旅人',
+                avatar: profile.avatar || '',
+                text: text,
+                media: null,
+                mediaType: composerPendingType || null,
+                mediaId: null,
+                time: Date.now(),
+                likes: 0,
+                likedBy: [],
+            };
+
+            // Persist media
+            if (composerPendingFile && composerPendingType === 'image') {
+                // Convert image to base64 for permanent storage
+                const base64 = await new Promise(resolve => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(r.result);
+                    r.readAsDataURL(composerPendingFile);
+                });
+                post.media = base64;
+            } else if (composerPendingFile && composerPendingType === 'video') {
+                // Store video in IndexedDB
+                const vid = await new Promise(resolve => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(r.result);
+                    r.readAsArrayBuffer(composerPendingFile);
+                });
+                post.mediaId = 'comm_vid_' + Date.now();
+                post.media = composerPendingMedia; // temp URL for current session
+                await IDB.save({
+                    id: post.mediaId,
+                    blob: vid,
+                    fileName: composerPendingFile.name,
+                    type: 'community_video',
+                    cat: '', subCat: '', title: '', coverBlob: null,
+                }).catch(() => {});
+            } else if (composerPendingMedia) {
+                post.media = composerPendingMedia;
+            }
+
+            communityPosts.unshift(post);
+            savePosts(communityPosts);
+            // Reset
+            composerInput.value = '';
+            composerPendingMedia = null; composerPendingType = null; composerPendingFile = null;
+            composerPreview.classList.remove('show');
+            composerPreviewContent.innerHTML = '';
+            composerSubmit.disabled = true;
+            composerImageInput.value = ''; composerVideoInput.value = '';
+            renderFeed();
+            showToast('✅ 发布成功！');
+        });
+
+        // Render feed
+        async function renderFeed() {
+            communityPosts = loadPosts();
+            // Restore community videos from IndexedDB
+            for (const p of communityPosts) {
+                if (p.mediaId && !p.media) {
+                    try {
+                        const stored = await IDB.loadAll();
+                        const found = stored.find(s => s.id === p.mediaId);
+                        if (found && found.blob) {
+                            const blob = new Blob([found.blob], { type: 'video/mp4' });
+                            p.media = URL.createObjectURL(blob);
+                        }
+                    } catch(e) {}
+                }
+            }
+            if (!communityPosts.length) {
+                communityFeed.innerHTML = '<div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>';
+                return;
+            }
+            const uid = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}').name || 'user'; } catch(e){ return 'user'; }})();
+            communityFeed.innerHTML = communityPosts.map(p => {
+                const isLiked = p.likedBy && p.likedBy.includes(uid);
+                const timeStr = new Date(p.time).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+                const avatarTag = p.avatar
+                    ? `<div class="post-avatar" style="background-image:url(${p.avatar});background-size:cover;"></div>`
+                    : `<div class="post-avatar">${p.name.charAt(0)}</div>`;
+                const mediaTag = p.media
+                    ? (p.mediaType === 'video'
+                        ? `<div class="post-media"><video src="${p.media}" controls></video></div>`
+                        : `<div class="post-media"><img src="${p.media}" alt=""></div>`)
+                    : '';
+                const canDel = p.name === uid;
+                const delBtn = canDel ? `<button class="post-delete" data-postid="${p.id}">删除</button>` : '';
+                const comments = p.comments || [];
+                const isAuthor = p.name === uid;
+                const commentList = comments.map((c, ci) => {
+                    const cImg = c.img ? `<img class="comment-img" src="${c.img}" alt="">` : '';
+                    const delBtn = (isAuthor || c.name === uid)
+                        ? `<button class="comment-delete" data-pid="${p.id}" data-cidx="${ci}">✕</button>`
+                        : '';
+                    return `<div class="comment-item"><span class="comment-name">${c.name}:</span><span class="comment-text">${c.text}${cImg}</span>${delBtn}</div>`;
+                }).join('');
+                return `
+                <div class="post-card" data-pid="${p.id}">
+                    <div class="post-header">
+                        ${avatarTag}
+                        <div class="post-meta"><div class="post-name">${p.name}</div><div class="post-time">${timeStr}</div></div>
+                        ${p.name !== uid ? `<button class="post-follow-btn" data-follow="${p.name}">${isFollowing(p.name) ? '已关注' : '+关注'}</button>` : ''}
+                    </div>
+                    ${p.text ? `<div class="post-content">${p.text}</div>` : ''}
+                    ${mediaTag}
+                    <div class="post-actions">
+                        <button class="post-like${isLiked?' liked':''}" data-postid="${p.id}">❤ ${p.likes||0}</button>
+                        <button class="post-comment-btn" data-postid="${p.id}">💬 ${comments.length||0}</button>
+                        ${delBtn}
+                    </div>
+                    <div class="comments-section" id="comments-${p.id}">
+                        ${commentList || '<div style="color:var(--text-muted);font-size:0.8rem;">暂无评论</div>'}
+                        <div class="comment-input-row">
+                            <input type="text" class="comment-input" data-postid="${p.id}" placeholder="写下评论..." maxlength="200">
+                            <button class="comment-img-btn" data-postid="${p.id}" title="图片">🖼</button>
+                            <input type="file" class="comment-img-input" data-postid="${p.id}" accept="image/*" style="display:none;">
+                            <button class="comment-submit" data-postid="${p.id}">发送</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Follow handlers
+            communityFeed.querySelectorAll('.post-follow-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.dataset.follow;
+                    const nowFollowing = toggleFollow(target);
+                    btn.textContent = nowFollowing ? '已关注' : '+关注';
+                    if (nowFollowing) showToast('已关注 ' + target);
+                    else showToast('已取消关注 ' + target);
+                });
+            });
+
+            // Like handlers
+            communityFeed.querySelectorAll('.post-like').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.postid;
+                    const idx = communityPosts.findIndex(p => p.id === pid);
+                    if (idx === -1) return;
+                    const post = communityPosts[idx];
+                    post.likedBy = post.likedBy || [];
+                    if (post.likedBy.includes(uid)) {
+                        post.likedBy = post.likedBy.filter(u => u !== uid);
+                        post.likes = Math.max(0, (post.likes||1) - 1);
+                    } else {
+                        post.likedBy.push(uid);
+                        post.likes = (post.likes||0) + 1;
+                    }
+                    savePosts(communityPosts);
+                    renderFeed();
+                });
+            });
+
+            // Comment toggle
+            communityFeed.querySelectorAll('.post-comment-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.postid;
+                    const section = document.getElementById('comments-' + pid);
+                    if (section) section.classList.toggle('open');
+                });
+            });
+
+            // Comment image button
+            communityFeed.querySelectorAll('.comment-img-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.postid;
+                    const fileInput = communityFeed.querySelector(`.comment-img-input[data-postid="${pid}"]`);
+                    if (fileInput) fileInput.click();
+                });
+            });
+
+            // Comment image input change → store pending image
+            const commentPendingImgs = {};
+            communityFeed.querySelectorAll('.comment-img-input').forEach(inp => {
+                inp.addEventListener('change', () => {
+                    if (!inp.files[0]) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        commentPendingImgs[inp.dataset.postid] = reader.result;
+                        showToast('图片已选择，发送评论时附带');
+                    };
+                    reader.readAsDataURL(inp.files[0]);
+                });
+            });
+
+            // Comment submit (with image support)
+            communityFeed.querySelectorAll('.comment-submit').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.postid;
+                    const input = communityFeed.querySelector(`.comment-input[data-postid="${pid}"]`);
+                    if (!input) return;
+                    const text = input.value.trim();
+                    const img = commentPendingImgs[pid] || null;
+                    if (!text && !img) return;
+                    const idx = communityPosts.findIndex(p => p.id === pid);
+                    if (idx === -1) return;
+                    const profile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
+                    communityPosts[idx].comments = communityPosts[idx].comments || [];
+                    communityPosts[idx].comments.push({ name: profile.name || '用户', text, img });
+                    delete commentPendingImgs[pid];
+                    savePosts(communityPosts);
+                    renderFeed();
+                });
+            });
+
+            // Comment delete (author or comment owner)
+            communityFeed.querySelectorAll('.comment-delete').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.pid;
+                    const cidx = parseInt(btn.dataset.cidx);
+                    const idx = communityPosts.findIndex(p => p.id === pid);
+                    if (idx === -1 || !communityPosts[idx].comments) return;
+                    communityPosts[idx].comments.splice(cidx, 1);
+                    savePosts(communityPosts);
+                    renderFeed();
+                });
+            });
+
+            // Delete handlers
+            communityFeed.querySelectorAll('.post-delete').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.postid;
+                    communityPosts = communityPosts.filter(p => p.id !== pid);
+                    savePosts(communityPosts);
+                    renderFeed();
+                    showToast('已删除');
+                });
+            });
+        }
+
+        // ========== Following Feed ==========
+        const followingOverlay = document.getElementById('followingOverlay');
+        const btnOpenFollowing = document.getElementById('btnOpenFollowing');
+        const followingClose = document.getElementById('followingClose');
+        const followingFeedEl = document.getElementById('followingFeed');
+
+        btnOpenFollowing.addEventListener('click', () => {
+            followingOverlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            renderFollowingFeed();
+        });
+        followingClose.addEventListener('click', () => { followingOverlay.classList.remove('open'); document.body.style.overflow = ''; });
+
+        function renderFollowingFeed() {
+            const me = getCurrentUser();
+            const social = getSocialData();
+            const following = (social.following && social.following[me]) ? social.following[me] : [];
+            if (!following.length) {
+                followingFeedEl.innerHTML = '<div class="community-empty">你还没有关注任何人<br>去社区或搜索关注创作者吧！</div>';
+                return;
+            }
+            const all = allItems();
+            const followedWorks = all.filter(m => m.author && following.includes(m.author));
+            if (!followedWorks.length) {
+                followingFeedEl.innerHTML = '<div class="community-empty">关注的用户还没有发布作品</div>';
+                return;
+            }
+            followingFeedEl.innerHTML = followedWorks.slice(0, 30).map(m => {
+                const thumb = m.type === 'video' ? '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px;font-size:2rem;">▶</div>'
+                    : m.type === 'model' ? '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px;font-size:2rem;">🧊</div>'
+                    : `<img src="${m.file}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">`;
+                return `<div class="post-card" data-wid="${m.id}" style="cursor:pointer;">
+                    <div class="post-header"><div class="post-avatar">${(m.author||'?').charAt(0)}</div>
+                    <div class="post-meta"><div class="post-name">${m.author||'风之旅人'}</div><div class="post-time">${m.cat}${m.subCat?' · '+m.subCat:''}</div></div></div>
+                    <div style="display:flex;gap:10px;"><div style="width:160px;flex-shrink:0;">${thumb}</div>
+                    <div style="flex:1;"><div style="font-weight:600;margin-bottom:4px;">${m.title}</div></div></div>
+                </div>`;
+            }).join('');
+            followingFeedEl.querySelectorAll('.post-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const wid = card.dataset.wid;
+                    const id = wid && wid.startsWith('upload_') ? wid : parseInt(wid);
+                    followingOverlay.classList.remove('open');
+                    document.body.style.overflow = '';
+                    setTimeout(() => openLightbox(id), 300);
+                });
+            });
+        }
+
+        syncComposerAvatar();
+
+        // ========== IndexedDB Storage ==========
+        const IDB = (function() {
+            const DB_NAME = 'WindWalkerUploads', STORE = 'files';
+            let db = null;
+            function open() {
+                return new Promise((resolve, reject) => {
+                    if (db) return resolve(db);
+                    const req = indexedDB.open(DB_NAME, 1);
+                    req.onupgradeneeded = e => { e.target.result.createObjectStore(STORE, { keyPath: 'id' }); };
+                    req.onsuccess = e => { db = e.target.result; resolve(db); };
+                    req.onerror = () => reject(req.error);
+                });
+            }
+            async function save(item) {
+                const d = await open();
+                return new Promise((resolve, reject) => {
+                    const tx = d.transaction(STORE, 'readwrite');
+                    tx.objectStore(STORE).put(item);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+            }
+            async function loadAll() {
+                const d = await open();
+                return new Promise((resolve, reject) => {
+                    const tx = d.transaction(STORE, 'readonly');
+                    const req = tx.objectStore(STORE).getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+            async function remove(id) {
+                const d = await open();
+                return new Promise((resolve, reject) => {
+                    const tx = d.transaction(STORE, 'readwrite');
+                    tx.objectStore(STORE).delete(id);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+            }
+            return { save, loadAll, remove };
+        })();
+
+        // ========== Upload ==========
+        let uploadedItems = [];
+
+        const uploadModal = document.getElementById('uploadModal');
+        const btnOpenUpload = document.getElementById('btnOpenUpload');
+        const modalClose = document.getElementById('modalClose');
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPreview = document.getElementById('uploadPreview');
+        const previewContent = document.getElementById('previewContent');
+        const previewName = document.getElementById('previewName');
+        const previewSize = document.getElementById('previewSize');
+        const previewRemove = document.getElementById('previewRemove');
+        const uploadTitle = document.getElementById('uploadTitle');
+        const uploadCategory = document.getElementById('uploadCategory');
+        const uploadSubCategory = document.getElementById('uploadSubCategory');
+        const uploadSubCatRow = document.getElementById('uploadSubCatRow');
+        const btnSubmitUpload = document.getElementById('btnSubmitUpload');
+
+        let pendingFile = null;
+        let pendingObjectURL = null;
+        let pendingCoverURL = null;
+        let pendingCoverFile = null;
+
+        // Cover image elements
+        const coverUploadRow = document.getElementById('coverUploadRow');
+        const btnCoverUpload = document.getElementById('btnCoverUpload');
+        const coverThumb = document.getElementById('coverThumb');
+        const coverRemove = document.getElementById('coverRemove');
+        const coverInput = document.getElementById('coverInput');
+
+        btnCoverUpload.addEventListener('click', () => coverInput.click());
+        coverInput.addEventListener('change', () => {
+            const f = coverInput.files[0];
+            if (!f || !f.type.startsWith('image/')) return;
+            if (pendingCoverURL) URL.revokeObjectURL(pendingCoverURL);
+            pendingCoverURL = URL.createObjectURL(f);
+            pendingCoverFile = f;
+            coverThumb.src = pendingCoverURL;
+            coverThumb.classList.add('show');
+            coverRemove.classList.add('show');
+        });
+        coverRemove.addEventListener('click', e => {
+            e.stopPropagation();
+            if (pendingCoverURL) URL.revokeObjectURL(pendingCoverURL);
+            pendingCoverURL = null;
+            coverThumb.src = '';
+            coverThumb.classList.remove('show');
+            coverRemove.classList.remove('show');
+        });
+
+        // Populate category select
+        function populateUploadCategories() {
+            uploadCategory.innerHTML = ALL_CATEGORIES.map(c =>
+                `<option value="${c}">${c}</option>`
+            ).join('');
+            uploadCategory.value = '作者作品';
+            uploadSubCategory.innerHTML = SUB_CATEGORIES_3D.map(s =>
+                `<option value="${s}">${s}</option>`
+            ).join('');
+            updateSubCatVisibility();
+        }
+        function updateSubCatVisibility() {
+            uploadSubCatRow.style.display = uploadCategory.value === '3D模型' ? 'grid' : 'none';
+        }
+        uploadCategory.addEventListener('change', updateSubCatVisibility);
+        populateUploadCategories();
+
+        // Open / close modal
+        btnOpenUpload.addEventListener('click', () => {
+            uploadModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            resetUploadForm();
+        });
+
+        function closeUploadModal() {
+            uploadModal.classList.remove('open');
+            document.body.style.overflow = '';
+            resetUploadForm();
+        }
+
+        modalClose.addEventListener('click', closeUploadModal);
+        uploadModal.addEventListener('click', e => {
+            if (e.target === uploadModal) closeUploadModal();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && uploadModal.classList.contains('open')) {
+                closeUploadModal();
+            }
+        });
+
+        function resetUploadForm() {
+            if (pendingObjectURL) URL.revokeObjectURL(pendingObjectURL);
+            if (pendingCoverURL) URL.revokeObjectURL(pendingCoverURL);
+            pendingFile = null;
+            pendingObjectURL = null;
+            pendingCoverURL = null; pendingCoverFile = null;
+            uploadPreview.classList.remove('show');
+            previewContent.innerHTML = '';
+            previewName.textContent = '';
+            previewSize.textContent = '';
+            uploadTitle.value = '';
+            uploadCategory.value = '作者作品';
+            uploadSubCategory.value = SUB_CATEGORIES_3D[0];
+            updateSubCatVisibility();
+            btnSubmitUpload.disabled = true;
+            fileInput.value = '';
+            coverInput.value = '';
+            coverThumb.src = '';
+            coverThumb.classList.remove('show');
+            coverRemove.classList.remove('show');
+            coverUploadRow.classList.remove('show');
+        }
+
+        // File selection
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            // Validate
+            const allowed = /\.(png|jpg|jpeg|gif|webp|bmp|svg|mp4|webm|mov|glb|fbx|obj|gltf)$/i;
+            if (!allowed.test(file.name)) {
+                showToast('不支持的文件格式', true);
+                return;
+            }
+
+            if (pendingObjectURL) URL.revokeObjectURL(pendingObjectURL);
+            pendingFile = file;
+            pendingObjectURL = URL.createObjectURL(file);
+
+            const isVideo = /\.(mp4|webm|mov)$/i.test(file.name);
+            const is3D = /\.(glb|fbx|obj|gltf)$/i.test(file.name);
+
+            uploadPreview.classList.add('show');
+            if (isVideo) {
+                previewContent.innerHTML = `<video src="${pendingObjectURL}" controls></video>`;
+                coverUploadRow.classList.remove('show');
+            } else if (is3D) {
+                previewContent.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:180px;font-size:3rem;">🧊</div>`;
+                coverUploadRow.classList.add('show');  // show cover upload for 3D models
+            } else {
+                previewContent.innerHTML = `<img src="${pendingObjectURL}" alt="预览">`;
+                coverUploadRow.classList.remove('show');
+            }
+
+            previewName.textContent = file.name;
+            previewSize.textContent = formatSize(file.size);
+
+            // Auto-fill title
+            if (!uploadTitle.value) {
+                const t = file.name.replace(/\.[^.]+$/, '').replace(/[_\-]/g, ' ').slice(0, 40);
+                uploadTitle.value = t;
+            }
+
+            btnSubmitUpload.disabled = false;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        previewRemove.addEventListener('click', e => {
+            e.stopPropagation();
+            resetUploadForm();
+        });
+
+        // Submit upload
+        btnSubmitUpload.addEventListener('click', () => {
+            if (!pendingFile || !uploadTitle.value.trim()) {
+                showToast('请选择文件并填写标题', true);
+                return;
+            }
+
+            const is3D = /\.(glb|fbx|obj|gltf)$/i.test(pendingFile.name);
+            const subCat = uploadCategory.value === '3D模型' ? uploadSubCategory.value : '';
+            const newItem = {
+                id: 'upload_' + Date.now(),
+                file: pendingObjectURL,
+                cover: pendingCoverURL || null,
+                type: /\.(mp4|webm|mov)$/i.test(pendingFile.name) ? 'video' : is3D ? 'model' : 'image',
+                cat: uploadCategory.value,
+                subCat: subCat,
+                title: uploadTitle.value.trim(),
+                author: (()=>{try{return JSON.parse(localStorage.getItem('windwalker_profile')||'{}').name||''}catch(e){return''}})() || '风之旅人',
+                fileName: pendingFile.name,
+                isUpload: true,
+            };
+
+            uploadedItems.push(newItem);
+
+            // Save file + cover blob to IndexedDB for persistence
+            if (pendingFile) {
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    let coverBuf = null;
+                    if (pendingCoverFile) {
+                        coverBuf = await new Promise(resolve => {
+                            const cr = new FileReader();
+                            cr.onload = () => resolve(cr.result);
+                            cr.readAsArrayBuffer(pendingCoverFile);
+                        });
+                    }
+                    IDB.save({
+                        id: newItem.id,
+                        blob: reader.result,
+                        fileName: pendingFile.name,
+                        type: newItem.type,
+                        cat: newItem.cat,
+                        subCat: newItem.subCat,
+                        title: newItem.title,
+                        author: newItem.author,
+                        coverBlob: coverBuf,
+                    }).catch((err) => { console.warn('IndexedDB save failed, file persisted in localStorage backup only:', err); });
+                };
+                reader.readAsArrayBuffer(pendingFile);
+            }
+
+            // Don't revoke — we need the URL for display
+            pendingObjectURL = null;
+            pendingCoverURL = null; pendingCoverFile = null;
+
+            // Backup metadata to localStorage (fallback if IDB fails)
+            try {
+                const backup = JSON.parse(localStorage.getItem('windwalker_upload_meta') || '[]');
+                backup.push({ id: newItem.id, title: newItem.title, type: newItem.type, cat: newItem.cat, subCat: newItem.subCat, author: newItem.author, fileName: newItem.fileName, time: Date.now() });
+                localStorage.setItem('windwalker_upload_meta', JSON.stringify(backup.slice(-50)));
+            } catch(e) {}
+
+            showToast('✅ 已添加: ' + newItem.title);
+            closeUploadModal();
+            renderGallery();
+            updateStats();
+            if (userDrawer.classList.contains('open')) {
+                refreshDrawerWorks();
+                updateDrawerStats();
+            }
+        });
+
+        // ========== Search (models + users) ==========
+        const searchUserDropdown = document.getElementById('searchUserDropdown');
+        let searchTimer;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                searchQ = searchInput.value;
+                renderGallery();
+                renderUserSearchResults();
+            }, 220);
+        });
+        searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) renderUserSearchResults(); });
+        document.addEventListener('click', e => { if (!e.target.closest('.search-wrapper')) searchUserDropdown.classList.remove('show'); });
+
+        function renderUserSearchResults() {
+            const q = searchQ.toLowerCase().trim();
+            searchUserDropdown.innerHTML = '';
+            if (!q) { searchUserDropdown.classList.remove('show'); return; }
+            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
+            const matches = Object.keys(accs).filter(u => u.toLowerCase().includes(q) || (accs[u].code && accs[u].code.includes(q))).slice(0, 5);
+            if (!matches.length) { searchUserDropdown.classList.remove('show'); return; }
+
+            searchUserDropdown.innerHTML = matches.map(u => {
+                const works = modelData.filter(m => m.author === u).length + uploadedItems.filter(m => m.author === u).length;
+                const info = getUserInfoCard ? getUserInfoCard(u) : { works, created: accs[u] ? new Date(accs[u].created).toLocaleDateString('zh-CN') : '' };
+                const following = typeof isFollowing === 'function' ? isFollowing(u) : false;
+                return `<div class="search-user-card" data-username="${u}">
+                    <div class="search-user-avatar">${u.charAt(0)}</div>
+                    <div class="search-user-info">
+                        <div class="search-user-name">${u}</div>
+                        <div class="search-user-stats">ID: ${accs[u]?.code||'---'} · 作品 ${info.works}</div>
+                    </div>
+                    <button class="search-user-follow" data-follow="${u}">${following ? '已关注' : '+关注'}</button>
+                </div>`;
+            }).join('');
+            searchUserDropdown.classList.add('show');
+
+            // Follow buttons
+            searchUserDropdown.querySelectorAll('.search-user-follow').forEach(b => {
+                b.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const target = b.dataset.follow;
+                    if (typeof toggleFollow === 'function') {
+                        const nowFollowing = toggleFollow(target);
+                        b.textContent = nowFollowing ? '已关注' : '+关注';
+                    }
+                });
+            });
+            // Click card → show toast with user info
+            searchUserDropdown.querySelectorAll('.search-user-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const u = card.dataset.username;
+                    searchUserDropdown.classList.remove('show');
+                    searchInput.value = u;
+                    searchQ = u;
+                    renderGallery();
+                });
+            });
+        }
+
+        // ========== Toast ==========
+        function showToast(msg, isErr) {
+            toast.textContent = msg;
+            toast.className = 'toast' + (isErr ? ' error' : '');
+            toast.classList.add('show');
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => toast.classList.remove('show'), 2600);
+        }
+
+        // ============================================================
+        //  🎬 3D 入场动画 — Wireframe + Particles
+        // ============================================================
+        function setupEntranceCanvas() {
+            entranceCanvas.width = window.innerWidth;
+            entranceCanvas.height = window.innerHeight;
+        }
+        setupEntranceCanvas();
+        window.addEventListener('resize', setupEntranceCanvas);
+
+        // 3D → 2D projection
+        function project(x, y, z) {
+            const d = 400;
+            const cx = entranceCanvas.width / 2;
+            const cy = entranceCanvas.height / 2;
+            const scale = d / (d + z);
+            return {
+                x: cx + x * scale,
+                y: cy - y * scale,
+                scale
+            };
+        }
+
+        // Wireframe cube vertices
+        const cubeVerts = [
+            [-1,-1,-1],[ 1,-1,-1],[ 1, 1,-1],[-1, 1,-1],
+            [-1,-1, 1],[ 1,-1, 1],[ 1, 1, 1],[-1, 1, 1],
+        ];
+        const cubeEdges = [
+            [0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7],
+        ];
+
+        // Particles
+        const particles = [];
+        const MAX_P = 15;
+        for (let i = 0; i < MAX_P; i++) {
+            particles.push({
+                x: (Math.random() - 0.5) * 500,
+                y: (Math.random() - 0.5) * 500,
+                z: Math.random() * 300,
+                vx: (Math.random() - 0.5) * 1.2,
+                vy: (Math.random() - 0.5) * 1.2,
+                vz: Math.random() * 1.5 + 0.3,
+                r: Math.random() * 1.8 + 0.5,
+            });
+        }
+
+        let animStart = performance.now();
+        const ANIM_DURATION = 2400; // ms
+
+        function drawEntrance(now) {
+            const elapsed = now - animStart;
+            const progress = Math.min(elapsed / ANIM_DURATION, 1);
+            // Ease-out
+            const eased = 1 - Math.pow(1 - progress, 3);
+
+            ctx.clearRect(0, 0, entranceCanvas.width, entranceCanvas.height);
+
+            const cubeSize = 70;
+            const rotY = eased * Math.PI * 2.5;
+            const rotX = eased * Math.PI * 0.8;
+            const cubeZ = 120 - eased * 60;
+
+            // --- Draw wireframe grid floor ---
+            const gridSize = 6;
+            const gridSpacing = 50;
+            const gridAlpha = 0.18 * (1 - eased * 0.7);
+            ctx.strokeStyle = `rgba(56,189,248,${gridAlpha})`;
+            ctx.lineWidth = 0.6;
+            for (let gx = -gridSize; gx <= gridSize; gx++) {
+                const p1 = project(gx * gridSpacing, -60, 0);
+                const p2 = project(gx * gridSpacing, -60, gridSize * 2 * gridSpacing);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+            for (let gz = 0; gz <= gridSize * 2; gz++) {
+                const p1 = project(-gridSize * gridSpacing, -60, gz * gridSpacing);
+                const p2 = project(gridSize * gridSpacing, -60, gz * gridSpacing);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+
+            // --- Draw wireframe cube ---
+            const rotated = cubeVerts.map(([x, y, z]) => {
+                // Rotate Y
+                const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+                let rx = x * cosY - z * sinY;
+                let rz = x * sinY + z * cosY;
+                // Rotate X
+                const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+                let ry = y * cosX - rz * sinX;
+                rz = y * sinX + rz * cosX;
+                return [rx * cubeSize, ry * cubeSize, rz * cubeSize + cubeZ];
+            });
+
+            const projected = rotated.map(([x, y, z]) => project(x, y, z));
+
+            // Cube edges
+            const edgeAlpha = 0.5 + eased * 0.3;
+            ctx.strokeStyle = `rgba(56,189,248,${edgeAlpha})`;
+            ctx.lineWidth = 1.4;
+            cubeEdges.forEach(([a, b]) => {
+                const pa = projected[a], pb = projected[b];
+                ctx.beginPath();
+                ctx.moveTo(pa.x, pa.y);
+                ctx.lineTo(pb.x, pb.y);
+                ctx.stroke();
+            });
+
+            // Cube vertices
+            projected.forEach(p => {
+                ctx.fillStyle = `rgba(129,140,248,${0.7 + eased * 0.3})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3.5 * p.scale, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // --- Particles ---
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.z += p.vz;
+                if (p.z > 300) { p.z = 0; p.x = (Math.random() - 0.5) * 500; p.y = (Math.random() - 0.5) * 400; }
+                if (Math.abs(p.x) > 300) p.vx *= -1;
+                if (Math.abs(p.y) > 300) p.vy *= -1;
+
+                const pp = project(p.x, p.y, p.z);
+                const pAlpha = (0.5 + p.z / 300 * 0.5) * (1 - eased * 0.5);
+                ctx.fillStyle = `rgba(129,140,248,${pAlpha})`;
+                ctx.beginPath();
+                ctx.arc(pp.x, pp.y, p.r * pp.scale, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // --- Center text ---
+            if (elapsed > 400) {
+                const textAlpha = Math.min((elapsed - 400) / 600, 1) * (1 - Math.max(0, (elapsed - 1800) / 400));
+                ctx.fillStyle = `rgba(226,232,240,${textAlpha})`;
+                ctx.font = '900 28px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('风之旅人', entranceCanvas.width / 2, entranceCanvas.height / 2 + 130);
+
+                ctx.fillStyle = `rgba(124,138,160,${textAlpha * 0.8})`;
+                ctx.font = '500 13px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+                ctx.fillText('3 D  模 型 资 源 库', entranceCanvas.width / 2, entranceCanvas.height / 2 + 158);
+            }
+
+            if (progress < 1) {
+                requestAnimationFrame(drawEntrance);
+            } else {
+                // Fade out canvas
+                entranceCanvas.classList.add('hidden');
+                setTimeout(() => {
+                    entranceCanvas.style.display = 'none';
+                    entranceCanvas.remove();
+                }, 800);
+            }
+        }
+
+        // ========== Douyin QR ==========
+        const douyinFloat = document.getElementById('douyinFloat');
+        const douyinModal = document.getElementById('douyinModal');
+        const douyinQRClose = document.getElementById('douyinQRClose');
+        const footerDouyin = document.getElementById('footerDouyin');
+
+        function openDouyinQR() {
+            douyinModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            AudioSys.douyinOpen();
+        }
+
+        function closeDouyinQR() {
+            douyinModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        // Floating button shows Douyin ID only (no QR modal)
+        douyinFloat.addEventListener('click', () => {
+            showToast('抖音号: 风之旅人 (扫码请看页面底部)');
+        });
+        // QR modal only from footer
+        footerDouyin.addEventListener('click', openDouyinQR);
+        douyinQRClose.addEventListener('click', closeDouyinQR);
+        douyinModal.addEventListener('click', e => {
+            if (e.target === douyinModal) closeDouyinQR();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && douyinModal.classList.contains('open')) {
+                closeDouyinQR();
+            }
+        });
+
+        // ========== Init ==========
+        async function init() {
+            // Load persisted uploads from IndexedDB
+            try {
+                const stored = await IDB.loadAll();
+                stored.forEach(item => {
+                    if (item.type === 'community_video') return;
+                    try {
+                        const blob = new Blob([item.blob], { type: (item.fileName||'').match(/\.(mp4|webm)$/i) ? 'video/mp4' : 'image/png' });
+                        const url = URL.createObjectURL(blob);
+                        let coverUrl = null;
+                        if (item.coverBlob && item.coverBlob.byteLength > 0) {
+                            const cblob = new Blob([item.coverBlob], { type: 'image/png' });
+                            coverUrl = URL.createObjectURL(cblob);
+                        }
+                        uploadedItems.push({
+                            id: item.id,
+                            file: url,
+                            cover: coverUrl,
+                            type: item.type,
+                            cat: item.cat,
+                            subCat: item.subCat || '',
+                            title: item.title,
+                            author: item.author || '',
+                            fileName: item.fileName,
+                            isUpload: true,
+                            persisted: true,
+                        });
+                    } catch(e) {
+                        // If blob creation fails, skip this item
+                        console.warn('Failed to restore upload:', item.title, e);
+                    }
+                });
+            } catch(e) { /* IDB not available */ }
+
+            // Fallback: if IDB failed to load anything, try localStorage backup
+            if (uploadedItems.length === 0) {
+                try {
+                    const backup = JSON.parse(localStorage.getItem('windwalker_upload_meta') || '[]');
+                    backup.forEach(meta => {
+                        // Metadata-only fallback — file will be missing but structure preserved
+                        uploadedItems.push({
+                            id: meta.id,
+                            file: '',
+                            cover: null,
+                            type: meta.type,
+                            cat: meta.cat,
+                            subCat: meta.subCat || '',
+                            title: meta.title + ' (需重新上传)',
+                            author: meta.author || '',
+                            fileName: meta.fileName,
+                            isUpload: true,
+                            persisted: false,
+                        });
+                    });
+                } catch(e2) {}
+            }
+
+            renderCategories();
+            renderGallery();
+            updateStats();
+
+            // Start entrance animation
+            animStart = performance.now();
+            requestAnimationFrame(drawEntrance);
+
+            // Trigger card stagger after entrance
+            setTimeout(() => {
+                gallery.classList.add('animate-in');
+                const cards = galleryGrid.querySelectorAll('.model-card');
+                cards.forEach((c, i) => {
+                    c.style.animationDelay = (i * 0.05) + 's';
+                });
+                setTimeout(() => {
+                    gallery.classList.remove('animate-in');
+                    cards.forEach(c => { c.style.animation = ''; c.style.animationDelay = ''; });
+                }, 1800);
+            }, 2000);
+        }
+
+        // ========== Auto-sync to Server ==========
+        const origSetItem = localStorage.setItem.bind(localStorage);
+        localStorage.setItem = function(key, value) {
+            origSetItem(key, value);
+            if (key.startsWith('windwalker_') || key.startsWith('wa_')) {
+                clearTimeout(localStorage._ss);
+                localStorage._ss = setTimeout(() => {
+                    const data = {};
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k.startsWith('windwalker_') || k.startsWith('wa_')) {
+                            try { data[k] = JSON.parse(localStorage.getItem(k)); } catch(e) { data[k] = localStorage.getItem(k); }
+                        }
+                    }
+                    fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'all',value:data}) }).catch(()=>{});
+                }, 800);
+            }
+        };
+
+        init();
+    })();
+    </script>
+</body>
+</html>
