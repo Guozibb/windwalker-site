@@ -2295,6 +2295,7 @@
         const ctx = entranceCanvas.getContext('2d');
 
         // ========== Filter ==========
+        let uploadedItems = []; // must be before allItems() due to let TDZ
         function allItems() { return [...modelData, ...uploadedItems]; }
 
         function filtered() {
@@ -3272,11 +3273,6 @@ function updateNav(items) {
 
         // Send
         let chatPImg = null;
-        document.getElementById('chatPanelImgBtn').addEventListener('click',()=>document.getElementById('chatPanelImgInput').click());
-        document.getElementById('chatPanelImgInput').addEventListener('change',function(){
-            const f=this.files[0];if(!f||!f.type.startsWith('image/'))return;
-            const r=new FileReader();r.onload=()=>{chatPImg=r.result;showToast('图片已选择');};r.readAsDataURL(f);
-        });
         async function sendChat() {
             const me=getCurrentUser(),text=chatPanelInput.value.trim();
             const target = chatPanelTarget.value.trim() || chatPartner;
@@ -3781,7 +3777,6 @@ function updateNav(items) {
         }
 
         // ========== Upload ==========
-        let uploadedItems = [];
 
         const uploadModal = document.getElementById('uploadModal');
         const btnOpenUpload = document.getElementById('btnOpenUpload');
