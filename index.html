@@ -2506,13 +2506,15 @@
             const items = filtered();
             lightboxIdx = items.findIndex(m => m.id === id);
             if (lightboxIdx === -1) return;
-            // 👁 浏览量+1
+            // 👁 浏览量+1（先查数据库最新值，避免竞态覆盖）
             const sid = String(id);
-            viewCounts[sid] = (viewCounts[sid]||0) + 1;
-            // 异步保存到 Supabase
+            try {
+                const { data: row } = await supabase.from('item_views').select('views').eq('item_id', sid).maybeSingle();
+                viewCounts[sid] = (row?.views || 0) + 1;
+            } catch(e) {
+                viewCounts[sid] = (viewCounts[sid]||0) + 1;
+            }
             supabase.from('item_views').upsert({item_id:sid, views:viewCounts[sid]}).then();
-            const uid = id.toString().startsWith('upload_') ? parseInt(id.toString().replace('upload_','')) : null;
-            if (uid) supabase.rpc('increment_upload_views', {row_id:uid}).then();
             renderGallery(); // 即时更新卡片浏览量
             showInLightbox(items[lightboxIdx]);
             lightbox.classList.add('open');
@@ -4682,7 +4684,29 @@ function updateNav(items) {
         setInterval(checkNotifications, 15000);
         setTimeout(checkNotifications, 3000);
         // 定时刷新画廊 (30秒)
-        setInterval(() => { if (document.hidden) return; renderGallery(); updateStats(); }, 30000);
+        // 定时刷新浏览/点赞/收藏/评论数（从 Supabase 同步最新数据）
+        async function refreshCounts() {
+            try {
+                const { data: vc } = await supabase.from('item_views').select('*');
+                (vc||[]).forEach(v => { viewCounts[v.item_id] = v.views; });
+            } catch(e) {}
+            try {
+                const { data: allLikes } = await supabase.from('item_likes').select('item_id');
+                likeCounts = {};
+                (allLikes||[]).forEach(l => { const k = String(l.item_id); likeCounts[k] = (likeCounts[k]||0) + 1; });
+            } catch(e) {}
+            try {
+                const { data: allBookmarks } = await supabase.from('item_bookmarks').select('item_id');
+                bookmarkCounts = {};
+                (allBookmarks||[]).forEach(b => { const k = String(b.item_id); bookmarkCounts[k] = (bookmarkCounts[k]||0) + 1; });
+            } catch(e) {}
+            try {
+                const { data: allComments } = await supabase.from('item_comments').select('item_id');
+                commentCounts = {};
+                (allComments||[]).forEach(c => { const k = String(c.item_id); commentCounts[k] = (commentCounts[k]||0) + 1; });
+            } catch(e) {}
+        }
+        setInterval(() => { if (document.hidden) return; refreshCounts().then(() => { renderGallery(); updateStats(); }); }, 30000);
 
         init();
     })();
