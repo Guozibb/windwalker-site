@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>风之旅人 · 诊断</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        body { font-family: monospace; max-width: 600px; margin: 30px auto; background: #111; color: #eee; padding: 20px; line-height: 1.8; }
+        .ok { color: #4ade80; } .err { color: #f87171; } .info { color: #60a5fa; }
+        button { padding: 10px 24px; margin: 10px 0; cursor: pointer; background: #3b82f6; color: #fff; border: none; border-radius: 6px; font-size: 14px; }
+        input { padding: 8px 12px; width: 200px; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>🔧 风之旅人 · 诊断页面</h2>
+    <div id="log"></div>
+    <hr>
+    <input id="testUser" placeholder="测试用户名" value="">
+    <input id="testPass" placeholder="测试密码" value="" type="password">
+    <br>
+    <button onclick="runAll()">▶ 开始诊断</button>
+    <button onclick="testPost()">📝 测试发帖</button>
+
+    <script>
+        function log(msg, type) { document.getElementById('log').innerHTML += `<span class="${type||'info'}">${msg}</span><br>`; window.scrollTo(0,document.body.scrollHeight); }
+
+        const SUPABASE_URL = 'https://gxbeztgssxniuqwawsrz.supabase.co';
+        const SUPABASE_ANON_KEY = document.querySelector('script[src*="supabase"]') ? '' : '';
+        // 从 index.html 的 URL 和 KEY 填充
+        const urlMatch = location.search.match(/url=([^&]+)/);
+        const keyMatch = location.search.match(/key=([^&]+)/);
+        const finalUrl = urlMatch ? decodeURIComponent(urlMatch[1]) : SUPABASE_URL;
+        // 尝试从 localStorage 获取之前保存的配置
+        const savedKey = localStorage.getItem('sb-key');
+
+        async function runAll() {
+            document.getElementById('log').innerHTML = '';
+            log('═══ 诊断开始 ═══', 'info');
+
+            // 1. CDN
+            if (typeof window.supabase === 'undefined') { log('❌ Supabase SDK 未加载', 'err'); return; }
+            log('✅ Supabase SDK 已加载', 'ok');
+
+            // 2. 创建客户端
+            if (!finalUrl || finalUrl.includes('YOUR-PROJECT')) { log('❌ Supabase URL 未设置', 'err'); return; }
+            const anonKey = savedKey || prompt('请输入 Supabase ANON KEY:');
+            if (!anonKey || anonKey === 'YOUR-ANON-KEY') { log('❌ ANON KEY 无效', 'err'); return; }
+            localStorage.setItem('sb-key', anonKey);
+            const sb = window.supabase.createClient(finalUrl, anonKey);
+            log('✅ 客户端已创建: ' + finalUrl, 'ok');
+
+            // 3. 测试 Auth
+            const { data: sessData, error: sessErr } = await sb.auth.getSession();
+            if (sessErr) { log('⚠ Auth 调用失败: ' + sessErr.message, 'err'); }
+            if (sessData?.session) {
+                log('✅ 已登录: ' + sessData.session.user.id.substring(0,8) + '...', 'ok');
+                await testTables(sb);
+            } else {
+                log('ℹ 未登录，请先注册/登录', 'info');
+                const u = document.getElementById('testUser').value || 'testuser' + Date.now() % 10000;
+                const p = document.getElementById('testPass').value || 'test123456';
+                log('📝 尝试注册: ' + u, 'info');
+
+                const { data: signData, error: signErr } = await sb.auth.signUp({
+                    email: u + '@windwalker.app', password: p,
+                    options: { data: { username: u } }
+                });
+                if (signErr) {
+                    if (signErr.message.includes('already')) {
+                        log('⚠ 用户已存在，尝试登录...', 'info');
+                        const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email: u+'@windwalker.app', password: p });
+                        if (loginErr) { log('❌ 登录失败: ' + loginErr.message, 'err'); return; }
+                        log('✅ 登录成功', 'ok');
+                        await testTables(sb);
+                    } else {
+                        log('❌ 注册失败: ' + signErr.message, 'err');
+                        return;
+                    }
+                } else {
+                    log('✅ 注册成功', 'ok');
+                    if (signData.session) {
+                        log('✅ Session 已获取', 'ok');
+                    } else {
+                        log('⚠ 无 Session，尝试手动登录', 'info');
+                        const { error: loginErr2 } = await sb.auth.signInWithPassword({ email: u+'@windwalker.app', password: p });
+                        if (loginErr2) { log('❌ 手动登录失败: ' + loginErr2.message, 'err'); return; }
+                        log('✅ 手动登录成功', 'ok');
+                    }
+                    await testTables(sb);
+                }
+            }
+        }
+
+        async function testTables(sb) {
+            log('═══ 数据库测试 ═══', 'info');
+            // profiles
+            const userId = (await sb.auth.getSession()).data.session.user.id;
+            log('  User ID: ' + userId.substring(0,8)+'...', 'info');
+
+            // 测试 profiles
+            let { data: pf, error: pfErr } = await sb.from('profiles').select('*').eq('id', userId).single();
+            if (pfErr) {
+                log('  ⚠ profiles 查询失败: ' + pfErr.message + ' (code:' + pfErr.code + ')', 'err');
+                log('  → 尝试创建 profiles...', 'info');
+                const { error: insErr } = await sb.from('profiles').upsert({ id: userId, username: 'test_'+Date.now()%10000, user_code: String(Math.floor(100000+Math.random()*900000)) });
+                if (insErr) log('  ❌ profiles 创建失败: ' + insErr.message, 'err');
+                else log('  ✅ profiles 已创建', 'ok');
+            } else {
+                log('  ✅ profiles 表 OK', 'ok');
+            }
+
+            // 测试 community_posts
+            log('  ── 测试 community_posts 表 ──', 'info');
+            const { data: posts, error: postsErr } = await sb.from('community_posts').select('count', { count: 'exact', head: true });
+            if (postsErr) {
+                log('  ❌ community_posts 读取失败: ' + postsErr.message + ' (code:' + postsErr.code + ')', 'err');
+            } else {
+                log(`  ✅ community_posts 表 OK (${posts} 条记录)`, 'ok');
+
+                // 尝试写入
+                const { data: newPost, error: writeErr } = await sb.from('community_posts').insert({
+                    author_id: userId,
+                    text: '诊断测试帖 ' + new Date().toLocaleString(),
+                    media_url: '', media_type: null, likes_count: 0
+                }).select('id').single();
+                if (writeErr) {
+                    log('  ❌ community_posts 写入失败: ' + writeErr.message + ' (code:' + writeErr.code + ')', 'err');
+                    log('  → 错误详情: ' + JSON.stringify(writeErr), 'err');
+                } else {
+                    log('  ✅ community_posts 写入成功, id=' + newPost.id, 'ok');
+                    // 清理
+                    await sb.from('community_posts').delete().eq('id', newPost.id);
+                }
+            }
+
+            // 测试其他表
+            const tables = ['follows','messages','notifications','uploads','item_likes','item_bookmarks','item_comments','post_likes','post_comments'];
+            for (const t of tables) {
+                const { error: e } = await sb.from(t).select('count', { count: 'exact', head: true });
+                if (e) log(`  ⚠ ${t}: ${e.message}`, 'err');
+                else log(`  ✅ ${t} 表 OK`, 'ok');
+            }
+
+            log('═══ 诊断完成 ═══', 'ok');
+        }
+
+        async function testPost() {
+            const anonKey = localStorage.getItem('sb-key');
+            if (!anonKey) { log('请先运行诊断', 'err'); return; }
+            const sb = window.supabase.createClient(finalUrl, anonKey);
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) { log('请先登录', 'err'); return; }
+            const { data, error } = await sb.from('community_posts').insert({
+                author_id: session.user.id,
+                text: '手动测试帖 ' + Date.now(),
+                media_url: '', media_type: null, likes_count: 0
+            }).select('id').single();
+            if (error) log('❌ 发帖失败: ' + error.message + ' [' + error.code + ']', 'err');
+            else log('✅ 发帖成功 id=' + data.id, 'ok');
+        }
+    </script>
+</body>
+</html>
