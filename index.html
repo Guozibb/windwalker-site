@@ -3381,12 +3381,19 @@ function updateNav(items) {
                     likes = new Set((l || []).map(x => String(x.item_id)));
                     const { data: b } = await supabase.from('item_bookmarks').select('item_id').eq('user_id', currentUserId);
                     bookmarks = new Set((b || []).map(x => String(x.item_id)));
-                    const { data: c } = await supabase.from('item_comments').select('*, profiles:author_id(username)').order('created_at', { ascending: true });
+                    const { data: c } = await supabase.from('item_comments').select('*').order('created_at', { ascending: true });
+                    // 单独查出所有评论者的用户名映射
+                    const authorIds = [...new Set((c||[]).map(cmt => cmt.author_id))];
+                    const nameMap = {};
+                    if (authorIds.length) {
+                        const { data: profiles } = await supabase.from('profiles').select('id,username').in('id', authorIds);
+                        (profiles||[]).forEach(p => { nameMap[p.id] = p.username; });
+                    }
                     itemComments = {};
                     (c || []).forEach(cmt => {
                         const sid = String(cmt.item_id);
                         if (!itemComments[sid]) itemComments[sid] = [];
-                        itemComments[sid].push({ name: cmt.profiles?.username || '用户', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
+                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
                     });
                 } catch(e) { likes = new Set(); bookmarks = new Set(); itemComments = {}; }
             }
@@ -4528,7 +4535,14 @@ function updateNav(items) {
 
             // 3. Load uploaded items from Supabase（画廊互通：加载所有人的作品）
             try {
-                const { data: uploads } = await supabase.from('uploads').select('*, profiles:user_id(username)').order('created_at', { ascending: false }).limit(200);
+                const { data: uploads } = await supabase.from('uploads').select('*').order('created_at', { ascending: false }).limit(200);
+                // 单独查出所有作者的 username
+                const uploaderIds = [...new Set((uploads||[]).map(u => u.user_id))];
+                const nameMap = {};
+                if (uploaderIds.length) {
+                    const { data: profiles } = await supabase.from('profiles').select('id,username').in('id', uploaderIds);
+                    (profiles||[]).forEach(p => { nameMap[p.id] = p.username; });
+                }
                 (uploads || []).forEach(item => {
                     uploadedItems.push({
                         id: 'upload_' + item.id,
@@ -4538,7 +4552,7 @@ function updateNav(items) {
                         cat: item.category,
                         subCat: item.sub_category || '',
                         title: item.title,
-                        author: item.profiles?.username || '用户',
+                        author: nameMap[item.user_id] || '用户',
                         fileName: item.file_name,
                         isUpload: true,
                         persisted: true,
