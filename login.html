@@ -649,33 +649,35 @@
                     return;
                 }
 
-                // 手动创建 profiles 记录（绕过数据库触发器问题）
+                // 手动创建 profiles 记录
                 if (data.user) {
-                    // 生成 6 位唯一码
                     const code = String(Math.floor(100000 + Math.random() * 900000));
-                    const { error: profileErr } = await supabase.from('profiles').insert({
+                    await supabase.from('profiles').upsert({
                         id: data.user.id,
                         username: username,
                         user_code: code
-                    });
-                    if (profileErr) {
-                        // 如果 profiles 插入失败（比如已存在），尝试更新
-                        const { error: updateErr } = await supabase.from('profiles').upsert({
-                            id: data.user.id,
-                            username: username,
-                            user_code: code
-                        });
-                        if (updateErr) {
-                            showToast('注册失败: ' + updateErr.message, 'err');
-                            btnSubmitMain.disabled = false;
-                            btnSubmitMain.textContent = '注 册';
-                            return;
-                        }
-                    }
+                    }).catch(() => {});
                 }
 
-                showToast('✅ 注册成功，正在跳转...', 'ok');
-                goToIndex();
+                // 确保 session 持久化：显式重新登录
+                if (data.session) {
+                    showToast('✅ 注册成功，正在跳转...', 'ok');
+                    goToIndex();
+                } else {
+                    // signUp 没有返回 session（邮箱验证未关闭？），手动登录
+                    const { error: loginErr } = await supabase.auth.signInWithPassword({
+                        email: email,
+                        password: pwd
+                    });
+                    if (loginErr) {
+                        showToast('注册成功但登录失败: ' + loginErr.message, 'err');
+                        btnSubmitMain.disabled = false;
+                        btnSubmitMain.textContent = '注 册';
+                        return;
+                    }
+                    showToast('✅ 注册成功，正在跳转...', 'ok');
+                    goToIndex();
+                }
             } else {
                 // ---- Login via Supabase ----
                 const username = phoneInput.value.trim();
