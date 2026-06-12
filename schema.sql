@@ -138,6 +138,13 @@ CREATE TABLE item_comments (
 );
 CREATE INDEX idx_item_comments_item ON item_comments(item_id, created_at);
 
+-- ========== 14. item_views（画廊浏览量） ==========
+CREATE TABLE item_views (
+  item_id     TEXT NOT NULL,
+  views       INTEGER DEFAULT 0,
+  PRIMARY KEY (item_id)
+);
+
 -- ============================================================
 -- RLS 策略（行级安全）
 -- ============================================================
@@ -224,6 +231,12 @@ ALTER TABLE item_comments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "画廊评论公开可读" ON item_comments FOR SELECT USING (true);
 CREATE POLICY "用户添加画廊评论" ON item_comments FOR INSERT WITH CHECK (author_id = auth.uid());
 CREATE POLICY "用户删除自己的画廊评论" ON item_comments FOR DELETE USING (author_id = auth.uid());
+
+-- === item_views ===
+ALTER TABLE item_views ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "浏览量公开可读" ON item_views FOR SELECT USING (true);
+CREATE POLICY "任何人可新增浏览量" ON item_views FOR INSERT WITH CHECK (true);
+CREATE POLICY "任何人可更新浏览量" ON item_views FOR UPDATE USING (true);
 
 -- ============================================================
 -- 辅助函数：生成 6 位唯一数字码

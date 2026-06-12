@@ -2284,6 +2284,9 @@
         let sortBy = ''; // '' | 'views' | 'likes' | 'bookmarks'
         let searchQ = '';
         let viewCounts = {}; // { itemId: views }
+        let likeCounts = {}; // { itemId: total likes }
+        let bookmarkCounts = {}; // { itemId: total bookmarks }
+        let commentCounts = {}; // { itemId: total comments }
         let lightboxIdx = -1;
 
         // ========== DOM ==========
@@ -2321,8 +2324,8 @@
             });
             // 排序
             if (sortBy === 'views') items.sort((a,b) => (viewCounts[String(b.id)]||0) - (viewCounts[String(a.id)]||0));
-            else if (sortBy === 'likes') items.sort((a,b) => (b.likes||0) - (a.likes||0));
-            else if (sortBy === 'bookmarks') items.sort((a,b) => (UserActions.isBookmarked(b.id)?1:0) - (UserActions.isBookmarked(a.id)?1:0));
+            else if (sortBy === 'likes') items.sort((a,b) => (likeCounts[String(b.id)]||0) - (likeCounts[String(a.id)]||0));
+            else if (sortBy === 'bookmarks') items.sort((a,b) => (bookmarkCounts[String(b.id)]||0) - (bookmarkCounts[String(a.id)]||0));
             return items;
         }
 
@@ -2419,9 +2422,15 @@
                         </div>
                         <div class="card-type-badge badge-video">视频</div>
                         <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
+                        <div class="card-info-bar">
+                            <span>👁 ${viewCounts[String(m.id)]||0}</span>
+                            <span>❤ ${likeCounts[String(m.id)]||0}</span>
+                            <span>🔖 ${bookmarkCounts[String(m.id)]||0}</span>
+                            <span>💬 ${commentCounts[String(m.id)]||0}</span>
+                        </div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">👁 ${viewCounts[String(m.id)]||0} · ${m.author||'风之旅人'} · ${m.cat}</div>
+                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -2435,9 +2444,15 @@
                         }
                         <div class="card-type-badge badge-image">3D</div>
                         <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
+                        <div class="card-info-bar">
+                            <span>👁 ${viewCounts[String(m.id)]||0}</span>
+                            <span>❤ ${likeCounts[String(m.id)]||0}</span>
+                            <span>🔖 ${bookmarkCounts[String(m.id)]||0}</span>
+                            <span>💬 ${commentCounts[String(m.id)]||0}</span>
+                        </div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">👁 ${viewCounts[String(m.id)]||0} · ${m.author||'风之旅人'} · ${m.cat}</div>
+                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -2454,8 +2469,9 @@
                     <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
                     <div class="card-info-bar">
                         <span>👁 ${viewCounts[String(m.id)]||0}</span>
-                        <span>❤ ${isLiked?'已':''}赞</span>
-                        <span>🔖 ${isBooked?'已':''}藏</span>
+                        <span>❤ ${likeCounts[String(m.id)]||0}</span>
+                        <span>🔖 ${bookmarkCounts[String(m.id)]||0}</span>
+                        <span>💬 ${commentCounts[String(m.id)]||0}</span>
                     </div>
                     <div class="card-overlay">
                         <div class="card-title">${m.title}</div>
@@ -2475,7 +2491,6 @@
                         const id = aid.startsWith('upload_') ? aid : parseInt(aid);
                         if (act === 'like') UserActions.toggleLike(id);
                         if (act === 'bookmark') UserActions.toggleBookmark(id);
-                        renderGallery(); // refresh to update button states
                         return;
                     }
                     const id = card.dataset.id;
@@ -2496,6 +2511,7 @@
             supabase.from('item_views').upsert({item_id:sid, views:viewCounts[sid]}).then();
             const uid = id.toString().startsWith('upload_') ? parseInt(id.toString().replace('upload_','')) : null;
             if (uid) supabase.rpc('increment_upload_views', {row_id:uid}).then();
+            renderGallery(); // 即时更新卡片浏览量
             showInLightbox(items[lightboxIdx]);
             lightbox.classList.add('open');
             document.body.style.overflow = 'hidden';
@@ -3376,22 +3392,28 @@ function updateNav(items) {
                 if (!currentUserId) return;
                 if (likes.has(sid)) {
                     likes.delete(sid);
+                    likeCounts[sid] = Math.max(0, (likeCounts[sid]||0) - 1);
                     supabase.from('item_likes').delete().eq('item_id', sid).eq('user_id', currentUserId).then();
                 } else {
                     likes.add(sid);
+                    likeCounts[sid] = (likeCounts[sid]||0) + 1;
                     supabase.from('item_likes').insert({ item_id: sid, user_id: currentUserId }).then();
                 }
+                renderGallery();
             }
             function toggleBookmark(id) {
                 const sid = String(id);
                 if (!currentUserId) return;
                 if (bookmarks.has(sid)) {
                     bookmarks.delete(sid);
+                    bookmarkCounts[sid] = Math.max(0, (bookmarkCounts[sid]||0) - 1);
                     supabase.from('item_bookmarks').delete().eq('item_id', sid).eq('user_id', currentUserId).then();
                 } else {
                     bookmarks.add(sid);
+                    bookmarkCounts[sid] = (bookmarkCounts[sid]||0) + 1;
                     supabase.from('item_bookmarks').insert({ item_id: sid, user_id: currentUserId }).then();
                 }
+                renderGallery();
             }
 
             function getComments(id) { return itemComments[String(id)] || []; }
@@ -3399,7 +3421,9 @@ function updateNav(items) {
                 const sid = String(id);
                 if (!itemComments[sid]) itemComments[sid] = [];
                 itemComments[sid].push({ name, text, time: Date.now() });
+                commentCounts[sid] = (commentCounts[sid]||0) + 1;
                 if (currentUserId) supabase.from('item_comments').insert({ item_id: sid, author_id: currentUserId, text }).then();
+                renderGallery();
             }
 
             function getLikedItems(all) { return all.filter(m => likes.has(String(m.id))); }
@@ -4434,6 +4458,22 @@ function updateNav(items) {
             try {
                 const { data: vc } = await supabase.from('item_views').select('*');
                 (vc||[]).forEach(v => { viewCounts[v.item_id] = v.views; });
+            } catch(e) {}
+            // 加载所有点赞/收藏/评论的总数
+            try {
+                const { data: allLikes } = await supabase.from('item_likes').select('item_id');
+                likeCounts = {};
+                (allLikes||[]).forEach(l => { const k = String(l.item_id); likeCounts[k] = (likeCounts[k]||0) + 1; });
+            } catch(e) {}
+            try {
+                const { data: allBookmarks } = await supabase.from('item_bookmarks').select('item_id');
+                bookmarkCounts = {};
+                (allBookmarks||[]).forEach(b => { const k = String(b.item_id); bookmarkCounts[k] = (bookmarkCounts[k]||0) + 1; });
+            } catch(e) {}
+            try {
+                const { data: allComments } = await supabase.from('item_comments').select('item_id');
+                commentCounts = {};
+                (allComments||[]).forEach(c => { const k = String(c.item_id); commentCounts[k] = (commentCounts[k]||0) + 1; });
             } catch(e) {}
 
             // 5. Render UI
