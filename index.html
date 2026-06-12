@@ -2502,7 +2502,7 @@
         }
 
         // ========== Lightbox ==========
-        function openLightbox(id) {
+        async function openLightbox(id) {
             const items = filtered();
             lightboxIdx = items.findIndex(m => m.id === id);
             if (lightboxIdx === -1) return;
