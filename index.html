@@ -2612,7 +2612,8 @@ function updateNav(items) {
                     const { data: userData } = await supabase.auth.getUser();
                     const username = userData?.user?.user_metadata?.username || 'user_' + Date.now() % 100000;
                     const code = String(Math.floor(100000 + Math.random() * 900000));
-                    await supabase.from('profiles').upsert({ id: currentUserId, username, user_code: code }).catch(() => {});
+                    const { error: upsertErr } = await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code });
+                    if (upsertErr) console.warn('Profile upsert error:', upsertErr.message);
                     profile = { id: currentUserId, username, bio: '', avatar_url: '', user_code: code };
                 }
                 currentUser = profile;
