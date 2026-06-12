@@ -3381,12 +3381,12 @@ function updateNav(items) {
                     likes = new Set((l || []).map(x => String(x.item_id)));
                     const { data: b } = await supabase.from('item_bookmarks').select('item_id').eq('user_id', currentUserId);
                     bookmarks = new Set((b || []).map(x => String(x.item_id)));
-                    const { data: c } = await supabase.from('item_comments').select('*, author:author_id(username)').order('created_at', { ascending: true });
+                    const { data: c } = await supabase.from('item_comments').select('*, profiles:author_id(username)').order('created_at', { ascending: true });
                     itemComments = {};
                     (c || []).forEach(cmt => {
                         const sid = String(cmt.item_id);
                         if (!itemComments[sid]) itemComments[sid] = [];
-                        itemComments[sid].push({ name: cmt.author?.username || '用户', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
+                        itemComments[sid].push({ name: cmt.profiles?.username || '用户', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
                     });
                 } catch(e) { likes = new Set(); bookmarks = new Set(); itemComments = {}; }
             }
