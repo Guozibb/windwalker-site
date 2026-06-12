@@ -3930,38 +3930,39 @@ function updateNav(items) {
                 cat: uploadCategory.value,
                 subCat: subCat,
                 title: uploadTitle.value.trim(),
-                author: (()=>{try{return JSON.parse(localStorage.getItem('windwalker_profile')||'{}').name||''}catch(e){return''}})() || '风之旅人',
+                author: currentUser ? currentUser.username : '风之旅人',
                 fileName: pendingFile.name,
                 isUpload: true,
             };
 
-            uploadedItems.push(newItem);
+            btnSubmitUpload.textContent = '⏳ 上传中...';
+            btnSubmitUpload.disabled = true;
 
-            // Upload file to Supabase Storage (async, non-blocking)
+            // Upload file to Supabase Storage and wait for confirmation
             if (pendingFile) {
-                const bucket = newItem.type === 'model' ? 'uploads' : 'uploads';
-                uploadFileToStorage(bucket, pendingFile, currentUserId).then(async fileUrl => {
-                    if (fileUrl) {
-                        newItem.file = fileUrl;
-                        // Also upload cover if exists
-                        let coverUrl = null;
-                        if (pendingCoverFile) {
-                            coverUrl = await uploadFileToStorage('uploads', pendingCoverFile, currentUserId + '/covers');
-                        }
-                        // Save metadata to Supabase
-                        await supabase.from('uploads').insert({
-                            user_id: currentUserId,
-                            title: newItem.title,
-                            category: newItem.cat,
-                            sub_category: newItem.subCat,
-                            file_type: newItem.type,
-                            file_url: fileUrl,
-                            cover_url: coverUrl || '',
-                            file_name: newItem.fileName
-                        });
-                    }
+                const bucket = 'uploads';
+                const fileUrl = await uploadFileToStorage(bucket, pendingFile, currentUserId);
+                if (!fileUrl) { showToast('上传失败，请重试', true); btnSubmitUpload.textContent = '确认上传到画廊'; btnSubmitUpload.disabled = false; return; }
+                newItem.file = fileUrl;
+                let coverUrl = null;
+                if (pendingCoverFile) {
+                    coverUrl = await uploadFileToStorage('uploads', pendingCoverFile, currentUserId + '/covers');
+                }
+                // Save metadata to Supabase
+                const { error: saveErr } = await supabase.from('uploads').insert({
+                    user_id: currentUserId,
+                    title: newItem.title,
+                    category: newItem.cat,
+                    sub_category: newItem.subCat,
+                    file_type: newItem.type,
+                    file_url: fileUrl,
+                    cover_url: coverUrl || '',
+                    file_name: newItem.fileName
                 });
+                if (saveErr) { showToast('保存失败: ' + saveErr.message, true); btnSubmitUpload.textContent = '确认上传到画廊'; btnSubmitUpload.disabled = false; return; }
             }
+
+            uploadedItems.push(newItem);
 
             // Don't revoke — we need the URL for display
             pendingObjectURL = null;
