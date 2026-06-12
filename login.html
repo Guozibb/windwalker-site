@@ -569,22 +569,25 @@
         document.addEventListener('mouseleave', () => { mx = -999; my = -999; });
         document.addEventListener('touchmove', e => { mx = e.touches[0].clientX; my = e.touches[0].clientY; }, {passive:true});
 
-        // 🐟 可爱鱼
+        // 🐟 小鱼图片加载
+        const fishImg = new Image();
+        fishImg.src = '小鱼/u=2133388060,723744454&fm=253&fmt=auto&app=138&f=JPEG.webp';
         const fishes = [];
-        const fishTypes = [
-            { body:'#ff8c69', fin:'#ff6347', cheek:'#ffb3a0', name:'小橘' },   // 橘红锦鲤
-            { body:'#ffb8c0', fin:'#ff9098', cheek:'#ffd0d8', name:'小粉' },   // 粉色金鱼
-            { body:'#ffe0b0', fin:'#ffc878', cheek:'#fff0d8', name:'小金' },   // 金色锦鲤
-            { body:'#ffe8e8', fin:'#ffd0d0', cheek:'#ffc0c0', name:'小白' },   // 白里透红
-            { body:'#ffc8a0', fin:'#ffa878', cheek:'#ffe0c8', name:'小花' },   // 花斑
+        const fishTints = [
+            { r:255, g:140, b:100 },  // 暖橘
+            { r:255, g:180, b:180 },  // 粉白
+            { r:255, g:200, b:140 },  // 金色
+            { r:255, g:220, b:200 },  // 米白
+            { r:255, g:160, b:130 },  // 橘粉
         ];
         for (let i=0;i<5;i++) {
-            const t = fishTypes[i%fishTypes.length];
             fishes.push({
-                x: Math.random()*W, y: 80+Math.random()*(H-180),
-                vx: (Math.random()-0.5)*1.2, vy: (Math.random()-0.5)*0.4,
-                size: 22+Math.random()*18, type: t,
-                tailPhase: Math.random()*6, eyeBlink: 0, bubbleTimer: Math.random()*100
+                x: Math.random()*W, y: 80+Math.random()*(H-200),
+                vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.2,
+                targetVx: 0, targetVy: 0,
+                size: 40+Math.random()*30, tint: fishTints[i],
+                tailPhase: Math.random()*6, bubbleTimer: Math.random()*100,
+                changeTimer: Math.random()*200
             });
         }
         // 莲花
@@ -602,52 +605,29 @@
         document.addEventListener('click', e => { ripples.push({ x:e.clientX, y:e.clientY, r:0, maxR:60, o:0.6 }); });
 
         function drawFish(f) {
+            if (!fishImg.complete) return; // 图片未加载完跳过
             ctx.save(); ctx.translate(f.x, f.y);
-            const dir = f.vx>0?1:-1; ctx.scale(dir, 1);
-            const s = f.size, t = f.type, wiggle = Math.sin(time*0.12+f.tailPhase)*0.3;
+            const dir = f.vx >= 0 ? 1 : -1;
+            ctx.scale(dir, 1);
+            const s = f.size;
+            const wobble = Math.sin(time*0.06+f.tailPhase)*0.05;
 
-            // 尾巴（先画，在身体下面）
-            const tailWag = Math.sin(time*0.2+f.tailPhase)*8;
-            ctx.fillStyle = t.fin; ctx.beginPath();
-            ctx.moveTo(-s*0.55, 0);
-            ctx.bezierCurveTo(-s*0.9, -s*0.35+tailWag*0.5, -s*1.4, -s*0.45+tailWag, -s*1.3, -s*0.15+tailWag);
-            ctx.bezierCurveTo(-s*1.3, s*0.05+tailWag, -s*0.9, s*0.35-tailWag*0.5, -s*0.55, 0);
-            ctx.fill();
-
-            // 身体
-            const bodyGrad = ctx.createRadialGradient(s*0.05, -s*0.1, s*0.05, 0, 0, s);
-            bodyGrad.addColorStop(0, '#ffffff'); bodyGrad.addColorStop(0.35, t.body); bodyGrad.addColorStop(0.7, t.body); bodyGrad.addColorStop(1, 'rgba(0,0,0,0.08)');
-            ctx.fillStyle = bodyGrad;
-            ctx.beginPath(); ctx.ellipse(0, 0, s*0.75, s*0.42, 0, 0, Math.PI*2); ctx.fill();
-
-            // 腮红
-            ctx.fillStyle = t.cheek; ctx.globalAlpha = 0.6;
-            ctx.beginPath(); ctx.ellipse(s*0.28, s*0.12, s*0.13, s*0.08, 0, 0, Math.PI*2); ctx.fill();
+            // 图片鱼身
+            ctx.globalAlpha = 0.92;
+            ctx.drawImage(fishImg, -s*0.7, -s*0.5, s*1.4, s);
             ctx.globalAlpha = 1;
 
-            // 大眼睛
-            const eyeX = s*0.32, eyeY = -s*0.08;
-            // 眼白
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(eyeX, eyeY, s*0.18, s*0.2, 0.1, 0, Math.PI*2); ctx.fill();
-            // 瞳孔
-            ctx.fillStyle = '#2a1a10'; ctx.beginPath(); ctx.arc(eyeX+s*0.03, eyeY+s*0.01, s*0.12, 0, 7); ctx.fill();
-            // 高光
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(eyeX-s*0.03, eyeY-s*0.06, s*0.06, 0, 7); ctx.fill();
-            ctx.beginPath(); ctx.arc(eyeX+s*0.06, eyeY+s*0.05, s*0.03, 0, 7); ctx.fill();
+            // 轻微色调叠加
+            ctx.fillStyle = `rgba(${f.tint.r},${f.tint.g},${f.tint.b},0.12)`;
+            ctx.beginPath(); ctx.ellipse(0, 0, s*0.6, s*0.35, 0, 0, Math.PI*2); ctx.fill();
 
-            // 小嘴
-            ctx.strokeStyle = t.fin; ctx.lineWidth = s*0.04; ctx.lineCap = 'round';
-            ctx.beginPath(); ctx.arc(s*0.2, s*0.12, s*0.08, 0.3, 1.5); ctx.stroke();
-            ctx.lineWidth = 1;
-
-            // 背鳍
-            ctx.fillStyle = t.fin; ctx.globalAlpha = 0.5;
-            ctx.beginPath(); ctx.moveTo(-s*0.1, -s*0.35);
-            ctx.quadraticCurveTo(s*0.1, -s*0.55+wiggle*3, s*0.3, -s*0.32); ctx.lineTo(s*0.1, -s*0.28); ctx.fill();
-            // 腹鳍
-            ctx.beginPath(); ctx.moveTo(s*0.05, s*0.22);
-            ctx.quadraticCurveTo(0, s*0.4+wiggle*2, -s*0.15, s*0.28); ctx.lineTo(0, s*0.18); ctx.fill();
-            ctx.globalAlpha = 1;
+            // 小圆眼
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(s*0.3, -s*0.08, s*0.13, 0, 7); ctx.fill();
+            ctx.fillStyle = '#1a0a00';
+            ctx.beginPath(); ctx.arc(s*0.32, -s*0.08, s*0.07, 0, 7); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(s*0.3, -s*0.1, s*0.03, 0, 7); ctx.fill();
 
             ctx.restore();
         }
@@ -694,30 +674,37 @@
             }
             // 水草
             for (const p of plants) drawPlant(p);
-            // 🐟 鱼游泳
+            // 🐟 小鱼自主缓慢游动
             for (const f of fishes) {
-                // 鼠标吸引
-                const dx=mx-f.x, dy=my-f.y, dist=Math.hypot(dx,dy)||1;
-                if (dist<250 && mx>0) {
-                    f.vx+=(dx/dist)*0.05;
-                    f.vy+=(dy/dist)*0.05;
+                // 定时改变游动方向
+                f.changeTimer--;
+                if (f.changeTimer <= 0) {
+                    f.changeTimer = 150 + Math.random() * 300;
+                    f.targetVx = (Math.random() - 0.5) * 0.8;
+                    f.targetVy = (Math.random() - 0.5) * 0.4;
                 }
-                // 随机游动 + 偶尔加速
-                if (Math.random()<0.01) { f.vx+=(Math.random()-0.5)*2; f.vy+=(Math.random()-0.5)*1; } // 偶尔冲刺
-                f.vx+=(Math.random()-0.5)*0.08; f.vy+=(Math.random()-0.5)*0.04;
-                f.vx*=0.985; f.vy*=0.985;
-                // 速度限制
-                const spd = Math.hypot(f.vx, f.vy);
-                if (spd>3) { f.vx*=2.8/spd; f.vy*=2.8/spd; }
-                if (spd<0.3 && mx<0) { f.vx+=(Math.random()-0.5)*0.3; } // 没鼠标时保持游动
-                f.x+=f.vx; f.y+=f.vy;
-                if (f.x<-80) f.x=W+80; if (f.x>W+80) f.x=-80;
-                if (f.y<20) f.y=20; if (f.y>H-20) f.y=H-20;
-                // 鱼吐泡泡
+                // 鼠标靠近时才互动（120px 内）
+                const dx = mx - f.x, dy = my - f.y, dist = Math.hypot(dx, dy) || 1;
+                if (dist < 120 && mx > 0) {
+                    // 轻轻靠近鼠标
+                    f.targetVx = (dx / dist) * 0.6;
+                    f.targetVy = (dy / dist) * 0.3;
+                    f.changeTimer = 60; // 靠近后保持短暂方向
+                }
+                // 平滑过渡到目标速度
+                f.vx += (f.targetVx - f.vx) * 0.02;
+                f.vy += (f.targetVy - f.vy) * 0.02;
+                f.x += f.vx; f.y += f.vy;
+                // 边界回弹
+                if (f.x < -60) f.x = W + 60;
+                if (f.x > W + 60) f.x = -60;
+                if (f.y < 40) f.y = 40;
+                if (f.y > H - 40) f.y = H - 40;
+                // 偶尔吐泡泡
                 f.bubbleTimer++;
-                if (f.bubbleTimer>80+Math.random()*60) {
-                    f.bubbleTimer=0;
-                    bubbles.push({x:f.x+(f.vx>0?-15:15), y:f.y-5, r:1.5+Math.random()*3, vy:0.2+Math.random()*0.4, o:0.4});
+                if (f.bubbleTimer > 120 + Math.random() * 80) {
+                    f.bubbleTimer = 0;
+                    bubbles.push({ x: f.x + (f.vx >= 0 ? -10 : 10), y: f.y - 8, r: 1.5 + Math.random() * 4, vy: 0.15 + Math.random() * 0.3, o: 0.35 });
                 }
                 drawFish(f);
             }
