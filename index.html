@@ -1963,6 +1963,10 @@
         <button class="type-filter-btn active" data-type="">全部</button>
         <button class="type-filter-btn" data-type="image">🖼 图片</button>
         <button class="type-filter-btn" data-type="video">🎬 视频</button>
+        <span style="color:var(--text-muted);margin:0 4px;">|</span>
+        <button class="type-filter-btn" data-sort="views">👁 最多浏览</button>
+        <button class="type-filter-btn" data-sort="likes">❤ 最高赞</button>
+        <button class="type-filter-btn" data-sort="bookmarks">🔖 最多收藏</button>
     </div>
     <div class="sub-categories" id="subCategories"></div>
 
@@ -2271,7 +2275,9 @@
         let activeCat = '全部';
         let activeSubCat = '';
         let typeFilter = ''; // '' | 'image' | 'video'
+        let sortBy = ''; // '' | 'views' | 'likes' | 'bookmarks'
         let searchQ = '';
+        let viewCounts = {}; // { itemId: views }
         let lightboxIdx = -1;
 
         // ========== DOM ==========
@@ -2299,7 +2305,7 @@
         function allItems() { return [...modelData, ...uploadedItems]; }
 
         function filtered() {
-            return allItems().filter(m => {
+            let items = allItems().filter(m => {
                 const matchCat = activeCat === '全部' || m.cat === activeCat;
                 const matchType = !typeFilter || m.type === typeFilter;
                 const matchSub = !activeSubCat || (m.subCat === activeSubCat);
@@ -2307,6 +2313,11 @@
                 const matchSearch = !q || m.title.toLowerCase().includes(q) || m.cat.toLowerCase().includes(q) || (m.file||'').toLowerCase().includes(q) || (m.author||'').toLowerCase().includes(q);
                 return matchCat && matchType && matchSub && matchSearch;
             });
+            // 排序
+            if (sortBy === 'views') items.sort((a,b) => (viewCounts[String(b.id)]||0) - (viewCounts[String(a.id)]||0));
+            else if (sortBy === 'likes') items.sort((a,b) => (b.likes||0) - (a.likes||0));
+            else if (sortBy === 'bookmarks') items.sort((a,b) => (UserActions.isBookmarked(b.id)?1:0) - (UserActions.isBookmarked(a.id)?1:0));
+            return items;
         }
 
         // ========== Update stats ==========
@@ -2342,7 +2353,13 @@
             // Type filter buttons
             document.querySelectorAll('.type-filter-btn').forEach(b => {
                 b.addEventListener('click', () => {
-                    typeFilter = b.dataset.type;
+                    if (b.dataset.sort) {
+                        sortBy = b.dataset.sort;
+                        typeFilter = '';
+                    } else if (b.dataset.type !== undefined) {
+                        typeFilter = b.dataset.type;
+                        sortBy = '';
+                    }
                     document.querySelectorAll('.type-filter-btn').forEach(x => x.classList.remove('active'));
                     b.classList.add('active');
                     renderGallery();
@@ -2398,7 +2415,7 @@
                         <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                            <div class="card-meta">👁 ${viewCounts[String(m.id)]||0} · ${m.author||'风之旅人'} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -2414,7 +2431,7 @@
                         <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                            <div class="card-meta">👁 ${viewCounts[String(m.id)]||0} · ${m.author||'风之旅人'} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -2461,6 +2478,13 @@
             const items = filtered();
             lightboxIdx = items.findIndex(m => m.id === id);
             if (lightboxIdx === -1) return;
+            // 👁 浏览量+1
+            const sid = String(id);
+            viewCounts[sid] = (viewCounts[sid]||0) + 1;
+            // 异步保存到 Supabase
+            supabase.from('item_views').upsert({item_id:sid, views:viewCounts[sid]}).then();
+            const uid = id.toString().startsWith('upload_') ? parseInt(id.toString().replace('upload_','')) : null;
+            if (uid) supabase.rpc('increment_upload_views', {row_id:uid}).then();
             showInLightbox(items[lightboxIdx]);
             lightbox.classList.add('open');
             document.body.style.overflow = 'hidden';
@@ -4394,8 +4418,12 @@ function updateNav(items) {
                 });
             } catch(e) { /* No uploads or error */ }
 
-            // 4. Gallery interactions (lazy load — don't block UI)
+            // 4. Gallery interactions + view counts
             UserActions.loadFromSupabase();
+            try {
+                const { data: vc } = await supabase.from('item_views').select('*');
+                (vc||[]).forEach(v => { viewCounts[v.item_id] = v.views; });
+            } catch(e) {}
 
             // 5. Render UI
             renderCategories();
