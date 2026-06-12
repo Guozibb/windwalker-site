@@ -58,7 +58,8 @@
             padding: 36px 32px 28px;
             box-shadow: 0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
             animation: cardUp 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards;
-            opacity: 0; transform: translateY(30px);
+            opacity: 0;
+            transition: transform 0.15s ease-out;
         }
         @keyframes cardUp { 0%{opacity:0;transform:translateY(30px);} 100%{opacity:1;transform:translateY(0);} }
 
@@ -477,6 +478,48 @@
             card.style.animation = 'shake 0.5s ease';
             setTimeout(() => { if (card) card.style.animation = 'cardUp 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards'; }, 500);
         }
+        // ========== 🎮 卡片3D倾斜 ==========
+        const loginCard = document.getElementById('loginCard');
+        document.addEventListener('mousemove', e => {
+            if (!loginCard) return;
+            const rect = loginCard.getBoundingClientRect();
+            const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+            const rx = (e.clientY - cy) / (rect.height/2) * -5;
+            const ry = (e.clientX - cx) / (rect.width/2) * 5;
+            loginCard.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+        });
+        document.addEventListener('mouseleave', () => {
+            if (loginCard) loginCard.style.transform = '';
+        });
+
+        // ========== 🐟 点击鱼跳起来 ==========
+        canvas.addEventListener('click', e => {
+            for (const f of fishes) {
+                const dx = e.clientX - f.x, dy = e.clientY - f.y;
+                if (Math.hypot(dx, dy) < f.size * 1.2) {
+                    f.vy = -4; f.vx += (Math.random()-0.5)*2;
+                    // 鱼跳出水面的泡泡
+                    for (let i=0;i<5;i++) {
+                        bubbles.push({x:f.x+(Math.random()-0.5)*20, y:f.y, r:2+Math.random()*4, vy:1+Math.random(), o:0.5});
+                    }
+                    break;
+                }
+            }
+        });
+
+        // ========== ⌨ 输入聚焦 → 鱼游过来 ==========
+        document.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('focus', () => {
+                const rect = loginCard.getBoundingClientRect();
+                const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+                fishes.forEach(f => {
+                    f.targetVx = (cx - f.x) * 0.003;
+                    f.targetVy = (cy - f.y) * 0.003;
+                    f.changeTimer = 40;
+                });
+            });
+        });
+
         // ========== Tab switch ==========
         const loginTabs = document.querySelector('.login-tabs');
         const tabs = document.querySelectorAll('.login-tab');
