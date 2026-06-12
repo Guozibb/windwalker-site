@@ -4526,9 +4526,9 @@ function updateNav(items) {
             loadProfile();
             updateUserButton();
 
-            // 3. Load uploaded items from Supabase（只加载当前用户的作品）
+            // 3. Load uploaded items from Supabase（画廊互通：加载所有人的作品）
             try {
-                const { data: uploads } = await supabase.from('uploads').select('*').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(200);
+                const { data: uploads } = await supabase.from('uploads').select('*, profiles:user_id(username)').order('created_at', { ascending: false }).limit(200);
                 (uploads || []).forEach(item => {
                     uploadedItems.push({
                         id: 'upload_' + item.id,
@@ -4538,7 +4538,7 @@ function updateNav(items) {
                         cat: item.category,
                         subCat: item.sub_category || '',
                         title: item.title,
-                        author: currentUser.username,
+                        author: item.profiles?.username || '用户',
                         fileName: item.file_name,
                         isUpload: true,
                         persisted: true,
