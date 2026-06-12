@@ -9,32 +9,32 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #06080d;
-            --surface: #0c0f16;
-            --surface2: #111620;
-            --border: #1e2636;
-            --text: #e2e8f0;
-            --text-muted: #7c8aa0;
-            --accent: #38bdf8;
-            --accent2: #818cf8;
-            --accent-glow: rgba(56,189,248,0.25);
-            --green: #34d399;
-            --orange: #fb923c;
-            --red: #f87171;
-            --radius: 12px;
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --surface2: #f0f4f8;
+            --border: #e2e8f0;
+            --text: #334155;
+            --text-muted: #94a3b8;
+            --accent: #7dd3a8;
+            --accent2: #a7c5eb;
+            --accent-glow: rgba(125,211,168,0.2);
+            --green: #86d6a8;
+            --orange: #f5b895;
+            --red: #f5a5a5;
+            --radius: 16px;
             --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         body.light {
-            --bg: #f1f5f9;
+            --bg: #f0f5f0;
             --surface: #ffffff;
-            --surface2: #f8fafc;
-            --border: #cbd5e1;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --accent: #0284c7;
-            --accent2: #4f46e5;
-            --accent-glow: rgba(2,132,199,0.15);
+            --surface2: #f5faf6;
+            --border: #dce8df;
+            --text: #3d5445;
+            --text-muted: #8ba892;
+            --accent: #6dbd8a;
+            --accent2: #8fb5d6;
+            --accent-glow: rgba(109,189,138,0.15);
         }
 
         html { scroll-behavior: smooth; }
@@ -2017,7 +2017,7 @@
         <div id="chatPanelBody" style="flex:1;overflow-y:auto;padding:8px;min-height:200px;max-height:250px;font-size:0.85rem;"></div>
         <div id="chatPanelPreview" style="display:none;padding:0 8px;"></div>
         <div style="display:flex;gap:4px;padding:8px;border-top:1px solid var(--border);align-items:center;flex-wrap:wrap;">
-            <input type="text" id="chatPanelTarget" placeholder="收件人" style="width:70px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:0.78rem;font-family:inherit;" readonly>
+            <input type="text" id="chatPanelTarget" placeholder="输入用户名" style="width:100px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:0.78rem;font-family:inherit;">
             <button id="chatPanelImgBtn" style="background:none;border:none;cursor:pointer;font-size:1rem;">🖼</button>
             <input type="file" id="chatPanelImgInput" accept="image/*" style="display:none;">
             <input type="text" id="chatPanelInput" placeholder="消息..." style="flex:1;min-width:80px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:0.8rem;font-family:inherit;">
@@ -3213,11 +3213,12 @@ function updateNav(items) {
         });
         async function sendChat() {
             const me=getCurrentUser(),text=chatPanelInput.value.trim();
-            if(!chatPartner){showToast('请先选择联系人',true);return;}
+            const target = chatPanelTarget.value.trim() || chatPartner;
+            if(!target){showToast('请输入收件人用户名',true);return;}
             if(!text&&!chatPImg)return;
-            // Find partner UUID
-            const { data: tp } = await supabase.from('profiles').select('id').eq('username', chatPartner).single();
+            const { data: tp } = await supabase.from('profiles').select('id').eq('username', target).single();
             if (!tp) { showToast('用户不存在', true); return; }
+            chatPartner = target;
             await saveMessageToDb({ from_id: currentUserId, to_id: tp.id, text, read: false, image_url: chatPImg || '' });
             chatPanelInput.value='';chatPImg=null;document.getElementById('chatPanelImgInput').value='';
             renderChatBubbles();updateMsgUnread();
@@ -4318,31 +4319,17 @@ function updateNav(items) {
                 });
             } catch(e) { /* No uploads or error */ }
 
-            // 4. Load gallery interactions
-            await UserActions.loadFromSupabase();
+            // 4. Gallery interactions (lazy load — don't block UI)
+            UserActions.loadFromSupabase();
 
             // 5. Render UI
             renderCategories();
             renderGallery();
             updateStats();
-            updateNotifyBadge();
+            // notifications load on bell click (lazy)
 
-            // 6. Start entrance animation
-            animStart = performance.now();
-            requestAnimationFrame(drawEntrance);
-
-            // 7. Trigger card stagger
-            setTimeout(() => {
-                gallery.classList.add('animate-in');
-                const cards = galleryGrid.querySelectorAll('.model-card');
-                cards.forEach((c, i) => {
-                    c.style.animationDelay = (i * 0.05) + 's';
-                });
-                setTimeout(() => {
-                    gallery.classList.remove('animate-in');
-                    cards.forEach(c => { c.style.animation = ''; c.style.animationDelay = ''; });
-                }, 1800);
-            }, 2000);
+            // 隐藏入场 Canvas（轻量化：跳过动画）
+            entranceCanvas.style.display = 'none';
         }
 
         // Auto-sync removed — Supabase handles persistence directly
