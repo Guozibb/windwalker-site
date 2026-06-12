@@ -37,6 +37,12 @@
             --accent-glow: rgba(109,189,138,0.15);
         }
 
+        /* 四季主题 */
+        body.spring { --season-accent: #f0a8b8; --season-accent2: #e8c8d0; --petal-color: #ffd0dc; }
+        body.summer { --season-accent: #7dc8a0; --season-accent2: #a8d8c0; --petal-color: #b8e8c8; }
+        body.autumn { --season-accent: #e8a860; --season-accent2: #f0c090; --petal-color: #f0c080; }
+        body.winter { --season-accent: #b8d0e8; --season-accent2: #c8ddf0; --petal-color: #e0eaf5; }
+
         html { scroll-behavior: smooth; }
 
         body {
@@ -1906,6 +1912,9 @@
 </head>
 <body>
 
+    <!-- 花瓣飘落 Canvas -->
+    <canvas id="petalCanvas" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
+
     <!-- Grid background -->
     <div class="grid-bg"></div>
 
@@ -1934,6 +1943,7 @@
                 <button class="btn-music" id="btnMusicToggle" title="音乐开关">🎵</button>
                 <button class="btn-sfx" id="btnSfxToggle" title="音效开关">🔔</button>
                 <button class="btn-theme" id="btnThemeToggle" title="切换主题">🌙</button>
+                <button class="btn-music" id="btnSeason" title="切换季节" style="font-size:0.85rem;">🌸</button>
                 <button class="btn-community" id="btnOpenFollowing" style="background:linear-gradient(135deg,#f97316,#ec4899);">👁 关注</button>
                 <button class="btn-community" id="btnOpenCommunity">🏛 广场</button>
                 <button class="btn-upload" id="btnOpenUpload">
@@ -2731,21 +2741,14 @@ function updateNav(items) {
                     tag.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         const u = tag.dataset.user;
+                        const { data: pf } = await supabase.from('profiles').select('*').eq('username', u).single();
                         const info = await getUserInfoCard(u);
                         const isF = await isFollowing(u);
-                        detail.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
-                            <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;margin:0 auto 6px;">${u.charAt(0)}</div>
-                            <strong>${u}</strong><div style="font-size:0.75rem;color:var(--text-muted);">作品 ${info.works} · ${info.created}</div>
-                            <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
-                                <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;" id="cardFollowBtn">${isF?'已关注':'+ 关注'}</button>
-                                <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);" id="cardMsgBtn">✉ 私信</button>
-                                <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);" id="cardSearchBtn">🔍 作品</button>
-                            </div>
-                            <button style="margin-top:6px;font-size:0.65rem;color:var(--text-muted);background:none;border:none;cursor:pointer;" id="cardCloseBtn">关闭</button></div>`;
-                        document.getElementById('cardFollowBtn').addEventListener('click', async () => { await toggleFollow(u); renderFeed(); });
-                        document.getElementById('cardMsgBtn').addEventListener('click', () => { detail.style.display='none'; openChatWith(u); });
-                        document.getElementById('cardSearchBtn').addEventListener('click', () => { searchInput.value = u; searchQ = u; renderGallery(); detail.style.display='none'; });
-                        document.getElementById('cardCloseBtn').addEventListener('click', () => { detail.style.display='none'; });
+                        showUserCard({
+                            username: u, userId: pf?.id, code: pf?.user_code||'', works: info.works, created: info.created,
+                            isFollowing: isF, bio: pf?.bio||'',
+                            avatarHtml: pf?.avatar_url ? `<div style="width:60px;height:60px;border-radius:50%;background-image:url(${pf.avatar_url});background-size:cover;margin:0 auto 10px;border:3px solid var(--accent);"></div>` : `<div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;margin:0 auto 10px;">${u[0]}</div>`
+                        });
                     });
                 });
             });
@@ -4333,6 +4336,55 @@ function updateNav(items) {
         }
 
         // Auto-sync removed — Supabase handles persistence directly
+
+        // ========== 🌸 花瓣飘落动画 ==========
+        (function() {
+            const canvas = document.getElementById('petalCanvas');
+            const ctx = canvas.getContext('2d');
+            let W, H, petals = [];
+            function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', resize);
+
+            let currentSeason = localStorage.getItem('ww_season') || 'spring';
+            const seasons = { spring:'🌸', summer:'🌿', autumn:'🍂', winter:'❄' };
+            const seasonNames = { spring:'春日·樱花', summer:'夏日·绿叶', autumn:'秋日·枫叶', winter:'冬日·飘雪' };
+            document.getElementById('btnSeason').textContent = seasons[currentSeason];
+            document.body.classList.add(currentSeason);
+
+            function createPetal() {
+                const shapes = {
+                    spring: () => { const a=Math.random()*Math.PI*2; return { draw(c,x,y,s)=>{ c.fillStyle='#ffc0d0'; c.beginPath(); c.ellipse(x,y,s*5,s*3,a,0,Math.PI*2); c.fill(); } } },
+                    summer: () => { const a=Math.random()*Math.PI*2; return { draw(c,x,y,s)=>{ c.fillStyle='#a0d8b0'; c.beginPath(); c.ellipse(x,y,s*4,s*2,a,0,Math.PI*2); c.fill(); } } },
+                    autumn: () => { const a=Math.random()*Math.PI*2; return { draw(c,x,y,s)=>{ c.fillStyle='rgba(220,140,60,0.7)'; c.beginPath(); c.arc(x,y,s*3,0,Math.PI*2); c.fill(); } } },
+                    winter: () => { return { draw(c,x,y,s)=>{ c.fillStyle='rgba(220,230,250,0.8)'; c.beginPath(); c.arc(x,y,s*3,0,Math.PI*2); c.fill(); } } }
+                };
+                const shape = (shapes[currentSeason] || shapes.spring)();
+                return { x: Math.random()*W, y: -20, s: Math.random()*0.8+0.4, vy: Math.random()*1+0.3, vx: (Math.random()-0.5)*0.8, rot: Math.random()*360, vrot: (Math.random()-0.5)*2, shape };
+            }
+
+            for (let i=0;i<40;i++) { const p=createPetal(); p.y=Math.random()*H; petals.push(p); }
+
+            function animate() {
+                ctx.clearRect(0,0,W,H);
+                petals.forEach(p => {
+                    p.y += p.vy; p.x += p.vx + Math.sin(p.y*0.02)*0.3; p.rot += p.vrot;
+                    if (p.y > H+20) { const n=createPetal(); p.x=n.x; p.y=n.y; p.vy=n.vy; p.vx=n.vx; }
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot*Math.PI/180); ctx.globalAlpha=0.6; p.shape.draw(ctx,0,0,p.s); ctx.restore();
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+
+            document.getElementById('btnSeason').addEventListener('click', () => {
+                const keys = Object.keys(seasons); const idx = (keys.indexOf(currentSeason)+1)%4;
+                currentSeason = keys[idx]; localStorage.setItem('ww_season', currentSeason);
+                document.getElementById('btnSeason').textContent = seasons[currentSeason];
+                document.body.classList.remove('spring','summer','autumn','winter');
+                document.body.classList.add(currentSeason);
+                petals = []; for (let i=0;i<40;i++) petals.push(createPetal());
+                showToast('🎨 ' + seasonNames[currentSeason], false);
+            });
+        })();
 
         init();
     })();
