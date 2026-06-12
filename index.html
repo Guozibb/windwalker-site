@@ -2099,6 +2099,24 @@
                 <img class="avatar-img" id="avatarImg" src="" alt="" style="display:none;">
                 <span class="avatar-edit-badge">✎</span>
                 <input type="file" class="avatar-input" id="avatarInput" accept="image/*">
+                <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;" id="presetAvatars">
+                    <span class="preset-avatar" data-emoji="🐱" style="font-size:1.3rem;cursor:pointer;">🐱</span>
+                    <span class="preset-avatar" data-emoji="🐶" style="font-size:1.3rem;cursor:pointer;">🐶</span>
+                    <span class="preset-avatar" data-emoji="🐰" style="font-size:1.3rem;cursor:pointer;">🐰</span>
+                    <span class="preset-avatar" data-emoji="🐼" style="font-size:1.3rem;cursor:pointer;">🐼</span>
+                    <span class="preset-avatar" data-emoji="🦊" style="font-size:1.3rem;cursor:pointer;">🦊</span>
+                    <span class="preset-avatar" data-emoji="🐨" style="font-size:1.3rem;cursor:pointer;">🐨</span>
+                    <span class="preset-avatar" data-emoji="🐸" style="font-size:1.3rem;cursor:pointer;">🐸</span>
+                    <span class="preset-avatar" data-emoji="🐯" style="font-size:1.3rem;cursor:pointer;">🐯</span>
+                    <span class="preset-avatar" data-emoji="🐻" style="font-size:1.3rem;cursor:pointer;">🐻</span>
+                    <span class="preset-avatar" data-emoji="🐥" style="font-size:1.3rem;cursor:pointer;">🐥</span>
+                    <span class="preset-avatar" data-emoji="🌸" style="font-size:1.3rem;cursor:pointer;">🌸</span>
+                    <span class="preset-avatar" data-emoji="🌺" style="font-size:1.3rem;cursor:pointer;">🌺</span>
+                    <span class="preset-avatar" data-emoji="🍀" style="font-size:1.3rem;cursor:pointer;">🍀</span>
+                    <span class="preset-avatar" data-emoji="⭐" style="font-size:1.3rem;cursor:pointer;">⭐</span>
+                    <span class="preset-avatar" data-emoji="🌈" style="font-size:1.3rem;cursor:pointer;">🌈</span>
+                    <span class="preset-avatar" data-emoji="💖" style="font-size:1.3rem;cursor:pointer;">💖</span>
+                </div>
             </div>
             <input class="drawer-name" id="drawerName" value="风之旅人" maxlength="20" placeholder="你的昵称">
             <textarea class="drawer-bio" id="drawerBio" placeholder="写一句个人简介..." maxlength="80" rows="1">3D 模型创作者</textarea>
@@ -2765,10 +2783,34 @@ function updateNav(items) {
                 avatarImg.src = reader.result;
                 avatarImg.style.display = 'block';
                 avatarPlaceholder.style.display = 'none';
-                saveProfile(); // save immediately
-                updateUserButton();
+                saveProfile(); updateUserButton();
             };
             reader.readAsDataURL(f);
+        });
+
+        // 预设头像选择
+        document.querySelectorAll('.preset-avatar').forEach(el => {
+            el.addEventListener('click', async () => {
+                const emoji = el.dataset.emoji;
+                // 生成可爱的 SVG 头像
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#fef5f7"/><text x="100" y="135" text-anchor="middle" font-size="100">${emoji}</text></svg>`;
+                const blob = new Blob([svg], { type: 'image/svg+xml' });
+                const file = new File([blob], 'avatar.svg', { type: 'image/svg+xml' });
+                // 上传到 Supabase Storage
+                const path = currentUserId + '_' + Date.now() + '.svg';
+                const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+                if (error) { showToast('头像设置失败: ' + error.message, true); return; }
+                const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+                const url = pub.publicUrl;
+                // 更新本地和 Supabase
+                avatarImg.src = url;
+                avatarImg.style.display = 'block';
+                avatarPlaceholder.style.display = 'none';
+                currentUser.avatar_url = url;
+                await supabase.from('profiles').update({ avatar_url: url }).eq('id', currentUserId);
+                updateUserButton();
+                showToast('头像已更新！');
+            });
         });
 
         // Name / bio edit → save on blur
@@ -4030,22 +4072,42 @@ function updateNav(items) {
             });
         }
 
-        // 用户名片弹窗
-        function showUserCard(user) {
+        // 用户主页弹窗（完整资料）
+        async function showUserCard(user) {
+            // 加载完整用户资料
+            const { data: pf } = await supabase.from('profiles').select('*').eq('username', user.username).single();
+            const { data: works } = await supabase.from('uploads').select('*').eq('user_id', pf?.id || user.userId).order('created_at', { ascending: false }).limit(8);
+            const { count: followerCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', pf?.id || user.userId);
+            const { count: followingCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', pf?.id || user.userId);
+            const created = pf?.created_at ? new Date(pf.created_at).toLocaleDateString('zh-CN') : user.created;
+            const avatarUrl = pf?.avatar_url || '';
+            const isF = await isFollowing(user.username);
+
+            const workThumbs = (works||[]).slice(0,6).map(w => {
+                const src = w.cover_url || w.file_url;
+                const icon = w.file_type === 'video' ? '▶' : (w.file_type === 'model' ? '🧊' : '🖼');
+                return src ? `<div style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--bg);"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:1.5rem;\\'>${icon}</div>'"></div>` : `<div style="aspect-ratio:1;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">${icon}</div>`;
+            }).join('');
+
             const overlay = document.createElement('div');
-            overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
-            overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;text-align:center;max-width:360px;width:90%;">
-                ${user.avatarHtml}
-                <h3 style="margin-bottom:2px;">${user.username}</h3>
-                <div style="font-size:0.75rem;color:var(--text-muted);">ID: ${user.code} · ${user.created}加入</div>
-                <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0;">${user.bio||'这个人很懒，什么也没写'}</div>
-                <div style="font-size:0.8rem;margin:8px 0;">作品 <strong style="color:var(--accent);">${user.works}</strong> 个</div>
-                <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
-                    <button id="ucFollowBtn" style="background:${user.isFollowing?'var(--bg)':'var(--accent)'};color:${user.isFollowing?'var(--text)':'#fff'};border:1px solid var(--border);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.8rem;font-weight:600;">${user.isFollowing?'已关注':'+ 关注'}</button>
-                    <button id="ucMsgBtn" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.8rem;">✉ 私信</button>
-                    <button id="ucFriendBtn" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 20px;border-radius:20px;cursor:pointer;font-size:0.8rem;">👥 加好友</button>
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:28px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto;text-align:center;">
+                ${avatarUrl ? `<img src="${avatarUrl}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 10px;border:3px solid var(--accent);">` : `<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:2rem;margin:0 auto 10px;">${(user.username||'?')[0]}</div>`}
+                <h3 style="margin:4px 0;">${user.username}</h3>
+                <div style="font-size:0.72rem;color:var(--text-muted);">ID: ${pf?.user_code||user.code||'---'} · ${created} 加入</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0;">${pf?.bio||user.bio||'这个人很懒，什么也没写...'}</div>
+                <div style="display:flex;justify-content:center;gap:20px;margin:10px 0;font-size:0.8rem;">
+                    <span>作品 <strong style="color:var(--accent);">${(works||[]).length}</strong></span>
+                    <span>粉丝 <strong style="color:var(--accent);">${followerCount||0}</strong></span>
+                    <span>关注 <strong style="color:var(--accent);">${followingCount||0}</strong></span>
                 </div>
-                <button id="ucCloseBtn" style="margin-top:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;">关闭</button>
+                ${workThumbs ? `<div style="margin:12px 0;"><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">📁 最近作品</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">${workThumbs}</div></div>` : '<div style="color:var(--text-muted);font-size:0.78rem;margin:10px 0;">暂无上传作品</div>'}
+                <div style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;">
+                    <button id="ucFollowBtn" style="background:${isF?'var(--bg)':'var(--accent)'};color:${isF?'var(--text)':'#fff'};border:1px solid var(--border);padding:9px 22px;border-radius:22px;cursor:pointer;font-size:0.82rem;font-weight:600;">${isF?'✓ 已关注':'+ 关注'}</button>
+                    <button id="ucMsgBtn" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:9px 22px;border-radius:22px;cursor:pointer;font-size:0.82rem;">✉ 私信</button>
+                    <button id="ucFriendBtn" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:9px 22px;border-radius:22px;cursor:pointer;font-size:0.82rem;">👥 加好友</button>
+                </div>
+                <button id="ucCloseBtn" style="margin-top:14px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.75rem;">关闭</button>
             </div>`;
             document.body.appendChild(overlay);
 
@@ -4053,17 +4115,12 @@ function updateNav(items) {
             document.getElementById('ucCloseBtn').addEventListener('click', () => overlay.remove());
             document.getElementById('ucFollowBtn').addEventListener('click', async () => {
                 await toggleFollow(user.username);
-                const isF = await isFollowing(user.username);
-                const btn = document.getElementById('ucFollowBtn');
-                btn.textContent = isF ? '已关注' : '+ 关注';
-                btn.style.background = isF ? 'var(--bg)' : 'var(--accent)';
-                btn.style.color = isF ? 'var(--text)' : '#fff';
-            });
-            document.getElementById('ucMsgBtn').addEventListener('click', () => { overlay.remove(); openChatWith(user.username); });
-            document.getElementById('ucFriendBtn').addEventListener('click', async () => {
-                await sendFriendRequest(user.username);
                 overlay.remove();
+                // Reopen with updated data
+                setTimeout(() => showUserCard(user), 100);
             });
+            document.getElementById('ucMsgBtn').addEventListener('click', () => { overlay.remove(); openChatWith(user.username); chatPanel.style.display='flex'; });
+            document.getElementById('ucFriendBtn').addEventListener('click', async () => { await sendFriendRequest(user.username); overlay.remove(); });
         }
 
         // ========== Toast ==========
