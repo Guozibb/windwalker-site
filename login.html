@@ -569,15 +569,22 @@
         document.addEventListener('mouseleave', () => { mx = -999; my = -999; });
         document.addEventListener('touchmove', e => { mx = e.touches[0].clientX; my = e.touches[0].clientY; }, {passive:true});
 
-        // 鱼
+        // 🐟 可爱鱼
         const fishes = [];
-        const fishColors = ['#f5a090','#f8c0a0','#ffe8d0','#f0c0b0','#ffd0c0','#e8c8b8'];
-        for (let i=0;i<4;i++) {
+        const fishTypes = [
+            { body:'#ff8c69', fin:'#ff6347', cheek:'#ffb3a0', name:'小橘' },   // 橘红锦鲤
+            { body:'#ffb8c0', fin:'#ff9098', cheek:'#ffd0d8', name:'小粉' },   // 粉色金鱼
+            { body:'#ffe0b0', fin:'#ffc878', cheek:'#fff0d8', name:'小金' },   // 金色锦鲤
+            { body:'#ffe8e8', fin:'#ffd0d0', cheek:'#ffc0c0', name:'小白' },   // 白里透红
+            { body:'#ffc8a0', fin:'#ffa878', cheek:'#ffe0c8', name:'小花' },   // 花斑
+        ];
+        for (let i=0;i<5;i++) {
+            const t = fishTypes[i%fishTypes.length];
             fishes.push({
-                x: Math.random()*W, y: 100+Math.random()*(H-200),
-                vx: (Math.random()-0.5)*1.5, vy: (Math.random()-0.5)*0.5,
-                size: 20+Math.random()*25, color: fishColors[i%fishColors.length],
-                tailPhase: Math.random()*6, facingLeft: Math.random()>0.5
+                x: Math.random()*W, y: 80+Math.random()*(H-180),
+                vx: (Math.random()-0.5)*1.2, vy: (Math.random()-0.5)*0.4,
+                size: 22+Math.random()*18, type: t,
+                tailPhase: Math.random()*6, eyeBlink: 0, bubbleTimer: Math.random()*100
             });
         }
         // 莲花
@@ -596,26 +603,52 @@
 
         function drawFish(f) {
             ctx.save(); ctx.translate(f.x, f.y);
-            const dir = f.vx>0 ? 1 : -1;
-            ctx.scale(dir, 1);
-            // 身体
-            const grad = ctx.createRadialGradient(0,0,2,0,0,f.size);
-            grad.addColorStop(0,'#fff'); grad.addColorStop(0.4,f.color); grad.addColorStop(1,'rgba(0,0,0,0.1)');
-            ctx.fillStyle = grad;
-            ctx.beginPath(); ctx.ellipse(0,0,f.size,f.size*0.45,0,0,Math.PI*2); ctx.fill();
-            // 尾巴
-            ctx.fillStyle = f.color;
-            ctx.beginPath(); ctx.moveTo(-f.size*0.7,0);
-            ctx.quadraticCurveTo(-f.size*1.3, -f.size*0.4+Math.sin(time*0.15+f.tailPhase)*5, -f.size*1.1, -f.size*0.5);
-            ctx.quadraticCurveTo(-f.size*1.3, 0, -f.size*1.1, f.size*0.5);
-            ctx.quadraticCurveTo(-f.size*1.3, f.size*0.4+Math.sin(time*0.15+f.tailPhase)*5, -f.size*0.7, 0);
+            const dir = f.vx>0?1:-1; ctx.scale(dir, 1);
+            const s = f.size, t = f.type, wiggle = Math.sin(time*0.12+f.tailPhase)*0.3;
+
+            // 尾巴（先画，在身体下面）
+            const tailWag = Math.sin(time*0.2+f.tailPhase)*8;
+            ctx.fillStyle = t.fin; ctx.beginPath();
+            ctx.moveTo(-s*0.55, 0);
+            ctx.bezierCurveTo(-s*0.9, -s*0.35+tailWag*0.5, -s*1.4, -s*0.45+tailWag, -s*1.3, -s*0.15+tailWag);
+            ctx.bezierCurveTo(-s*1.3, s*0.05+tailWag, -s*0.9, s*0.35-tailWag*0.5, -s*0.55, 0);
             ctx.fill();
-            // 眼
-            ctx.fillStyle='#333'; ctx.beginPath(); ctx.arc(f.size*0.35,-f.size*0.1,f.size*0.12,0,7); ctx.fill();
-            ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(f.size*0.37,-f.size*0.12,f.size*0.04,0,7); ctx.fill();
-            // 鳍
-            ctx.strokeStyle = f.color; ctx.lineWidth=1.5; ctx.globalAlpha=0.5;
-            ctx.beginPath(); ctx.moveTo(0,-f.size*0.35); ctx.quadraticCurveTo(5,-f.size*0.55,0,-f.size*0.3); ctx.stroke();
+
+            // 身体
+            const bodyGrad = ctx.createRadialGradient(s*0.05, -s*0.1, s*0.05, 0, 0, s);
+            bodyGrad.addColorStop(0, '#ffffff'); bodyGrad.addColorStop(0.35, t.body); bodyGrad.addColorStop(0.7, t.body); bodyGrad.addColorStop(1, 'rgba(0,0,0,0.08)');
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath(); ctx.ellipse(0, 0, s*0.75, s*0.42, 0, 0, Math.PI*2); ctx.fill();
+
+            // 腮红
+            ctx.fillStyle = t.cheek; ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.ellipse(s*0.28, s*0.12, s*0.13, s*0.08, 0, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // 大眼睛
+            const eyeX = s*0.32, eyeY = -s*0.08;
+            // 眼白
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(eyeX, eyeY, s*0.18, s*0.2, 0.1, 0, Math.PI*2); ctx.fill();
+            // 瞳孔
+            ctx.fillStyle = '#2a1a10'; ctx.beginPath(); ctx.arc(eyeX+s*0.03, eyeY+s*0.01, s*0.12, 0, 7); ctx.fill();
+            // 高光
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(eyeX-s*0.03, eyeY-s*0.06, s*0.06, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.arc(eyeX+s*0.06, eyeY+s*0.05, s*0.03, 0, 7); ctx.fill();
+
+            // 小嘴
+            ctx.strokeStyle = t.fin; ctx.lineWidth = s*0.04; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(s*0.2, s*0.12, s*0.08, 0.3, 1.5); ctx.stroke();
+            ctx.lineWidth = 1;
+
+            // 背鳍
+            ctx.fillStyle = t.fin; ctx.globalAlpha = 0.5;
+            ctx.beginPath(); ctx.moveTo(-s*0.1, -s*0.35);
+            ctx.quadraticCurveTo(s*0.1, -s*0.55+wiggle*3, s*0.3, -s*0.32); ctx.lineTo(s*0.1, -s*0.28); ctx.fill();
+            // 腹鳍
+            ctx.beginPath(); ctx.moveTo(s*0.05, s*0.22);
+            ctx.quadraticCurveTo(0, s*0.4+wiggle*2, -s*0.15, s*0.28); ctx.lineTo(0, s*0.18); ctx.fill();
+            ctx.globalAlpha = 1;
+
             ctx.restore();
         }
 
@@ -661,15 +694,31 @@
             }
             // 水草
             for (const p of plants) drawPlant(p);
-            // 鱼
+            // 🐟 鱼游泳
             for (const f of fishes) {
+                // 鼠标吸引
                 const dx=mx-f.x, dy=my-f.y, dist=Math.hypot(dx,dy)||1;
-                if (dist<180 && mx>0) { f.vx+=(dx/dist)*0.04; f.vy+=(dy/dist)*0.04; }
-                f.vx+=(Math.random()-0.5)*0.1; f.vy+=(Math.random()-0.5)*0.05;
-                f.vx*=0.98; f.vy*=0.98;
+                if (dist<250 && mx>0) {
+                    f.vx+=(dx/dist)*0.05;
+                    f.vy+=(dy/dist)*0.05;
+                }
+                // 随机游动 + 偶尔加速
+                if (Math.random()<0.01) { f.vx+=(Math.random()-0.5)*2; f.vy+=(Math.random()-0.5)*1; } // 偶尔冲刺
+                f.vx+=(Math.random()-0.5)*0.08; f.vy+=(Math.random()-0.5)*0.04;
+                f.vx*=0.985; f.vy*=0.985;
+                // 速度限制
+                const spd = Math.hypot(f.vx, f.vy);
+                if (spd>3) { f.vx*=2.8/spd; f.vy*=2.8/spd; }
+                if (spd<0.3 && mx<0) { f.vx+=(Math.random()-0.5)*0.3; } // 没鼠标时保持游动
                 f.x+=f.vx; f.y+=f.vy;
-                if (f.x<-60) f.x=W+60; if (f.x>W+60) f.x=-60;
-                if (f.y<30) f.y=30; if (f.y>H-30) f.y=H-30;
+                if (f.x<-80) f.x=W+80; if (f.x>W+80) f.x=-80;
+                if (f.y<20) f.y=20; if (f.y>H-20) f.y=H-20;
+                // 鱼吐泡泡
+                f.bubbleTimer++;
+                if (f.bubbleTimer>80+Math.random()*60) {
+                    f.bubbleTimer=0;
+                    bubbles.push({x:f.x+(f.vx>0?-15:15), y:f.y-5, r:1.5+Math.random()*3, vy:0.2+Math.random()*0.4, o:0.4});
+                }
                 drawFish(f);
             }
             // 莲花
