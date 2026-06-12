@@ -649,6 +649,31 @@
                     return;
                 }
 
+                // 手动创建 profiles 记录（绕过数据库触发器问题）
+                if (data.user) {
+                    // 生成 6 位唯一码
+                    const code = String(Math.floor(100000 + Math.random() * 900000));
+                    const { error: profileErr } = await supabase.from('profiles').insert({
+                        id: data.user.id,
+                        username: username,
+                        user_code: code
+                    });
+                    if (profileErr) {
+                        // 如果 profiles 插入失败（比如已存在），尝试更新
+                        const { error: updateErr } = await supabase.from('profiles').upsert({
+                            id: data.user.id,
+                            username: username,
+                            user_code: code
+                        });
+                        if (updateErr) {
+                            showToast('注册失败: ' + updateErr.message, 'err');
+                            btnSubmitMain.disabled = false;
+                            btnSubmitMain.textContent = '注 册';
+                            return;
+                        }
+                    }
+                }
+
                 showToast('✅ 注册成功，正在跳转...', 'ok');
                 goToIndex();
             } else {
