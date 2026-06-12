@@ -618,91 +618,65 @@
         loginForm.addEventListener('submit', async e => {
             e.preventDefault();
             btnSubmitMain.disabled = true;
-            btnSubmitMain.textContent = '处理中...';
 
             if (loginMode === 'register') {
-                // ---- Register via Supabase ----
                 const username = document.getElementById('regUsername').value.trim();
                 const pwd = document.getElementById('regPassword').value.trim();
                 const pwd2 = document.getElementById('regPassword2').value.trim();
 
-                if (username.length < 3) { showToast('用户名至少3个字符', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '注 册'; return; }
-                if (pwd.length < 6) { showToast('密码至少6位', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '注 册'; return; }
-                if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '注 册'; return; }
+                if (username.length < 3) { showToast('用户名至少3个字符', 'err'); resetBtn('注 册'); return; }
+                if (pwd.length < 6) { showToast('密码至少6位', 'err'); resetBtn('注 册'); return; }
+                if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); resetBtn('注 册'); return; }
 
-                // 用 username + @windwalker.app 作为 Supabase 登录邮箱
+                btnSubmitMain.textContent = '⏳ 注册中...';
                 const email = username + '@windwalker.app';
-                const { data, error } = await supabase.auth.signUp({
-                    email: email,
-                    password: pwd,
-                    options: { data: { username: username } }
-                });
 
-                if (error) {
-                    if (error.message.includes('already registered') || error.message.includes('already exists')) {
-                        showToast('用户名已存在', 'err');
-                    } else {
-                        showToast('注册失败: ' + error.message, 'err');
+                try {
+                    const { data, error } = await supabase.auth.signUp({ email, password: pwd, options: { data: { username } } });
+                    if (error) {
+                        const msg = error.message.includes('already') ? '用户名已存在' : '注册失败: ' + error.message;
+                        showToast(msg, 'err'); resetBtn('注 册'); return;
                     }
-                    btnSubmitMain.disabled = false;
-                    btnSubmitMain.textContent = '注 册';
-                    return;
-                }
+                    if (!data.user) { showToast('注册失败，请重试', 'err'); resetBtn('注 册'); return; }
 
-                // 手动创建 profiles 记录
-                if (data.user) {
+                    // 创建 profiles
                     const code = String(Math.floor(100000 + Math.random() * 900000));
-                    await supabase.from('profiles').upsert({
-                        id: data.user.id,
-                        username: username,
-                        user_code: code
-                    }).catch(() => {});
-                }
+                    await supabase.from('profiles').upsert({ id: data.user.id, username, user_code: code });
 
-                // 确保 session 持久化：显式重新登录
-                if (data.session) {
-                    showToast('✅ 注册成功，正在跳转...', 'ok');
-                    goToIndex();
-                } else {
-                    // signUp 没有返回 session（邮箱验证未关闭？），手动登录
-                    const { error: loginErr } = await supabase.auth.signInWithPassword({
-                        email: email,
-                        password: pwd
-                    });
-                    if (loginErr) {
-                        showToast('注册成功但登录失败: ' + loginErr.message, 'err');
-                        btnSubmitMain.disabled = false;
-                        btnSubmitMain.textContent = '注 册';
-                        return;
+                    // 确保有 session
+                    if (!data.session) {
+                        btnSubmitMain.textContent = '⏳ 登录中...';
+                        const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password: pwd });
+                        if (loginErr) { showToast('注册成功但自动登录失败，请手动登录', 'err'); resetBtn('注 册'); return; }
                     }
-                    showToast('✅ 注册成功，正在跳转...', 'ok');
-                    goToIndex();
+                    showToast('✅ 注册成功！', 'ok');
+                    setTimeout(() => window.location.href = 'index.html', 800);
+                } catch(ex) {
+                    showToast('网络错误，请检查连接后重试', 'err');
+                    resetBtn('注 册');
                 }
             } else {
-                // ---- Login via Supabase ----
                 const username = phoneInput.value.trim();
                 const pwd = passwordInput.value.trim();
 
-                if (!username) { showToast('请输入用户名', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '登 录'; return; }
-                if (!pwd) { showToast('请输入密码', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '登 录'; return; }
+                if (!username) { showToast('请输入用户名', 'err'); resetBtn('登 录'); return; }
+                if (!pwd) { showToast('请输入密码', 'err'); resetBtn('登 录'); return; }
 
-                const email = username + '@windwalker.app';
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email: email,
-                    password: pwd
-                });
-
-                if (error) {
-                    showToast('账号或密码错误', 'err');
-                    btnSubmitMain.disabled = false;
-                    btnSubmitMain.textContent = '登 录';
-                    return;
+                btnSubmitMain.textContent = '⏳ 登录中...';
+                try {
+                    const { data, error } = await supabase.auth.signInWithPassword({ email: username + '@windwalker.app', password: pwd });
+                    if (error) { showToast('账号或密码错误', 'err'); resetBtn('登 录'); return; }
+                    if (!data.session) { showToast('登录失败，请重试', 'err'); resetBtn('登 录'); return; }
+                    showToast('✅ 登录成功！', 'ok');
+                    setTimeout(() => window.location.href = 'index.html', 800);
+                } catch(ex) {
+                    showToast('网络错误，请检查连接后重试', 'err');
+                    resetBtn('登 录');
                 }
-
-                showToast('✅ 登录成功，正在跳转...', 'ok');
-                goToIndex();
             }
         });
+
+        function resetBtn(text) { btnSubmitMain.disabled = false; btnSubmitMain.textContent = text; }
 
         function goToIndex() {
             setTimeout(() => {

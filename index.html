@@ -2602,22 +2602,44 @@ function updateNav(items) {
 
         // ========== Auth Check ==========
         async function requireAuth() {
-            const { data, error } = await supabase.auth.getSession();
-            if (error) console.log('getSession error:', error);
-            const session = data?.session;
-            if (!session) { console.log('No session, redirecting to login'); window.location.href = 'login.html'; return null; }
-            currentUserId = session.user.id;
-            console.log('Logged in as:', currentUserId);
-            let { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
-            if (!profile) {
-                console.log('No profile found, creating...');
-                const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'user';
-                const code = String(Math.floor(100000 + Math.random() * 900000));
-                await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code }).catch(() => {});
-                profile = { id: currentUserId, username: username, bio: '', avatar_url: '', user_code: code, created_at: new Date().toISOString() };
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) { console.warn('getSession error:', error.message); }
+                const session = data?.session;
+                if (!session) {
+                    // 等待一下再试（可能是 Supabase 延迟）
+                    await new Promise(r => setTimeout(r, 1000));
+                    const { data: retry } = await supabase.auth.getSession();
+                    if (!retry?.session) { window.location.href = 'login.html'; return null; }
+                    currentUserId = retry.session.user.id;
+                } else {
+                    currentUserId = session.user.id;
+                }
+                let { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).maybeSingle();
+                if (!profile) {
+                    const { data: userData } = await supabase.auth.getUser();
+                    const username = userData?.user?.user_metadata?.username || 'user_' + Date.now() % 100000;
+                    const code = String(Math.floor(100000 + Math.random() * 900000));
+                    await supabase.from('profiles').upsert({ id: currentUserId, username, user_code: code }).catch(() => {});
+                    profile = { id: currentUserId, username, bio: '', avatar_url: '', user_code: code };
+                }
+                currentUser = profile;
+                return profile;
+            } catch(e) {
+                console.error('requireAuth failed:', e.message);
+                // 网络错误，重试一次
+                try {
+                    await new Promise(r => setTimeout(r, 2000));
+                    const { data } = await supabase.auth.getSession();
+                    if (data?.session) {
+                        currentUserId = data.session.user.id;
+                        currentUser = { id: currentUserId, username: 'user', bio: '', avatar_url: '', user_code: '000000' };
+                        return currentUser;
+                    }
+                } catch(e2) {}
+                window.location.href = 'login.html';
+                return null;
             }
-            currentUser = profile;
-            return profile;
         }
 
         // Load profile from Supabase
@@ -3507,7 +3529,14 @@ function updateNav(items) {
         async function savePostToDb(post) {
             if (!currentUserId) { showToast('请先登录再发帖', true); return null; }
             try {
-                console.log('savePostToDb: author_id=' + currentUserId + ' text=' + (post.text || '').substring(0, 20));
+                // 先确保 profiles 行存在
+                const { data: pf } = await supabase.from('profiles').select('id').eq('id', currentUserId).maybeSingle();
+                if (!pf) {
+                    const username = currentUser?.username || 'user_' + Date.now() % 10000;
+                    const code = String(Math.floor(100000 + Math.random() * 900000));
+                    await supabase.from('profiles').upsert({ id: currentUserId, username, user_code: code });
+                }
+
                 const { data, error } = await supabase.from('community_posts').insert({
                     author_id: currentUserId,
                     text: post.text || '',
@@ -3515,16 +3544,20 @@ function updateNav(items) {
                     media_type: post.mediaType || null,
                     likes_count: 0
                 }).select('id').single();
+
                 if (error) {
-                    console.error('Post insert error:', JSON.stringify(error));
-                    showToast('发布失败: ' + (error.message || error.code || JSON.stringify(error)), true);
+                    const msg = error.code === '42501' ? '权限不足（请确认已关闭RLS）' :
+                              error.code === '23503' ? '用户资料异常，请重新登录' :
+                              error.code === '42P01' ? '数据库表不存在，请重新运行schema.sql' :
+                              (error.message || '未知错误');
+                    showToast('发布失败: ' + msg, true);
+                    console.error('Post insert error:', error.code, error.message, error.details);
                     return null;
                 }
-                console.log('Post saved, id=' + data.id);
                 return data.id;
             } catch(e) {
-                console.error('Post exception:', e.message, e);
-                showToast('发布异常: ' + (e.message || '网络错误'), true);
+                showToast('发布失败: 网络异常，请重试', true);
+                console.error('Post exception:', e);
                 return null;
             }
         }
