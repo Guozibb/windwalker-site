@@ -497,7 +497,17 @@
                 </div>
 
                 <button type="submit" class="btn-login" id="btnSubmitMain">登 录</button>
+                <div style="text-align:center;margin-top:8px;">
+                    <a href="#" id="forgotPwdLink" style="color:var(--accent);font-size:0.78rem;text-decoration:none;">忘记密码？</a>
+                </div>
             </form>
+
+            <div id="forgotPwdPanel" style="display:none;text-align:center;padding:10px 0;">
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px;">输入用户名，发送重置邮件</p>
+                <input type="text" id="forgotUsername" placeholder="输入用户名" style="width:100%;padding:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--text);margin-bottom:8px;font-family:inherit;">
+                <button id="forgotSubmit" style="width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;">发送重置链接</button>
+                <a href="#" id="forgotBack" style="display:block;margin-top:8px;color:var(--text-muted);font-size:0.75rem;">← 返回登录</a>
+            </div>
 
             <div class="agreement">
                 登录即表示同意 <a href="#">用户协议</a> 和 <a href="#">隐私政策</a>
@@ -677,6 +687,36 @@
         });
 
         function resetBtn(text) { btnSubmitMain.disabled = false; btnSubmitMain.textContent = text; }
+
+        // ========== 忘记密码 ==========
+        const forgotPwdLink = document.getElementById('forgotPwdLink');
+        const forgotPwdPanel = document.getElementById('forgotPwdPanel');
+        const forgotBack = document.getElementById('forgotBack');
+        const forgotSubmit = document.getElementById('forgotSubmit');
+        const forgotUsername = document.getElementById('forgotUsername');
+
+        forgotPwdLink.addEventListener('click', e => {
+            e.preventDefault();
+            loginForm.style.display = 'none';
+            forgotPwdPanel.style.display = 'block';
+        });
+        forgotBack.addEventListener('click', e => {
+            e.preventDefault();
+            loginForm.style.display = '';
+            forgotPwdPanel.style.display = 'none';
+        });
+        forgotSubmit.addEventListener('click', async () => {
+            const username = forgotUsername.value.trim();
+            if (!username) { showToast('请输入用户名', 'err'); return; }
+            forgotSubmit.disabled = true; forgotSubmit.textContent = '发送中...';
+            const email = username + '@windwalker.app';
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + window.location.pathname.replace('login.html','') + 'reset-password.html'
+            });
+            if (error) { showToast('发送失败: ' + error.message, 'err'); }
+            else { showToast('如果账号存在，重置链接已发送（请检查Supabase Auth后台的邮件日志）', 'ok'); }
+            forgotSubmit.disabled = false; forgotSubmit.textContent = '发送重置链接';
+        });
 
         function goToIndex() {
             setTimeout(() => {
