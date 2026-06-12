@@ -2602,13 +2602,15 @@ function updateNav(items) {
 
         // ========== Auth Check ==========
         async function requireAuth() {
-            // 先刷新 session token
-            const { data: refreshData } = await supabase.auth.refreshSession();
-            const session = refreshData.session || (await supabase.auth.getSession()).data.session;
+            const { data, error } = await supabase.auth.getSession();
+            if (error) console.log('getSession error:', error);
+            const session = data?.session;
             if (!session) { console.log('No session, redirecting to login'); window.location.href = 'login.html'; return null; }
             currentUserId = session.user.id;
+            console.log('Logged in as:', currentUserId);
             let { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
             if (!profile) {
+                console.log('No profile found, creating...');
                 const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'user';
                 const code = String(Math.floor(100000 + Math.random() * 900000));
                 await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code }).catch(() => {});
