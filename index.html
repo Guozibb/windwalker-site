@@ -4338,53 +4338,55 @@ function updateNav(items) {
         // Auto-sync removed — Supabase handles persistence directly
 
         // ========== 🌸 花瓣飘落动画 ==========
-        (function() {
-            const canvas = document.getElementById('petalCanvas');
-            const ctx = canvas.getContext('2d');
-            let W, H, petals = [];
-            function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-            resize(); window.addEventListener('resize', resize);
+        setTimeout(() => {
+            try {
+                const canvas = document.getElementById('petalCanvas');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                let W, H, petals = [];
+                function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+                resize(); window.addEventListener('resize', resize);
 
-            let currentSeason = localStorage.getItem('ww_season') || 'spring';
-            const seasons = { spring:'🌸', summer:'🌿', autumn:'🍂', winter:'❄' };
-            const seasonNames = { spring:'春日·樱花', summer:'夏日·绿叶', autumn:'秋日·枫叶', winter:'冬日·飘雪' };
-            document.getElementById('btnSeason').textContent = seasons[currentSeason];
-            document.body.classList.add(currentSeason);
-
-            function createPetal() {
-                const shapes = {
-                    spring: () => { const a=Math.random()*Math.PI*2; return { draw(c,x,y,s)=>{ c.fillStyle='#ffc0d0'; c.beginPath(); c.ellipse(x,y,s*5,s*3,a,0,Math.PI*2); c.fill(); } } },
-                    summer: () => { const a=Math.random()*Math.PI*2; return { draw(c,x,y,s)=>{ c.fillStyle='#a0d8b0'; c.beginPath(); c.ellipse(x,y,s*4,s*2,a,0,Math.PI*2); c.fill(); } } },
-                    autumn: () => { const a=Math.random()*Math.PI*2; return { draw(c,x,y,s)=>{ c.fillStyle='rgba(220,140,60,0.7)'; c.beginPath(); c.arc(x,y,s*3,0,Math.PI*2); c.fill(); } } },
-                    winter: () => { return { draw(c,x,y,s)=>{ c.fillStyle='rgba(220,230,250,0.8)'; c.beginPath(); c.arc(x,y,s*3,0,Math.PI*2); c.fill(); } } }
-                };
-                const shape = (shapes[currentSeason] || shapes.spring)();
-                return { x: Math.random()*W, y: -20, s: Math.random()*0.8+0.4, vy: Math.random()*1+0.3, vx: (Math.random()-0.5)*0.8, rot: Math.random()*360, vrot: (Math.random()-0.5)*2, shape };
-            }
-
-            for (let i=0;i<40;i++) { const p=createPetal(); p.y=Math.random()*H; petals.push(p); }
-
-            function animate() {
-                ctx.clearRect(0,0,W,H);
-                petals.forEach(p => {
-                    p.y += p.vy; p.x += p.vx + Math.sin(p.y*0.02)*0.3; p.rot += p.vrot;
-                    if (p.y > H+20) { const n=createPetal(); p.x=n.x; p.y=n.y; p.vy=n.vy; p.vx=n.vx; }
-                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot*Math.PI/180); ctx.globalAlpha=0.6; p.shape.draw(ctx,0,0,p.s); ctx.restore();
-                });
-                requestAnimationFrame(animate);
-            }
-            animate();
-
-            document.getElementById('btnSeason').addEventListener('click', () => {
-                const keys = Object.keys(seasons); const idx = (keys.indexOf(currentSeason)+1)%4;
-                currentSeason = keys[idx]; localStorage.setItem('ww_season', currentSeason);
-                document.getElementById('btnSeason').textContent = seasons[currentSeason];
-                document.body.classList.remove('spring','summer','autumn','winter');
+                let currentSeason = localStorage.getItem('ww_season') || 'spring';
+                const seasons = { spring:'🌸', summer:'🌿', autumn:'🍂', winter:'❄' };
+                const seasonNames = { spring:'春日·樱花', summer:'夏日·绿叶', autumn:'秋日·枫叶', winter:'冬日·飘雪' };
+                const seasonBtn = document.getElementById('btnSeason');
+                if (seasonBtn) seasonBtn.textContent = seasons[currentSeason];
                 document.body.classList.add(currentSeason);
-                petals = []; for (let i=0;i<40;i++) petals.push(createPetal());
-                showToast('🎨 ' + seasonNames[currentSeason], false);
-            });
-        })();
+
+                function createPetal() {
+                    const s = currentSeason;
+                    const shape = s==='winter' ? function(c,x,y,z){c.fillStyle='rgba(220,230,250,0.7)';c.beginPath();c.arc(x,y,z*3,0,Math.PI*2);c.fill();}
+                        : s==='autumn' ? function(c,x,y,z){c.fillStyle='rgba(220,140,60,0.6)';c.beginPath();c.arc(x,y,z*3,0,Math.PI*2);c.fill();}
+                        : s==='summer' ? function(c,x,y,z){c.fillStyle='rgba(140,200,140,0.5)';c.beginPath();c.ellipse(x,y,z*4,z*2,0,0,Math.PI*2);c.fill();}
+                        : function(c,x,y,z){c.fillStyle='rgba(255,180,200,0.5)';c.beginPath();c.ellipse(x,y,z*5,z*2.5,0,0,Math.PI*2);c.fill();};
+                    return {x:Math.random()*W, y:-20, s:Math.random()*0.7+0.3, vy:Math.random()*0.8+0.2, vx:(Math.random()-0.5)*0.6, shape};
+                }
+                for (let i=0;i<30;i++) { const p=createPetal(); p.y=Math.random()*H; petals.push(p); }
+
+                let animId;
+                function animate() {
+                    ctx.clearRect(0,0,W,H);
+                    for (const p of petals) {
+                        p.y+=p.vy; p.x+=p.vx+Math.sin(p.y*0.015)*0.2;
+                        if(p.y>H+20){const n=createPetal();p.x=n.x;p.y=n.y;p.vy=n.vy;}
+                        ctx.globalAlpha=0.5; p.shape(ctx,p.x,p.y,p.s);
+                    }
+                    animId=requestAnimationFrame(animate);
+                }
+                animate();
+
+                if (seasonBtn) seasonBtn.addEventListener('click', () => {
+                    const keys=['spring','summer','autumn','winter'];
+                    currentSeason=keys[(keys.indexOf(currentSeason)+1)%4];
+                    localStorage.setItem('ww_season',currentSeason);
+                    seasonBtn.textContent=seasons[currentSeason];
+                    document.body.classList.remove('spring','summer','autumn','winter');
+                    document.body.classList.add(currentSeason);
+                    petals=[]; for(let i=0;i<30;i++) petals.push(createPetal());
+                });
+            } catch(e) { console.warn('Petal animation error:', e.message); }
+        }, 500);
 
         init();
     })();
