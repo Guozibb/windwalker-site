@@ -1935,7 +1935,7 @@
                 <button class="btn-sfx" id="btnSfxToggle" title="音效开关">🔔</button>
                 <button class="btn-theme" id="btnThemeToggle" title="切换主题">🌙</button>
                 <button class="btn-community" id="btnOpenFollowing" style="background:linear-gradient(135deg,#f97316,#ec4899);">👁 关注</button>
-                <button class="btn-community" id="btnOpenCommunity">💬 社区</button>
+                <button class="btn-community" id="btnOpenCommunity">🏛 广场</button>
                 <button class="btn-upload" id="btnOpenUpload">
                     ⬆ <span class="ulabel">上传</span>
                 </button>
@@ -1986,7 +1986,7 @@
         </div>
         <div class="lb-comments" id="lbComments" style="display:none;"></div>
         <div class="lb-comment-input-row" id="lbCommentInputRow" style="display:none;max-width:500px;margin:0 auto;">
-            <input type="text" id="lbCommentInput" placeholder="写评论..." maxlength="200">
+            <input type="text" id="lbCommentInput" placeholder="写回复..." maxlength="200">
             <button class="lb-comment-submit" id="lbCommentSubmit">发送</button>
         </div>
     </div>
@@ -1998,7 +1998,7 @@
             <button class="community-close" id="followingClose">✕</button>
         </div>
         <div class="community-feed" id="followingFeed">
-            <div class="community-empty">你还没有关注任何人<br>去社区或搜索关注创作者吧！</div>
+            <div class="community-empty">你还没有关注任何人<br>去广场或搜索关注创作者吧！</div>
         </div>
     </div>
 
@@ -2027,7 +2027,7 @@
 
     <div class="community-overlay" id="communityOverlay">
         <div class="community-header">
-            <h2>💬 社区</h2>
+            <h2>🏛 广场</h2>
             <button class="community-close" id="communityClose">✕</button>
         </div>
         <div class="community-composer">
@@ -2048,7 +2048,7 @@
             </div>
         </div>
         <div class="community-feed" id="communityFeed">
-            <div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>
+            <div class="community-empty">💬 广场暂无动态，来发布第一条吧！</div>
         </div>
     </div>
 
@@ -2521,7 +2521,7 @@
             const lbComments = document.getElementById('lbComments');
             lbComments.innerHTML = cmts.length
                 ? cmts.map(c => `<div class="lb-comment-item"><strong>${c.name}:</strong> ${c.text}</div>`).join('')
-                : '<div style="color:#888;font-size:0.78rem;">暂无评论</div>';
+                : '<div style="color:#888;font-size:0.78rem;">暂无回复</div>';
         }
 
         function closeLightbox() {
@@ -3157,7 +3157,7 @@ function updateNav(items) {
             const partners = new Set();
             msgs.forEach(m => { if (m.from===me) partners.add(m.to); if (m.to===me) partners.add(m.from); });
             chatPanelBody.innerHTML = !partners.size
-                ? '<div style="text-align:center;color:var(--text-muted);padding:30px;">暂无私信<br>在社区搜索用户发送</div>'
+                ? '<div style="text-align:center;color:var(--text-muted);padding:30px;">暂无私信<br>在广场搜索用户发送</div>'
                 : [...partners].map(p => {
                     const conv = msgs.filter(m => (m.from===me&&m.to===p)||(m.from===p&&m.to===me));
                     const last = conv[conv.length-1];
@@ -3488,7 +3488,7 @@ function updateNav(items) {
 
         // Community posts (Supabase)
         // ============================================================
-        // 💬 社区功能 (Supabase 重构版 - 干净版本)
+        // 🏛 广场功能 (Supabase 重构版 - 干净版本)
         // ============================================================
         let communityPosts = [];
 
@@ -3583,7 +3583,7 @@ function updateNav(items) {
             const supabaseIds = new Set(supabasePosts.map(p => p.id));
             communityPosts = [...communityPosts.filter(p => !supabaseIds.has(p.id)), ...supabasePosts];
 
-            if (!communityPosts.length) { communityFeed.innerHTML = '<div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>'; return; }
+            if (!communityPosts.length) { communityFeed.innerHTML = '<div class="community-empty">💬 广场暂无动态，来发布第一条吧！</div>'; return; }
 
             communityFeed.innerHTML = communityPosts.map(p => {
                 const liked = currentUserId && p.likedBy?.includes(currentUserId);
@@ -3603,8 +3603,8 @@ function updateNav(items) {
                         <button class="post-comment-btn" data-postid="${p.id}">💬 评论</button>
                     </div>
                     <div class="comments-section" id="comments-${p.id}">
-                        ${(p.comments||[]).length ? p.comments.map(c => `<div class="comment-item"><span class="comment-name">${c.name}</span><span class="comment-text">${c.text||''}</span></div>`).join('') : '<div style="color:var(--text-muted);font-size:0.8rem;">暂无评论</div>'}
-                        <div class="comment-input-row"><input type="text" class="comment-input" data-postid="${p.id}" placeholder="写评论..." maxlength="200"><button class="comment-submit" data-postid="${p.id}">发送</button></div>
+                        ${(p.comments||[]).length ? p.comments.map(c => `<div class="comment-item"><span class="comment-name">${c.name}</span><span class="comment-text">${c.text||''}</span></div>`).join('') : '<div style="color:var(--text-muted);font-size:0.8rem;">暂无回复</div>'}
+                        <div class="comment-input-row"><input type="text" class="comment-input" data-postid="${p.id}" placeholder="写回复..." maxlength="200"><button class="comment-submit" data-postid="${p.id}">发送</button></div>
                     </div>
                 </div>`;
             }).join('');
@@ -3664,7 +3664,7 @@ function updateNav(items) {
             const { data } = await supabase.from('follows').select('following:following_id(username)').eq('follower_id', currentUserId);
             const following = (data||[]).map(d => d.following?.username).filter(Boolean);
             if (!following.length) {
-                followingFeedEl.innerHTML = '<div class="community-empty">你还没有关注任何人<br>去社区或搜索关注创作者吧！</div>';
+                followingFeedEl.innerHTML = '<div class="community-empty">你还没有关注任何人<br>去广场或搜索关注创作者吧！</div>';
                 return;
             }
             const all = allItems();
