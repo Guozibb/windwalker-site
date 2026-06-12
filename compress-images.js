@@ -1,4 +1,4 @@
-// 图片压缩脚本 — 将大 PNG/JPG 转为 WebP，大幅减少体积
+// 图片压缩脚本 — 压缩约70%（保留原体积30%）
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
@@ -25,21 +25,18 @@ const IMAGE_FILES = [
     "3eeb38378e22d2e2b06d24ebc1a6229a.png",
 ];
 
-const FULL_WIDTH = 1600;  // 大图最大宽度
-const THUMB_WIDTH = 400;  // 缩略图宽度（画廊卡片用）
-
 async function compressAll() {
-    const fullDir = path.join(__dirname, 'optimized');
+    const outDir = path.join(__dirname, 'optimized');
     const thumbDir = path.join(__dirname, 'optimized', 'thumb');
-    if (!fs.existsSync(fullDir)) fs.mkdirSync(fullDir, { recursive: true });
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
     if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
 
-    let totalBefore = 0, totalAfter = 0;
+    let totalBefore = 0, totalOpt = 0, totalThumb = 0;
 
     for (const file of IMAGE_FILES) {
         const srcPath = path.join(__dirname, file);
         if (!fs.existsSync(srcPath)) {
-            console.log(`  ⚠ 跳过（不存在）: ${file}`);
+            console.log(`  ⚠ 跳过: ${file}`);
             continue;
         }
 
@@ -47,31 +44,32 @@ async function compressAll() {
         const beforeSize = fs.statSync(srcPath).size;
         totalBefore += beforeSize;
 
-        // 生成大图 WebP (1600px)
-        const fullOut = path.join(fullDir, name + '.webp');
+        // 大图：保持原分辨率，WebP quality 70（压缩约70%）
+        const optOut = path.join(outDir, name + '.webp');
         await sharp(srcPath)
-            .resize(FULL_WIDTH, undefined, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality: 82 })
-            .toFile(fullOut);
-        const fullSize = fs.statSync(fullOut).size;
+            .webp({ quality: 70 })
+            .toFile(optOut);
+        const optSize = fs.statSync(optOut).size;
 
-        // 生成缩略图 WebP (400px)
+        // 卡片缩略图：1200px 宽
         const thumbOut = path.join(thumbDir, name + '.webp');
         await sharp(srcPath)
-            .resize(THUMB_WIDTH, undefined, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality: 72 })
+            .resize(1200, undefined, { withoutEnlargement: true, fit: 'inside' })
+            .webp({ quality: 65 })
             .toFile(thumbOut);
         const thumbSize = fs.statSync(thumbOut).size;
 
-        totalAfter += thumbSize; // 缩略图用于卡片展示
-        const pct = Math.round((1 - fullSize / beforeSize) * 100);
-        console.log(`  ✅ ${file}  ${(beforeSize/1e6).toFixed(1)}MB → 大图${(fullSize/1e3).toFixed(0)}KB / 缩略图${(thumbSize/1e3).toFixed(0)}KB  (${pct}%)`);
+        totalOpt += optSize;
+        totalThumb += thumbSize;
+        const optPct = Math.round((1 - optSize / beforeSize) * 100);
+        const thumbPct = Math.round((1 - thumbSize / beforeSize) * 100);
+        console.log(`  ✅ ${file}  ${(beforeSize/1e6).toFixed(1)}MB → 大图${(optSize/1e3).toFixed(0)}KB(-${optPct}%) / 卡片${(thumbSize/1e3).toFixed(0)}KB(-${thumbPct}%)`);
     }
 
-    console.log(`\n  📊 总计: ${(totalBefore/1e6).toFixed(1)}MB → ${(totalAfter/1e6).toFixed(1)}MB (缩略图)`);
-    console.log(`  📁 输出: optimized/ 目录`);
-    console.log(`\n  ⚡ 下一步: 修改 modelData 中的 file 路径指向 optimized/thumb/ 下的 .webp 文件`);
-    console.log(`     灯箱大图使用 optimized/ 下的 .webp 文件`);
+    console.log(`\n  📊 原图总计: ${(totalBefore/1e6).toFixed(1)}MB`);
+    console.log(`  📊 优化大图: ${(totalOpt/1e6).toFixed(1)}MB`);
+    console.log(`  📊 卡片缩略: ${(totalThumb/1e6).toFixed(1)}MB`);
+    console.log(`  📁 输出: optimized/`);
 }
 
 compressAll().catch(e => { console.error(e); process.exit(1); });
