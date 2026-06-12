@@ -2962,13 +2962,18 @@ function updateNav(items) {
 
             // Delete handlers
             drawerWorksGrid.querySelectorAll('.drawer-work-delete').forEach(btn => {
-                btn.addEventListener('click', e => {
+                btn.addEventListener('click', async e => {
                     e.stopPropagation();
                     const id = btn.dataset.delete;
                     const idx = uploadedItems.findIndex(m => String(m.id) === String(id));
                     if (idx !== -1) {
                         if (uploadedItems[idx].file && uploadedItems[idx].file.startsWith('blob:')) {
                             URL.revokeObjectURL(uploadedItems[idx].file);
+                        }
+                        // 从 Supabase 删除记录
+                        const dbId = String(id).replace('upload_', '');
+                        if (/^\d+$/.test(dbId)) {
+                            await supabase.from('uploads').delete().eq('id', parseInt(dbId));
                         }
                         uploadedItems.splice(idx, 1);
                         refreshDrawerWorks();
@@ -4518,9 +4523,9 @@ function updateNav(items) {
             loadProfile();
             updateUserButton();
 
-            // 3. Load uploaded items from Supabase
+            // 3. Load uploaded items from Supabase（只加载当前用户的作品）
             try {
-                const { data: uploads } = await supabase.from('uploads').select('*').order('created_at', { ascending: false }).limit(200);
+                const { data: uploads } = await supabase.from('uploads').select('*').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(200);
                 (uploads || []).forEach(item => {
                     uploadedItems.push({
                         id: 'upload_' + item.id,
