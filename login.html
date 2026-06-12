@@ -569,23 +569,22 @@
         document.addEventListener('mouseleave', () => { mx = -999; my = -999; });
         document.addEventListener('touchmove', e => { mx = e.touches[0].clientX; my = e.touches[0].clientY; }, {passive:true});
 
-        // 🐟 小鱼图片加载
-        const fishImg = new Image();
-        fishImg.src = '小鱼/u=2133388060,723744454&fm=253&fmt=auto&app=138&f=JPEG.webp';
+        // 🐟 全新可爱小鱼设计
         const fishes = [];
-        const fishTints = [
-            { r:255, g:140, b:100 },  // 暖橘
-            { r:255, g:180, b:180 },  // 粉白
-            { r:255, g:200, b:140 },  // 金色
-            { r:255, g:220, b:200 },  // 米白
-            { r:255, g:160, b:130 },  // 橘粉
+        const fishDefs = [
+            { body:'#ffb0b8', belly:'#ffe0e5', fin:'#ff90a0', name:'樱樱' },  // 樱花粉
+            { body:'#ffc898', belly:'#ffe8d0', fin:'#ffb070', name:'橘橘' },  // 蜜橘橙
+            { body:'#ffe8c0', belly:'#fff8ee', fin:'#ffd090', name:'绵绵' },  // 奶黄
+            { body:'#ffc8c0', belly:'#fff0ec', fin:'#ffa898', name:'桃桃' },  // 蜜桃
+            { body:'#ffd8c8', belly:'#fff5f0', fin:'#ffc0a8', name:'团团' },  // 浅杏
         ];
         for (let i=0;i<5;i++) {
+            const d = fishDefs[i];
             fishes.push({
-                x: Math.random()*W, y: 80+Math.random()*(H-200),
-                vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.2,
+                x: 100+Math.random()*(W-200), y: 80+Math.random()*(H-200),
+                vx: (Math.random()-0.5)*0.35, vy: (Math.random()-0.5)*0.15,
                 targetVx: 0, targetVy: 0,
-                size: 40+Math.random()*30, tint: fishTints[i],
+                size: 28+Math.random()*16, def: d,
                 tailPhase: Math.random()*6, bubbleTimer: Math.random()*100,
                 changeTimer: Math.random()*200
             });
@@ -605,29 +604,65 @@
         document.addEventListener('click', e => { ripples.push({ x:e.clientX, y:e.clientY, r:0, maxR:60, o:0.6 }); });
 
         function drawFish(f) {
-            if (!fishImg.complete) return; // 图片未加载完跳过
             ctx.save(); ctx.translate(f.x, f.y);
-            const dir = f.vx >= 0 ? 1 : -1;
-            ctx.scale(dir, 1);
-            const s = f.size;
-            const wobble = Math.sin(time*0.06+f.tailPhase)*0.05;
+            const dir = f.vx >= 0 ? 1 : -1; ctx.scale(dir, 1);
+            const s = f.size, d = f.def;
+            const tailWag = Math.sin(time*0.15+f.tailPhase)*7;
 
-            // 图片鱼身
-            ctx.globalAlpha = 0.92;
-            ctx.drawImage(fishImg, -s*0.7, -s*0.5, s*1.4, s);
-            ctx.globalAlpha = 1;
+            // 🌊 尾巴
+            ctx.fillStyle = d.fin;
+            ctx.beginPath();
+            ctx.moveTo(-s*0.45, 0);
+            ctx.bezierCurveTo(-s*0.9, -s*0.35+tailWag, -s*1.35, -s*0.4+tailWag*1.2, -s*1.15, tailWag*0.6);
+            ctx.bezierCurveTo(-s*1.35, s*0.4-tailWag*1.2, -s*0.9, s*0.35-tailWag, -s*0.45, 0);
+            ctx.fill();
 
-            // 轻微色调叠加
-            ctx.fillStyle = `rgba(${f.tint.r},${f.tint.g},${f.tint.b},0.12)`;
-            ctx.beginPath(); ctx.ellipse(0, 0, s*0.6, s*0.35, 0, 0, Math.PI*2); ctx.fill();
+            // 🎈 圆滚滚身体
+            const bodyGrad = ctx.createLinearGradient(0, -s*0.45, 0, s*0.45);
+            bodyGrad.addColorStop(0, d.body);
+            bodyGrad.addColorStop(0.55, d.belly);
+            bodyGrad.addColorStop(1, d.body);
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.ellipse(s*0.05, 0, s*0.55, s*0.44, 0.05, 0, Math.PI*2);
+            ctx.fill();
 
-            // 小圆眼
+            // 身体高光
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.beginPath();
+            ctx.ellipse(-s*0.05, -s*0.15, s*0.2, s*0.2, -0.3, 0, Math.PI*2);
+            ctx.fill();
+
+            // 😊 腮红
+            ctx.fillStyle = 'rgba(255,150,150,0.35)';
+            ctx.beginPath(); ctx.ellipse(s*0.25, s*0.1, s*0.12, s*0.07, 0, 0, Math.PI*2); ctx.fill();
+
+            // 👁‍🗨 大眼睛（萌系比例）
+            const ex = s*0.28, ey = -s*0.1;
+            // 眼白
             ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(s*0.3, -s*0.08, s*0.13, 0, 7); ctx.fill();
-            ctx.fillStyle = '#1a0a00';
-            ctx.beginPath(); ctx.arc(s*0.32, -s*0.08, s*0.07, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(ex, ey, s*0.16, s*0.2, 0.05, 0, Math.PI*2); ctx.fill();
+            // 瞳孔
+            const pupilGrad = ctx.createRadialGradient(ex, ey, 0, ex, ey, s*0.14);
+            pupilGrad.addColorStop(0, '#2a1810'); pupilGrad.addColorStop(0.6, '#3a2818'); pupilGrad.addColorStop(1, '#1a0800');
+            ctx.fillStyle = pupilGrad;
+            ctx.beginPath(); ctx.arc(ex+s*0.02, ey+s*0.02, s*0.1, 0, 7); ctx.fill();
+            // 大高光
             ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(s*0.3, -s*0.1, s*0.03, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.arc(ex-s*0.04, ey-s*0.06, s*0.05, 0, 7); ctx.fill();
+            // 小高光
+            ctx.beginPath(); ctx.arc(ex+s*0.06, ey+s*0.04, s*0.025, 0, 7); ctx.fill();
+
+            // 👄 小嘴
+            ctx.strokeStyle = d.fin; ctx.lineWidth = s*0.03; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(s*0.15, s*0.1, s*0.06, 0.2, 1.8); ctx.stroke();
+
+            // 🩴 小背鳍
+            ctx.fillStyle = d.fin; ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.moveTo(-s*0.15, -s*0.35);
+            ctx.quadraticCurveTo(s*0.1, -s*0.5, s*0.25, -s*0.3);
+            ctx.quadraticCurveTo(s*0.15, -s*0.3, -s*0.15, -s*0.28);
+            ctx.fill();
 
             ctx.restore();
         }
