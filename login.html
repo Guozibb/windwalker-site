@@ -428,6 +428,26 @@
         .toast.err { background: #f87171; color: #fff; }
 
         /* ========== Responsive ========== */
+        /* 涟漪动画 */
+        @keyframes rippleOut {
+            0% { transform: scale(0); opacity: 0.8; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        /* 抖动动画 */
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+        }
+        /* 按钮粒子爆发 */
+        .btn-login:active::after {
+            content: ''; position: absolute; inset: -10px;
+            background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+            animation: rippleOut 0.5s ease-out forwards; pointer-events: none; border-radius: 50%;
+        }
+
         @media (max-width: 440px) {
             .phone-frame {
                 width: calc(100vw - 32px);
@@ -538,59 +558,69 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ========== Particle Canvas ==========
+        // ========== 🎨 鼠标互动粒子系统 ==========
         const canvas = document.getElementById('particleCanvas');
         const ctx = canvas.getContext('2d');
-        let W, H;
+        let W, H, mx = -999, my = -999;
 
-        function resize() {
-            W = canvas.width = window.innerWidth;
-            H = canvas.height = window.innerHeight;
-        }
-        resize();
-        window.addEventListener('resize', resize);
+        function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+        resize(); window.addEventListener('resize', resize);
+
+        // 鼠标追踪
+        document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+        document.addEventListener('mouseleave', () => { mx = -999; my = -999; });
+        // 移动端触摸
+        document.addEventListener('touchmove', e => { mx = e.touches[0].clientX; my = e.touches[0].clientY; }, {passive:true});
 
         const pts = [];
-        const N = 70;
-        for (let i = 0; i < N; i++) {
-            pts.push({
-                x: Math.random() * W,
-                y: Math.random() * H,
-                r: Math.random() * 2 + 0.5,
-                vx: (Math.random() - 0.5) * 0.5,
-                vy: (Math.random() - 0.5) * 0.5,
-            });
-        }
+        for (let i = 0; i < 60; i++) pts.push({ x: Math.random()*W, y: Math.random()*H, r: Math.random()*3+1, vx: 0, vy: 0, ox: Math.random()*W, oy: Math.random()*H });
 
         function drawPts() {
             ctx.clearRect(0, 0, W, H);
-            pts.forEach(p => {
-                p.x += p.vx;
-                p.y += p.vy;
-                if (p.x < 0) p.x = W;
-                if (p.x > W) p.x = 0;
-                if (p.y < 0) p.y = H;
-                if (p.y > H) p.y = 0;
+            for (const p of pts) {
+                // 粒子向鼠标靠近
+                const dx = mx - p.x, dy = my - p.y, dist = Math.hypot(dx, dy) || 1;
+                if (dist < 200 && mx > 0) {
+                    p.vx += (dx / dist) * 0.08;
+                    p.vy += (dy / dist) * 0.08;
+                }
+                // 回到原始位置
+                p.vx += (p.ox - p.x) * 0.0005;
+                p.vy += (p.oy - p.y) * 0.0005;
+                p.vx *= 0.96; p.vy *= 0.96;
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+                if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
 
-                pts.forEach(q => {
-                    const dx = p.x - q.x, dy = p.y - q.y;
-                    const dist = Math.hypot(dx, dy);
-                    if (dist < 100) {
-                        ctx.strokeStyle = `rgba(56,189,248,${0.06 * (1 - dist / 100)})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.beginPath();
-                        ctx.moveTo(p.x, p.y);
-                        ctx.lineTo(q.x, q.y);
-                        ctx.stroke();
-                    }
-                });
-
-                ctx.fillStyle = 'rgba(129,140,248,0.5)';
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                ctx.fill();
-            });
+                // 连线
+                for (const q of pts) {
+                    const d = Math.hypot(p.x-q.x, p.y-q.y);
+                    if (d < 80) { ctx.strokeStyle = `rgba(125,211,168,${0.08*(1-d/80)})`; ctx.lineWidth=0.5; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); }
+                }
+                ctx.fillStyle = 'rgba(125,180,160,0.6)';
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+            }
             requestAnimationFrame(drawPts);
+        }
+        drawPts();
+
+        // ========== ✨ 点击涟漪效果 ==========
+        document.addEventListener('click', e => {
+            const ripple = document.createElement('div');
+            const size = 60;
+            ripple.style.cssText = `position:fixed;left:${e.clientX-size/2}px;top:${e.clientY-size/2}px;width:${size}px;height:${size}px;border-radius:50%;border:2px solid var(--accent);pointer-events:none;z-index:9999;animation:rippleOut 0.6s ease-out forwards;`;
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        });
+
+        // ========== 🔐 密码错误抖动 ==========
+        function shakeForm() {
+            const phone = document.querySelector('.phone-frame');
+            if (!phone) return;
+            phone.style.animation = 'none';
+            phone.offsetHeight;
+            phone.style.animation = 'shake 0.5s ease';
+            setTimeout(() => { if (phone) phone.style.animation = ''; }, 500);
         }
         drawPts();
 
@@ -738,6 +768,7 @@
 
         // ========== Toast ==========
         function showToast(msg, type) {
+            if (type === 'err') shakeForm();
             const t = document.getElementById('toast');
             t.textContent = msg;
             t.className = 'toast ' + (type || 'ok');
