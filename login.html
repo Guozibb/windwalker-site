@@ -649,9 +649,19 @@
                     }
                     if (!data.user) { showToast('注册失败，请重试', 'err'); resetBtn('注 册'); return; }
 
+                    // 随机分配一个头像
+                    const randomAvatar = [{c:'#ffb8c6',i:'🐱'},{c:'#ffc8a0',i:'🐶'},{c:'#f0c0e0',i:'🐰'},{c:'#b8d8f0',i:'🐼'},{c:'#f0c8a0',i:'🦊'},{c:'#c0e0c8',i:'🐸'},{c:'#e0d0b8',i:'🐻'},{c:'#ffd0d0',i:'🐥'},{c:'#d0c8f0',i:'🦄'},{c:'#c8e8d0',i:'🌿'},{c:'#ffe0b0',i:'⭐'},{c:'#e0d8f8',i:'🌙'}][Math.floor(Math.random()*12)];
+                    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" rx="100" fill="#fff"/><circle cx="100" cy="100" r="70" fill="${randomAvatar.c}" opacity="0.5"/><text x="100" y="125" text-anchor="middle" font-size="65">${randomAvatar.i}</text></svg>`;
+                    let avatarUrl = '';
+                    try {
+                        const blob = new Blob([svg], { type: 'image/svg+xml' });
+                        const { error: upErr } = await supabase.storage.from('avatars').upload(data.user.id + '_av.svg', blob, { upsert: true });
+                        if (!upErr) { const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.user.id + '_av.svg'); avatarUrl = pub.publicUrl; }
+                    } catch(e) {}
+
                     // 创建 profiles
                     const code = String(Math.floor(100000 + Math.random() * 900000));
-                    await supabase.from('profiles').upsert({ id: data.user.id, username, user_code: code });
+                    await supabase.from('profiles').upsert({ id: data.user.id, username, user_code: code, avatar_url: avatarUrl });
 
                     // 确保有 session
                     if (!data.session) {
