@@ -25,11 +25,27 @@
             --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 四季主题色 */
-        body.spring { --accent: #f0a0b8; --accent2: #e8c0d0; }
-        body.summer { --accent: #7dc8a0; --accent2: #a0d8b8; }
-        body.autumn { --accent: #e0a060; --accent2: #e8c090; }
-        body.winter { --accent: #a0c0e0; --accent2: #c0d8f0; }
+        /* 四季主题色 — 春夏秋冬分明 */
+        body.spring {
+            --accent: #f5a0b5; --accent2: #f8c5d0;
+            --bg: #fef5f7; --surface: #fff; --surface2: #fef0f3; --border: #f0d5dd;
+            --text: #5c4050; --text-muted: #b890a0;
+        }
+        body.summer {
+            --accent: #6bc48a; --accent2: #a0d8b0;
+            --bg: #f4faf6; --surface: #fff; --surface2: #eef8f0; --border: #d0e8d5;
+            --text: #3a5c45; --text-muted: #80a88a;
+        }
+        body.autumn {
+            --accent: #e89850; --accent2: #f0c890;
+            --bg: #fdf8f4; --surface: #fff; --surface2: #fdf2e8; --border: #f0dcc5;
+            --text: #5c4535; --text-muted: #b89878;
+        }
+        body.winter {
+            --accent: #90bce8; --accent2: #b8d4f5;
+            --bg: #f5f8fc; --surface: #fff; --surface2: #eef3fa; --border: #d5e0f0;
+            --text: #405068; --text-muted: #8098b8;
+        }
 
         html { scroll-behavior: smooth; }
 
@@ -4317,7 +4333,7 @@ function updateNav(items) {
                 if(btn) btn.textContent = icons[season];
                 document.body.className = season;
 
-                const colors = { spring:'255,180,200', summer:'140,200,140', autumn:'220,140,60', winter:'200,220,240' };
+                const colors = { spring:'245,160,180', summer:'100,190,135', autumn:'230,150,80', winter:'140,185,230' };
                 function mkPetal() {
                     return { x:Math.random()*W, y:-30, r:Math.random()*5+2, vy:Math.random()*1+0.3, vx:(Math.random()-0.5)*0.6, o:Math.random()*0.4+0.2 };
                 }
@@ -4342,6 +4358,29 @@ function updateNav(items) {
                 };
             } catch(e) {}
         })();
+
+        // ========== 🔔 通知实时检测 ==========
+        async function checkNotifications() {
+            if (!currentUserId) return;
+            try {
+                const { count } = await supabase.from('notifications')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', currentUserId).eq('read', false);
+                const badge = document.getElementById('notifyBadge');
+                const unread = count || 0;
+                badge.textContent = unread > 99 ? '99+' : unread;
+                badge.classList.toggle('show', unread > 0);
+                // 更新私信未读数
+                const { count: msgCount } = await supabase.from('messages')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('to_id', currentUserId).eq('read', false);
+                document.getElementById('msgUnread').textContent = msgCount ? `${msgCount} 条新消息` : '';
+            } catch(e) {}
+        }
+        // 每 15 秒检测一次
+        setInterval(checkNotifications, 15000);
+        // 页面加载后延迟检测
+        setTimeout(checkNotifications, 3000);
 
         init();
     })();
