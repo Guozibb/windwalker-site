@@ -3611,7 +3611,7 @@ function updateNav(items) {
             const text = composerInput.value.trim();
             if (!text && !composerPendingMedia) return;
 
-            btnSubmitMain && (composerSubmit.disabled = true);
+            composerSubmit.disabled = true;
             composerSubmit.textContent = '⏳...';
 
             let mediaUrl = '';
