@@ -1040,19 +1040,10 @@
         }
 
         .gallery-grid {
-            display: flex;
-            overflow-x: auto;
-            overflow-y: hidden;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            gap: 16px;
-            padding-bottom: 12px;
-            scroll-behavior: smooth;
-            cursor: grab;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
         }
-        .gallery-grid:active { cursor: grabbing; }
-        .gallery-grid::-webkit-scrollbar { height: 6px; }
-        .gallery-grid::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
 
         /* ========== Card ========== */
         .model-card {
@@ -1063,9 +1054,9 @@
             border: 1px solid var(--border);
             cursor: pointer;
             transition: var(--transition);
-            flex: 0 0 300px;
-            height: 220px;
-            scroll-snap-align: start;
+            aspect-ratio: 16/11;
+            content-visibility: auto;
+            contain-intrinsic-size: 300px 206px;
         }
 
         .model-card:hover {
@@ -1259,7 +1250,7 @@
 
         /* ========== No Results ========== */
         .no-results {
-            flex: 1 0 100%;
+            grid-column: 1 / -1;
             text-align: center;
             padding: 80px 20px;
             color: var(--text-muted);
@@ -1888,8 +1879,10 @@
             .search-wrapper input { width: 120px; }
             .search-wrapper input:focus { width: 160px; }
 
-            .gallery-grid { gap: 12px; }
-            .model-card { flex: 0 0 200px; height: 160px; }
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 12px;
+            }
 
             .btn-upload { padding: 8px 14px; font-size: 0.78rem; }
             .btn-upload .ulabel { display: none; }
@@ -1903,8 +1896,7 @@
         }
 
         @media (max-width: 480px) {
-            .gallery-grid { gap: 8px; }
-            .model-card { flex: 0 0 160px; height: 140px; }
+            .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
             .cat-btn { padding: 5px 12px; font-size: 0.76rem; }
             .search-wrapper input { width: 90px; }
             .search-wrapper input:focus { width: 130px; }
@@ -2222,7 +2214,7 @@
         // ⚙ Supabase 配置 — 替换为你的项目信息
         // ============================================================
         const SUPABASE_URL = 'https://gxbeztgssxniuqwawsrz.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb publishable_CEoUalap5DiFEfkbBuqJCw_DL21vR5q';
+        const SUPABASE_ANON_KEY = 'sb_publishable_CEoUalap5DiFEfkBBuqJCw_DL21vR5o';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 当前登录用户（页面初始化后填充）
@@ -3618,24 +3610,32 @@ function updateNav(items) {
             const text = composerInput.value.trim();
             if (!text && !composerPendingMedia) return;
 
+            btnSubmitMain && (composerSubmit.disabled = true);
+            composerSubmit.textContent = '⏳...';
+
             let mediaUrl = '';
             let mediaType = composerPendingType || null;
 
-            // Upload media to Supabase Storage
+            // Upload media (optional - fails silently if bucket missing)
             if (composerPendingFile) {
-                const bucket = 'community-media';
-                const ext = composerPendingFile.name.split('.').pop() || 'jpg';
-                const path = `${currentUserId}_${Date.now()}.${ext}`;
-                const { data: uploadData, error: uploadErr } = await supabase.storage.from(bucket).upload(path, composerPendingFile);
-                if (!uploadErr) {
-                    const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(path);
-                    mediaUrl = publicUrl.publicUrl;
-                }
-            } else if (composerPendingMedia) {
-                mediaUrl = composerPendingMedia;
+                try {
+                    const bucket = 'community-media';
+                    const ext = composerPendingFile.name.split('.').pop() || 'jpg';
+                    const path = `${currentUserId}_${Date.now()}.${ext}`;
+                    const { error: uploadErr } = await supabase.storage.from(bucket).upload(path, composerPendingFile);
+                    if (!uploadErr) {
+                        const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(path);
+                        mediaUrl = publicUrl.publicUrl;
+                    } else {
+                        console.warn('Media upload failed (bucket may not exist):', uploadErr.message);
+                    }
+                } catch(e) { console.warn('Media upload exception:', e.message); }
             }
 
             const postId = await savePostToDb({ text, media: mediaUrl, mediaType });
+
+            composerSubmit.textContent = '发布';
+            composerSubmit.disabled = true;
             if (!postId) return;
 
             // Reset
@@ -3643,7 +3643,6 @@ function updateNav(items) {
             composerPendingMedia = null; composerPendingType = null; composerPendingFile = null;
             composerPreview.classList.remove('show');
             composerPreviewContent.innerHTML = '';
-            composerSubmit.disabled = true;
             composerImageInput.value = ''; composerVideoInput.value = '';
             renderFeed();
             showToast('✅ 发布成功！');
@@ -4443,26 +4442,6 @@ function updateNav(items) {
         }
 
         // Auto-sync removed — Supabase handles persistence directly
-
-        // ========== 画廊拖拽滑动 ==========
-        (function() {
-            const grid = document.getElementById('galleryGrid');
-            let isDown = false, startX, scrollLeft;
-            grid.addEventListener('mousedown', e => {
-                if (e.target.closest('.card-quick-actions') || e.target.closest('button')) return;
-                isDown = true; grid.style.cursor = 'grabbing';
-                startX = e.pageX - grid.offsetLeft;
-                scrollLeft = grid.scrollLeft;
-            });
-            grid.addEventListener('mouseleave', () => { isDown = false; grid.style.cursor = 'grab'; });
-            grid.addEventListener('mouseup', () => { isDown = false; grid.style.cursor = 'grab'; });
-            grid.addEventListener('mousemove', e => {
-                if (!isDown) return;
-                e.preventDefault();
-                const x = e.pageX - grid.offsetLeft;
-                grid.scrollLeft = scrollLeft - (x - startX) * 2;
-            });
-        })();
 
         init();
     })();
