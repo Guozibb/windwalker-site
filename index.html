@@ -3633,11 +3633,26 @@ function updateNav(items) {
                 } catch(e) { showToast('图片上传异常: 请确认已创建 community-media 存储桶', true); }
             }
 
-            const postId = await savePostToDb({ text, media: mediaUrl, mediaType });
+            const dbId = await savePostToDb({ text, media: mediaUrl, mediaType });
 
             composerSubmit.textContent = '发布';
             composerSubmit.disabled = true;
-            if (!postId) return;
+            if (!dbId) return;
+
+            // 立即添加到本地数组（不等 Supabase 同步），保证发帖后立刻显示
+            const newPost = {
+                id: 'post_' + dbId,
+                name: currentUser.username,
+                avatar: currentUser.avatar_url || '',
+                text: text,
+                media: mediaUrl,
+                mediaType: mediaType,
+                time: Date.now(),
+                likes: 0,
+                likedBy: [],
+                comments: []
+            };
+            communityPosts.unshift(newPost);
 
             // Reset
             composerInput.value = '';
@@ -3651,7 +3666,13 @@ function updateNav(items) {
 
         // Render feed
         async function renderFeed() {
-            communityPosts = await loadPosts();
+            // 保存本地新增的帖子（尚未被 Supabase 同步的）
+            const localIds = new Set(communityPosts.map(p => p.id));
+            const supabasePosts = await loadPosts();
+            const supabaseIds = new Set(supabasePosts.map(p => p.id));
+            // 保留本地有但 Supabase 还没有的帖子
+            const localOnly = communityPosts.filter(p => !supabaseIds.has(p.id));
+            communityPosts = [...localOnly, ...supabasePosts];
             if (!communityPosts.length) {
                 communityFeed.innerHTML = '<div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>';
                 return;
