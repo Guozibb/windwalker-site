@@ -436,6 +436,7 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -518,6 +519,15 @@
 
     <script>
     (function() {
+        // ============================================================
+        // ⚙ Supabase 配置 — 替换为你的 Supabase 项目信息
+        //    在 Supabase 后台 → Settings → API 里找到这两个值
+        // ============================================================
+        const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+        const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // ========== Particle Canvas ==========
         const canvas = document.getElementById('particleCanvas');
         const ctx = canvas.getContext('2d');
@@ -552,7 +562,6 @@
                 if (p.y < 0) p.y = H;
                 if (p.y > H) p.y = 0;
 
-                // Connect nearby
                 pts.forEach(q => {
                     const dx = p.x - q.x, dy = p.y - q.y;
                     const dist = Math.hypot(dx, dy);
@@ -604,100 +613,77 @@
             });
         });
 
-        // ========== Account store ==========
-        function getAccounts() {
-            try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e) { return {}; }
-        }
-        function saveAccounts(accs) {
-            localStorage.setItem('windwalker_accounts', JSON.stringify(accs));
-        }
-
-        // ========== Submit (login or register) ==========
+        // ========== Submit (login or register via Supabase) ==========
         const loginForm = document.getElementById('loginForm');
-        loginForm.addEventListener('submit', e => {
+        loginForm.addEventListener('submit', async e => {
             e.preventDefault();
+            btnSubmitMain.disabled = true;
+            btnSubmitMain.textContent = '处理中...';
 
             if (loginMode === 'register') {
-                // ---- Register ----
+                // ---- Register via Supabase ----
                 const username = document.getElementById('regUsername').value.trim();
                 const pwd = document.getElementById('regPassword').value.trim();
                 const pwd2 = document.getElementById('regPassword2').value.trim();
 
-                if (username.length < 3) { showToast('用户名至少3个字符', 'err'); return; }
-                if (pwd.length < 6) { showToast('密码至少6位', 'err'); return; }
-                if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); return; }
+                if (username.length < 3) { showToast('用户名至少3个字符', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '注 册'; return; }
+                if (pwd.length < 6) { showToast('密码至少6位', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '注 册'; return; }
+                if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '注 册'; return; }
 
-                const accounts = getAccounts();
-                if (accounts[username]) { showToast('用户名已存在', 'err'); return; }
+                // 用 username + @windwalker.app 作为 Supabase 登录邮箱
+                const email = username + '@windwalker.app';
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: pwd,
+                    options: { data: { username: username } }
+                });
 
-                // Generate unique 6-digit code
-                let code;
-                do { code = String(Math.floor(100000 + Math.random() * 900000)); }
-                while (Object.values(accounts).some(a => a.code === code));
-                accounts[username] = { password: pwd, created: Date.now(), code: code };
-                saveAccounts(accounts);
+                if (error) {
+                    if (error.message.includes('already registered') || error.message.includes('already exists')) {
+                        showToast('用户名已存在', 'err');
+                    } else {
+                        showToast('注册失败: ' + error.message, 'err');
+                    }
+                    btnSubmitMain.disabled = false;
+                    btnSubmitMain.textContent = '注 册';
+                    return;
+                }
 
-                // Auto-login — preserve existing profile if same user had one
-                const existProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e) { return {}; } })();
-                localStorage.setItem('windwalker_profile', JSON.stringify({
-                    name: username,
-                    bio: existProfile.name === username ? (existProfile.bio || '') : '',
-                    avatar: existProfile.name === username ? (existProfile.avatar || '') : '',
-                }));
-                localStorage.setItem('windwalker_logged_user', username);
                 showToast('✅ 注册成功，正在跳转...', 'ok');
-                setTimeout(() => {
-                    document.body.style.transition = 'opacity 0.4s ease';
-                    document.body.style.opacity = '0';
-                    setTimeout(() => { window.location.href = 'index.html'; }, 400);
-                }, 600);
+                goToIndex();
             } else {
-                // ---- Login with username ----
+                // ---- Login via Supabase ----
                 const username = phoneInput.value.trim();
                 const pwd = passwordInput.value.trim();
 
-                if (!username) { showToast('请输入用户名', 'err'); return; }
-                if (!pwd) { showToast('请输入密码', 'err'); return; }
+                if (!username) { showToast('请输入用户名', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '登 录'; return; }
+                if (!pwd) { showToast('请输入密码', 'err'); btnSubmitMain.disabled = false; btnSubmitMain.textContent = '登 录'; return; }
 
-                const accounts = getAccounts();
+                const email = username + '@windwalker.app';
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: pwd
+                });
 
-                // Check registered accounts first
-                if (accounts[username]) {
-                    if (accounts[username].password !== pwd) {
-                        showToast('密码错误', 'err'); return;
-                    }
-                    // Preserve existing profile (avatar, bio) if same user
-                    const existProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e) { return {}; } })();
-                    localStorage.setItem('windwalker_profile', JSON.stringify({
-                        name: username,
-                        bio: existProfile.name === username ? (existProfile.bio || '') : '',
-                        avatar: existProfile.name === username ? (existProfile.avatar || '') : '',
-                    }));
-                    localStorage.setItem('windwalker_logged_user', username);
-                } else {
-                    // Demo fallback
-                    if (username === 'admin' && pwd === '123456') {
-                        const existProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e) { return {}; } })();
-                        localStorage.setItem('windwalker_profile', JSON.stringify({
-                            name: 'admin',
-                            bio: existProfile.name === 'admin' ? (existProfile.bio || '') : '',
-                            avatar: existProfile.name === 'admin' ? (existProfile.avatar || '') : '',
-                        }));
-                        localStorage.setItem('windwalker_logged_user', 'admin');
-                    } else {
-                        showToast('账号不存在，请先注册', 'err');
-                        return;
-                    }
+                if (error) {
+                    showToast('账号或密码错误', 'err');
+                    btnSubmitMain.disabled = false;
+                    btnSubmitMain.textContent = '登 录';
+                    return;
                 }
 
                 showToast('✅ 登录成功，正在跳转...', 'ok');
-                setTimeout(() => {
-                    document.body.style.transition = 'opacity 0.4s ease';
-                    document.body.style.opacity = '0';
-                    setTimeout(() => { window.location.href = 'index.html'; }, 400);
-                }, 600);
+                goToIndex();
             }
         });
+
+        function goToIndex() {
+            setTimeout(() => {
+                document.body.style.transition = 'opacity 0.4s ease';
+                document.body.style.opacity = '0';
+                setTimeout(() => { window.location.href = 'index.html'; }, 400);
+            }, 600);
+        }
 
         // ========== Toast ==========
         function showToast(msg, type) {

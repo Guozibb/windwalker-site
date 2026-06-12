@@ -125,26 +125,20 @@ function getLocalIPs() {
     return ips;
 }
 
-// ========== ngrok 外网穿透（可选） ==========
-// 1. 浏览器打开 https://dashboard.ngrok.com/get-started/your-authtoken
-// 2. 用 GitHub/Google 免费注册，复制你的 authtoken
-// 3. 把下面空字符串替换成你的 token
-const NGROK_TOKEN = '';
-
-async function startNgrok() {
-    if (!NGROK_TOKEN) {
-        console.log('  🌐 外网访问: 未配置 ngrok token（跳过了）');
-        console.log('     如需外网访问，请注册 https://ngrok.com 获取免费 token\n');
-        return;
-    }
+// ========== localtunnel 外网穿透（免费，无需注册） ==========
+async function startTunnel() {
     try {
-        const ngrok = require('@ngrok/ngrok');
-        const listener = await ngrok.forward({ addr: PORT, authtoken: NGROK_TOKEN });
-        console.log(`  🌐 外网访问: ${listener.url()}/login.html`);
-        console.log(`     （任何网络、任何设备都能打开）\n`);
+        const localtunnel = require('localtunnel');
+        const tunnel = await localtunnel({ port: PORT });
+        console.log(`  🌐 外网访问: ${tunnel.url}/login.html`);
+        console.log(`     （任何网络、任何设备都能打开，无需注册）`);
+        console.log(`     （只要电脑不关机，地址一直有效）\n`);
+        tunnel.on('close', () => {
+            console.log('  🌐 外网通道已断开，重启服务器即可恢复\n');
+        });
     } catch(e) {
-        console.log(`  🌐 ngrok 启动失败: ${e.message}`);
-        console.log(`     请检查 token 是否正确，或稍后重试\n`);
+        console.log(`  🌐 外网通道启动失败: ${e.message}`);
+        console.log(`     请检查网络连接后重启服务器\n`);
     }
 }
 
@@ -156,5 +150,5 @@ app.listen(PORT, '0.0.0.0', async () => {
         console.log(`  📱 局域网访问: http://${ips[0]}:${PORT}/login.html`);
         ips.slice(1).forEach(ip => console.log(`               http://${ip}:${PORT}/login.html`));
     }
-    await startNgrok();
+    await startTunnel();
 });

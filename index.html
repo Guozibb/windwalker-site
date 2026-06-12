@@ -1902,6 +1902,7 @@
             .search-wrapper input:focus { width: 130px; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -2210,8 +2211,18 @@
     <script>
     (function() {
         // ============================================================
+        // ⚙ Supabase 配置 — 替换为你的项目信息
+        // ============================================================
+        const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
+        const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 当前登录用户（页面初始化后填充）
+        let currentUser = null;      // { id, username, bio, avatar_url, user_code }
+        let currentUserId = null;    // UUID string
+
+        // ============================================================
         //  📦 资源数据 — 所有文件默认归入「作者作品」
-        //  拖入新文件后可在数组中添加条目，或使用页面上传功能
         // ============================================================
         const modelData = [
             // ======== 3D模型 — 人物 ========
@@ -2497,7 +2508,7 @@
                 const inp = document.getElementById('lbCommentInput');
                 const txt = inp.value.trim();
                 if (!txt) return;
-                const p = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
+                const p = (() => { try { return JSON.parse((currentUser ? JSON.stringify(currentUser) : '{}')); } catch(e){ return {}; }})();
                 UserActions.addComment(m.id, p.name || '用户', txt);
                 inp.value = '';
                 renderItemComments(m.id);
@@ -2581,72 +2592,64 @@ function updateNav(items) {
         const drawerWorksGrid = document.getElementById('drawerWorksGrid');
         const btnLogout = document.getElementById('btnLogout');
 
-        // Load profile from localStorage
-        function loadProfile() {
-            try {
-                const saved = JSON.parse(localStorage.getItem('windwalker_profile') || '{}');
-                if (saved.name) drawerName.value = saved.name;
-                if (saved.bio) drawerBio.value = saved.bio;
-                if (saved.avatar) {
-                    avatarImg.src = saved.avatar;
-                    avatarImg.style.display = 'block';
-                    avatarPlaceholder.style.display = 'none';
-                    btnOpenUser.classList.add('has-avatar');
-                }
-                // Display user code
-                const accs = JSON.parse(localStorage.getItem('windwalker_accounts') || '{}');
-                const code = (accs[saved.name] && accs[saved.name].code) ? accs[saved.name].code : '------';
-                document.getElementById('drawerUserCode').textContent = code;
-            } catch (e) { /* ignore */ }
+        // ========== Auth Check ==========
+        async function requireAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) { window.location.href = 'login.html'; return null; }
+            currentUserId = session.user.id;
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
+            if (!profile) {
+                // Profile not found — sign out and redirect
+                await supabase.auth.signOut();
+                window.location.href = 'login.html';
+                return null;
+            }
+            currentUser = profile;
+            return profile;
         }
 
-        function saveProfile() {
+        // Load profile from Supabase
+        async function loadProfile() {
+            if (!currentUser) return;
+            drawerName.value = currentUser.username || '';
+            drawerBio.value = currentUser.bio || '';
+            if (currentUser.avatar_url) {
+                avatarImg.src = currentUser.avatar_url;
+                avatarImg.style.display = 'block';
+                avatarPlaceholder.style.display = 'none';
+                btnOpenUser.classList.add('has-avatar');
+            }
+            document.getElementById('drawerUserCode').textContent = currentUser.user_code || '------';
+        }
+
+        async function saveProfile() {
+            if (!currentUserId) return;
             const newName = drawerName.value.trim();
-            const oldProfile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
-            // Check duplicate username against registered accounts
-            if (newName && newName !== oldProfile.name) {
-                const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
-                if (accs[newName]) {
-                    showToast('该用户名已被注册，请换一个', true);
-                    drawerName.value = oldProfile.name || '';
-                    return;
-                }
-                // Update account key if user is registered
-                if (oldProfile.name && accs[oldProfile.name]) {
-                    accs[newName] = accs[oldProfile.name];
-                    delete accs[oldProfile.name];
-                    localStorage.setItem('windwalker_accounts', JSON.stringify(accs));
-                    localStorage.setItem('windwalker_logged_user', newName);
-                }
+            // Check duplicate username
+            if (newName && newName !== currentUser.username) {
+                const { data: existing } = await supabase.from('profiles').select('id').eq('username', newName).single();
+                if (existing) { showToast('该用户名已被注册，请换一个', true); drawerName.value = currentUser.username || ''; return; }
             }
-            const data = { name: newName, bio: drawerBio.value.trim(), avatar: avatarImg.style.display !== 'none' ? avatarImg.src : '' };
-            try {
-                localStorage.setItem('windwalker_profile', JSON.stringify(data));
-            } catch(e) {
-                // localStorage full — try to save without avatar (base64)
-                if (data.avatar) {
-                    showToast('存储空间不足，头像较大已转为临时保存', true);
-                    const smallData = { name: data.name, bio: data.bio, avatar: '' };
-                    try { localStorage.setItem('windwalker_profile', JSON.stringify(smallData)); } catch(e2) {
-                        showToast('保存失败，请清理浏览器存储空间', true);
-                    }
-                } else {
-                    showToast('保存失败: ' + e.message, true);
-                }
-            }
-            if (data.avatar) btnOpenUser.classList.add('has-avatar');
+            const updates = {
+                username: newName || currentUser.username,
+                bio: drawerBio.value.trim(),
+                updated_at: new Date().toISOString()
+            };
+            const { error } = await supabase.from('profiles').update(updates).eq('id', currentUserId);
+            if (error) { showToast('保存失败: ' + error.message, true); return; }
+            currentUser.username = updates.username;
+            currentUser.bio = updates.bio;
+            if (currentUser.avatar_url) btnOpenUser.classList.add('has-avatar');
             else btnOpenUser.classList.remove('has-avatar');
             updateUserButton();
-            // Refresh user code display
-            const accs2 = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
-            document.getElementById('drawerUserCode').textContent = (accs2[newName] && accs2[newName].code) ? accs2[newName].code : '------';
+            document.getElementById('drawerUserCode').textContent = currentUser.user_code || '------';
         }
 
         function updateUserButton() {
-            if (avatarImg.style.display !== 'none' && avatarImg.src) {
-                btnOpenUser.innerHTML = `<img src="${avatarImg.src}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            if (currentUser && currentUser.avatar_url) {
+                btnOpenUser.innerHTML = `<img src="${currentUser.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
             } else {
-                btnOpenUser.textContent = drawerName.value.trim().charAt(0) || '👤';
+                btnOpenUser.textContent = (currentUser && currentUser.username) ? currentUser.username.charAt(0) : '👤';
             }
         }
 
@@ -2841,61 +2844,58 @@ function updateNav(items) {
             });
         }
 
-        function updateDrawerStats() {
+        async function updateDrawerStats() {
             drawerUploadCount.textContent = uploadedItems.length;
             drawerWorkCount.textContent = allItems().length;
-            document.getElementById('drawerFollowing').textContent = getFollowingCount();
-            document.getElementById('drawerFollowers').textContent = getFollowerCount();
-            document.getElementById('drawerFriendCount').textContent = getFriendCount();
+            document.getElementById('drawerFollowing').textContent = await getFollowingCount();
+            document.getElementById('drawerFollowers').textContent = await getFollowerCount();
+            document.getElementById('drawerFriendCount').textContent = await getFriendCount();
         }
 
-        // ========== Notification System ==========
-        function getNotifs() {
-            try { return JSON.parse(localStorage.getItem('windwalker_notifs') || '[]'); } catch(e) { return []; }
+        // ========== Notification System (Supabase) ==========
+        async function addNotif(type, from, text, targetUserId) {
+            if (!targetUserId) {
+                // Try to find target user by username lookup for legacy calls
+                return;
+            }
+            if (from === currentUser.username) return;
+            await supabase.from('notifications').insert({
+                user_id: targetUserId,
+                type: type,
+                from_user_id: currentUserId,
+                text: text,
+                read: false
+            });
         }
-        function saveNotifs(ns) { localStorage.setItem('windwalker_notifs', JSON.stringify(ns)); }
 
-        function addNotif(type, from, text) {
-            const me = getCurrentUser();
-            if (from === me) return; // Don't notify self
-            const ns = getNotifs();
-            ns.unshift({ type, from, text, time: Date.now(), read: false });
-            if (ns.length > 50) ns.length = 50;
-            saveNotifs(ns);
-            updateNotifyBadge();
-        }
-
-        function updateNotifyBadge() {
-            const me = getCurrentUser();
-            const ns = getNotifs();
-            const unread = ns.filter(n => !n.read).length;
+        async function updateNotifyBadge() {
+            if (!currentUserId) return;
+            const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId).eq('read', false);
             const badge = document.getElementById('notifyBadge');
-            badge.textContent = unread;
-            badge.classList.toggle('show', unread > 0);
+            badge.textContent = count || 0;
+            badge.classList.toggle('show', count > 0);
         }
 
-        function renderNotifs() {
-            const ns = getNotifs();
+        async function renderNotifs() {
+            if (!currentUserId) return;
+            const { data: ns } = await supabase.from('notifications').select('*, from_user:from_user_id(username)').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(50);
             const dd = document.getElementById('notifyDropdown');
-            if (!ns.length) {
+            if (!ns || !ns.length) {
                 dd.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">暂无通知</div>';
                 return;
             }
             const icons = { follow:'🔔', like:'❤', comment:'💬', message:'✉', friend:'👥' };
             dd.innerHTML = ns.map(n => {
-                const time = new Date(n.time).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-                return `<div class="notify-item${n.read?'':' unread'}" data-idx="${ns.indexOf(n)}">
-                    <strong>${icons[n.type]||'📢'} ${n.from}</strong> ${n.text}
+                const time = new Date(n.created_at).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                const fromName = n.from_user ? n.from_user.username : '未知';
+                return `<div class="notify-item${n.read?'':' unread'}" data-id="${n.id}">
+                    <strong>${icons[n.type]||'📢'} ${fromName}</strong> ${n.text}
                     <div class="notify-time">${time}</div>
                 </div>`;
             }).join('');
-            // Mark read on click
             dd.querySelectorAll('.notify-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const idx = parseInt(item.dataset.idx);
-                    const updated = getNotifs();
-                    if (updated[idx]) updated[idx].read = true;
-                    saveNotifs(updated);
+                item.addEventListener('click', async () => {
+                    await supabase.from('notifications').update({ read: true }).eq('id', item.dataset.id);
                     renderNotifs();
                     updateNotifyBadge();
                 });
@@ -2915,104 +2915,89 @@ function updateNav(items) {
 
         updateNotifyBadge();
 
-        // ========== Friend & Follow System ==========
-        function getSocialData() {
-            try { return JSON.parse(localStorage.getItem('windwalker_social') || '{}'); } catch(e) { return {}; }
-        }
-        function saveSocialData(data) { localStorage.setItem('windwalker_social', JSON.stringify(data)); }
-
+        // ========== Friend & Follow System (Supabase) ==========
         function getCurrentUser() {
-            try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}').name || ''; } catch(e) { return ''; }
+            return currentUser ? currentUser.username : '';
+        }
+        function getCurrentUserId() {
+            return currentUserId;
         }
 
-        // Follow/unfollow
-        function toggleFollow(targetUser) {
-            const me = getCurrentUser();
-            if (!me || me === targetUser) return;
-            const social = getSocialData();
-            if (!social.following) social.following = {};
-            if (!social.followers) social.followers = {};
+        async function toggleFollow(targetUsername) {
+            if (!currentUserId || currentUser.username === targetUsername) return false;
+            // Find target user ID
+            const { data: targetProfile } = await supabase.from('profiles').select('id').eq('username', targetUsername).single();
+            if (!targetProfile) { showToast('用户不存在', true); return false; }
+            const targetId = targetProfile.id;
 
-            if (!social.following[me]) social.following[me] = [];
-            const idx = social.following[me].indexOf(targetUser);
-            if (idx >= 0) {
-                social.following[me].splice(idx, 1);
+            // Check if already following
+            const { data: existing } = await supabase.from('follows').select('*').eq('follower_id', currentUserId).eq('following_id', targetId).single();
+            if (existing) {
+                await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', targetId);
+                return false; // unfollowed
             } else {
-                social.following[me].push(targetUser);
+                await supabase.from('follows').insert({ follower_id: currentUserId, following_id: targetId });
+                addNotif('follow', currentUser.username, '关注了你', targetId);
+                return true; // followed
             }
-            // Rebuild all followers from following data (prevents stale counts)
-            social.followers = {};
-            for (const [user, following] of Object.entries(social.following)) {
-                following.forEach(f => {
-                    if (!social.followers[f]) social.followers[f] = [];
-                    if (!social.followers[f].includes(user)) social.followers[f].push(user);
-                });
-            }
-            saveSocialData(social);
-            if (idx < 0) addNotif('follow', me, '关注了你');
-            return idx < 0;
         }
 
-        function isFollowing(targetUser) {
-            const me = getCurrentUser();
-            const social = getSocialData();
-            return social.following && social.following[me] && social.following[me].includes(targetUser);
+        async function isFollowing(targetUsername) {
+            if (!currentUserId) return false;
+            const { data: targetProfile } = await supabase.from('profiles').select('id').eq('username', targetUsername).single();
+            if (!targetProfile) return false;
+            const { data } = await supabase.from('follows').select('*').eq('follower_id', currentUserId).eq('following_id', targetProfile.id).single();
+            return !!data;
         }
 
-        // Friend request
-        function sendFriendRequest(targetUser) {
-            const me = getCurrentUser();
-            if (!me || me === targetUser) { showToast('无法添加自己', true); return false; }
-            const social = getSocialData();
-            if (!social.friends) social.friends = {};
-            if (!social.friendRequests) social.friendRequests = {};
-            if (!social.friendRequests[targetUser]) social.friendRequests[targetUser] = [];
-            if (social.friendRequests[targetUser].includes(me)) { showToast('已发送过请求', true); return false; }
-            social.friendRequests[targetUser].push(me);
-            saveSocialData(social);
-            addNotif('friend', me, '请求添加你为好友');
-            showToast('已发送好友请求给 ' + targetUser);
+        async function getFollowingCount() {
+            if (!currentUserId) return 0;
+            const { count } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', currentUserId);
+            return count || 0;
+        }
+
+        async function getFollowerCount() {
+            if (!currentUserId) return 0;
+            const { count } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', currentUserId);
+            return count || 0;
+        }
+
+        async function getFriendCount() {
+            if (!currentUserId) return 0;
+            const { count } = await supabase.from('friendships').select('*', { count: 'exact', head: true }).or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
+            return count || 0;
+        }
+
+        async function sendFriendRequest(targetUsername) {
+            if (!currentUserId || currentUser.username === targetUsername) { showToast('无法添加自己', true); return false; }
+            const { data: tp } = await supabase.from('profiles').select('id').eq('username', targetUsername).single();
+            if (!tp) { showToast('用户不存在', true); return false; }
+            const { error } = await supabase.from('friend_requests').insert({ from_id: currentUserId, to_id: tp.id });
+            if (error) { showToast('已发送过请求', true); return false; }
+            addNotif('friend', currentUser.username, '请求添加你为好友', tp.id);
+            showToast('已发送好友请求给 ' + targetUsername);
             return true;
         }
 
-        function acceptFriendRequest(fromUser) {
-            const me = getCurrentUser();
-            const social = getSocialData();
-            if (!social.friendRequests || !social.friendRequests[me]) return;
-            const idx = social.friendRequests[me].indexOf(fromUser);
-            if (idx < 0) return;
-            social.friendRequests[me].splice(idx, 1);
-            if (!social.friends) social.friends = {};
-            if (!social.friends[me]) social.friends[me] = [];
-            if (!social.friends[fromUser]) social.friends[fromUser] = [];
-            if (!social.friends[me].includes(fromUser)) social.friends[me].push(fromUser);
-            if (!social.friends[fromUser].includes(me)) social.friends[fromUser].push(me);
-            saveSocialData(social);
+        async function acceptFriendRequest(fromUsername) {
+            if (!currentUserId) return;
+            const { data: fp } = await supabase.from('profiles').select('id').eq('username', fromUsername).single();
+            if (!fp) return;
+            // Update friend request
+            await supabase.from('friend_requests').update({ status: 'accepted' }).eq('from_id', fp.id).eq('to_id', currentUserId);
+            // Create friendship (order IDs)
+            const [a, b] = [currentUserId, fp.id].sort();
+            await supabase.from('friendships').upsert({ user_a_id: a, user_b_id: b });
             refreshFriendUI();
-            showToast('已添加 ' + fromUser + ' 为好友');
+            showToast('已添加 ' + fromUsername + ' 为好友');
         }
 
-        function getFriendCount() {
-            const me = getCurrentUser();
-            const social = getSocialData();
-            return (social.friends && social.friends[me]) ? social.friends[me].length : 0;
-        }
-        function getFollowerCount() {
-            const me = getCurrentUser();
-            const social = getSocialData();
-            return (social.followers && social.followers[me]) ? social.followers[me].length : 0;
-        }
-        function getFollowingCount() {
-            const me = getCurrentUser();
-            const social = getSocialData();
-            return (social.following && social.following[me]) ? social.following[me].length : 0;
-        }
-
-        function getUserInfoCard(username) {
-            const accs = (() => { try { return JSON.parse(localStorage.getItem('windwalker_accounts') || '{}'); } catch(e){ return {}; }})();
-            const works = modelData.filter(m => m.author === username).length + uploadedItems.filter(m => m.author === username).length;
-            const created = accs[username] ? new Date(accs[username].created).toLocaleDateString('zh-CN') : '未知';
-            return { works, created };
+        async function getUserInfoCard(username) {
+            const { data: profile } = await supabase.from('profiles').select('*').eq('username', username).single();
+            if (!profile) return { works: 0, created: '未知' };
+            const { count } = await supabase.from('uploads').select('*', { count: 'exact', head: true }).eq('user_id', profile.id);
+            const created = profile.created_at ? new Date(profile.created_at).toLocaleDateString('zh-CN') : '未知';
+            return { works: count || 0, created };
         }
 
         function refreshFriendUI() {
@@ -3124,12 +3109,18 @@ function updateNav(items) {
         const chatPanelInput = document.getElementById('chatPanelInput');
         const chatPanelBack = document.getElementById('chatPanelBack');
 
-        function getMessages() { try { return JSON.parse(localStorage.getItem('windwalker_messages') || '[]'); } catch(e) { return []; }}
-        function saveMessages(msgs) { localStorage.setItem('windwalker_messages', JSON.stringify(msgs)); }
+        async function getMessages() {
+            if (!currentUserId) return [];
+            const { data } = await supabase.from('messages').select('*, from_user:from_id(username), to_user:to_id(username)').or(`from_id.eq.${currentUserId},to_id.eq.${currentUserId}`).order('created_at', { ascending: true });
+            // Map to legacy format
+            return (data || []).map(m => ({ from: m.from_user ? m.from_user.username : '', to: m.to_user ? m.to_user.username : '', text: m.text, time: new Date(m.created_at).getTime(), read: m.read, img: m.image_url, id: m.id, fromId: m.from_id, toId: m.to_id }));
+        }
+        async function saveMessageToDb(msg) { await supabase.from('messages').insert(msg); }
 
-        function updateMsgUnread() {
+        async function updateMsgUnread() {
             const me = getCurrentUser();
-            const unread = getMessages().filter(m => m.to === me && !m.read).length;
+            const msgs = await getMessages();
+            const unread = msgs.filter(m => m.to === me && !m.read).length;
             document.getElementById('msgUnread').textContent = unread ? `${unread} 条未读` : '';
         }
 
@@ -3140,10 +3131,10 @@ function updateNav(items) {
         });
         chatPanelBack.addEventListener('click', () => { chatPartner=''; openChatList(); });
 
-        function openChatList() {
+        async function openChatList() {
             chatPartner = ''; chatPanelBack.style.display='none'; chatPanelTitle.textContent='✉ 私信';
             const me = getCurrentUser();
-            const msgs = getMessages();
+            const msgs = await getMessages();
             const partners = new Set();
             msgs.forEach(m => { if (m.from===me) partners.add(m.to); if (m.to===me) partners.add(m.from); });
             chatPanelBody.innerHTML = !partners.size
@@ -3164,22 +3155,24 @@ function updateNav(items) {
             chatPanelTarget.value = '';
         }
 
-        function openChatWith(partner) {
+        async function openChatWith(partner) {
             chatPartner = partner; chatPanelBack.style.display='inline'; chatPanelTitle.textContent = `💬 ${partner}`;
             chatPanelTarget.value = partner;
-            const me = getCurrentUser();
-            const msgs = getMessages();
-            const updated = msgs.map(m => m.from===partner&&m.to===me ? {...m,read:true} : m);
-            saveMessages(updated);
+            // Mark messages as read in Supabase
+            if (currentUserId) {
+                const { data: tp } = await supabase.from('profiles').select('id').eq('username', partner).single();
+                if (tp) await supabase.from('messages').update({ read: true }).eq('to_id', currentUserId).eq('from_id', tp.id);
+            }
             renderChatBubbles();
             updateMsgUnread();
         }
 
-        function renderChatBubbles() {
+        async function renderChatBubbles() {
             const me = getCurrentUser();
-            const msgs = getMessages().filter(m => (m.from===me&&m.to===chatPartner)||(m.from===chatPartner&&m.to===me));
-            chatPanelBody.innerHTML = !msgs.length ? '<div style="text-align:center;color:var(--text-muted);padding:30px;">开始聊天吧！</div>'
-                : msgs.map(m => {
+            const msgs = await getMessages();
+            const filtered = msgs.filter(m => (m.from===me&&m.to===chatPartner)||(m.from===chatPartner&&m.to===me));
+            chatPanelBody.innerHTML = !filtered.length ? '<div style="text-align:center;color:var(--text-muted);padding:30px;">开始聊天吧！</div>'
+                : filtered.map(m => {
                     const isMe = m.from===me;
                     const time = new Date(m.time).toLocaleString('zh-CN',{hour:'2-digit',minute:'2-digit'});
                     const imgTag = m.img ? `<img class="chat-bubble-img" src="${m.img}" style="max-width:120px;max-height:100px;border-radius:8px;cursor:pointer;" onclick="window.open('${m.img}')">` : '';
@@ -3203,13 +3196,14 @@ function updateNav(items) {
             const f=this.files[0];if(!f||!f.type.startsWith('image/'))return;
             const r=new FileReader();r.onload=()=>{chatPImg=r.result;showToast('图片已选择');};r.readAsDataURL(f);
         });
-        function sendChat() {
+        async function sendChat() {
             const me=getCurrentUser(),text=chatPanelInput.value.trim();
             if(!chatPartner){showToast('请先选择联系人',true);return;}
             if(!text&&!chatPImg)return;
-            const msgs=getMessages(),msg={from:me,to:chatPartner,text,time:Date.now(),read:false};
-            if(chatPImg)msg.img=chatPImg;
-            msgs.push(msg);saveMessages(msgs);
+            // Find partner UUID
+            const { data: tp } = await supabase.from('profiles').select('id').eq('username', chatPartner).single();
+            if (!tp) { showToast('用户不存在', true); return; }
+            await saveMessageToDb({ from_id: currentUserId, to_id: tp.id, text, read: false, image_url: chatPImg || '' });
             chatPanelInput.value='';chatPImg=null;document.getElementById('chatPanelImgInput').value='';
             renderChatBubbles();updateMsgUnread();
         }
@@ -3244,29 +3238,48 @@ function updateNav(items) {
         const UserActions = (function() {
             let likes = new Set(), bookmarks = new Set(), itemComments = {};
 
-            function load() {
+            // Load from Supabase (called during init)
+            async function loadFromSupabase() {
+                if (!currentUserId) return;
                 try {
-                    likes = new Set(JSON.parse(localStorage.getItem('wa_likes') || '[]'));
-                    bookmarks = new Set(JSON.parse(localStorage.getItem('wa_bookmarks') || '[]'));
-                    itemComments = JSON.parse(localStorage.getItem('wa_comments') || '{}');
+                    const { data: l } = await supabase.from('item_likes').select('item_id').eq('user_id', currentUserId);
+                    likes = new Set((l || []).map(x => String(x.item_id)));
+                    const { data: b } = await supabase.from('item_bookmarks').select('item_id').eq('user_id', currentUserId);
+                    bookmarks = new Set((b || []).map(x => String(x.item_id)));
+                    const { data: c } = await supabase.from('item_comments').select('*').order('created_at', { ascending: true });
+                    itemComments = {};
+                    (c || []).forEach(cmt => {
+                        const sid = String(cmt.item_id);
+                        if (!itemComments[sid]) itemComments[sid] = [];
+                        itemComments[sid].push({ name: cmt.author_id, text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
+                    });
                 } catch(e) { likes = new Set(); bookmarks = new Set(); itemComments = {}; }
             }
-            function saveLikes() { localStorage.setItem('wa_likes', JSON.stringify([...likes])); }
-            function saveBookmarks() { localStorage.setItem('wa_bookmarks', JSON.stringify([...bookmarks])); }
-            function saveComments() { localStorage.setItem('wa_comments', JSON.stringify(itemComments)); }
 
             function isLiked(id) { return likes.has(String(id)); }
             function isBookmarked(id) { return bookmarks.has(String(id)); }
 
             function toggleLike(id) {
                 const sid = String(id);
-                likes.has(sid) ? likes.delete(sid) : likes.add(sid);
-                saveLikes();
+                if (!currentUserId) return;
+                if (likes.has(sid)) {
+                    likes.delete(sid);
+                    supabase.from('item_likes').delete().eq('item_id', sid).eq('user_id', currentUserId).then();
+                } else {
+                    likes.add(sid);
+                    supabase.from('item_likes').insert({ item_id: sid, user_id: currentUserId }).then();
+                }
             }
             function toggleBookmark(id) {
                 const sid = String(id);
-                bookmarks.has(sid) ? bookmarks.delete(sid) : bookmarks.add(sid);
-                saveBookmarks();
+                if (!currentUserId) return;
+                if (bookmarks.has(sid)) {
+                    bookmarks.delete(sid);
+                    supabase.from('item_bookmarks').delete().eq('item_id', sid).eq('user_id', currentUserId).then();
+                } else {
+                    bookmarks.add(sid);
+                    supabase.from('item_bookmarks').insert({ item_id: sid, user_id: currentUserId }).then();
+                }
             }
 
             function getComments(id) { return itemComments[String(id)] || []; }
@@ -3274,14 +3287,13 @@ function updateNav(items) {
                 const sid = String(id);
                 if (!itemComments[sid]) itemComments[sid] = [];
                 itemComments[sid].push({ name, text, time: Date.now() });
-                saveComments();
+                if (currentUserId) supabase.from('item_comments').insert({ item_id: sid, author_id: currentUserId, text }).then();
             }
 
             function getLikedItems(all) { return all.filter(m => likes.has(String(m.id))); }
             function getBookmarkedItems(all) { return all.filter(m => bookmarks.has(String(m.id))); }
 
-            load();
-            return { isLiked, isBookmarked, toggleLike, toggleBookmark, getComments, addComment, getLikedItems, getBookmarkedItems, load };
+            return { isLiked, isBookmarked, toggleLike, toggleBookmark, getComments, addComment, getLikedItems, getBookmarkedItems, loadFromSupabase };
         })();
 
         // ============================================================
@@ -3455,22 +3467,51 @@ function updateNav(items) {
         const communityFeed = document.getElementById('communityFeed');
         let composerPendingMedia = null, composerPendingType = null;
 
-        // Load posts from localStorage
-        function loadPosts() {
-            try { return JSON.parse(localStorage.getItem('windwalker_community') || '[]'); } catch(e) { return []; }
+        // Community posts (Supabase)
+        let communityPosts = [];
+        async function loadPosts() {
+            const { data: posts } = await supabase.from('community_posts').select('*, author:author_id(username,avatar_url)').order('created_at', { ascending: false }).limit(100);
+            if (!posts) return [];
+            // Load likes and comments for each post
+            const result = await Promise.all(posts.map(async p => {
+                const { data: likes } = await supabase.from('post_likes').select('user_id').eq('post_id', p.id);
+                const { data: comments } = await supabase.from('post_comments').select('*, author:author_id(username)').eq('post_id', p.id).order('created_at', { ascending: true });
+                return {
+                    id: 'post_' + p.id,
+                    name: p.author ? p.author.username : '未知',
+                    avatar: p.author ? (p.author.avatar_url || '') : '',
+                    text: p.text,
+                    media: p.media_url,
+                    mediaType: p.media_type,
+                    mediaId: null,
+                    time: new Date(p.created_at).getTime(),
+                    likes: p.likes_count || 0,
+                    likedBy: (likes || []).map(l => l.user_id),
+                    comments: (comments || []).map(c => ({ name: c.author ? c.author.username : '', text: c.text, img: c.image_url }))
+                };
+            }));
+            return result;
         }
-        function savePosts(posts) {
-            try { localStorage.setItem('windwalker_community', JSON.stringify(posts)); } catch(e) { showToast('存储空间不足', true); }
+        async function savePostToDb(post) {
+            // Determine author UUID from username
+            const authorId = currentUserId;
+            const { data, error } = await supabase.from('community_posts').insert({
+                author_id: authorId,
+                text: post.text,
+                media_url: post.media || '',
+                media_type: post.mediaType || null,
+                likes_count: 0
+            }).select('id').single();
+            if (error) { showToast('发布失败: ' + error.message, true); return null; }
+            return data.id;
         }
-        let communityPosts = loadPosts();
 
         // Sync user profile to community
         function syncComposerAvatar() {
-            try {
-                const p = JSON.parse(localStorage.getItem('windwalker_profile') || '{}');
-                if (p.avatar) { composerAvatar.textContent = ''; composerAvatar.style.backgroundImage = `url(${p.avatar})`; composerAvatar.style.backgroundSize = 'cover'; }
-                else composerAvatar.textContent = (p.name || '风').charAt(0);
-            } catch(e){ composerAvatar.textContent = '😎'; }
+            if (currentUser) {
+                if (currentUser.avatar_url) { composerAvatar.textContent = ''; composerAvatar.style.backgroundImage = `url(${currentUser.avatar_url})`; composerAvatar.style.backgroundSize = 'cover'; }
+                else composerAvatar.textContent = (currentUser.username || '风').charAt(0);
+            } else { composerAvatar.textContent = '😎'; }
         }
 
         // Open/close
@@ -3517,53 +3558,30 @@ function updateNav(items) {
 
         // Submit post (with persistence)
         composerSubmit.addEventListener('click', async () => {
+            if (!currentUserId) { showToast('请先登录', true); return; }
             const text = composerInput.value.trim();
             if (!text && !composerPendingMedia) return;
-            const profile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
-            const post = {
-                id: 'post_' + Date.now(),
-                name: profile.name || '风之旅人',
-                avatar: profile.avatar || '',
-                text: text,
-                media: null,
-                mediaType: composerPendingType || null,
-                mediaId: null,
-                time: Date.now(),
-                likes: 0,
-                likedBy: [],
-            };
 
-            // Persist media
-            if (composerPendingFile && composerPendingType === 'image') {
-                // Convert image to base64 for permanent storage
-                const base64 = await new Promise(resolve => {
-                    const r = new FileReader();
-                    r.onload = () => resolve(r.result);
-                    r.readAsDataURL(composerPendingFile);
-                });
-                post.media = base64;
-            } else if (composerPendingFile && composerPendingType === 'video') {
-                // Store video in IndexedDB
-                const vid = await new Promise(resolve => {
-                    const r = new FileReader();
-                    r.onload = () => resolve(r.result);
-                    r.readAsArrayBuffer(composerPendingFile);
-                });
-                post.mediaId = 'comm_vid_' + Date.now();
-                post.media = composerPendingMedia; // temp URL for current session
-                await IDB.save({
-                    id: post.mediaId,
-                    blob: vid,
-                    fileName: composerPendingFile.name,
-                    type: 'community_video',
-                    cat: '', subCat: '', title: '', coverBlob: null,
-                }).catch(() => {});
+            let mediaUrl = '';
+            let mediaType = composerPendingType || null;
+
+            // Upload media to Supabase Storage
+            if (composerPendingFile) {
+                const bucket = 'community-media';
+                const ext = composerPendingFile.name.split('.').pop() || 'jpg';
+                const path = `${currentUserId}_${Date.now()}.${ext}`;
+                const { data: uploadData, error: uploadErr } = await supabase.storage.from(bucket).upload(path, composerPendingFile);
+                if (!uploadErr) {
+                    const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(path);
+                    mediaUrl = publicUrl.publicUrl;
+                }
             } else if (composerPendingMedia) {
-                post.media = composerPendingMedia;
+                mediaUrl = composerPendingMedia;
             }
 
-            communityPosts.unshift(post);
-            savePosts(communityPosts);
+            const postId = await savePostToDb({ text, media: mediaUrl, mediaType });
+            if (!postId) return;
+
             // Reset
             composerInput.value = '';
             composerPendingMedia = null; composerPendingType = null; composerPendingFile = null;
@@ -3577,25 +3595,12 @@ function updateNav(items) {
 
         // Render feed
         async function renderFeed() {
-            communityPosts = loadPosts();
-            // Restore community videos from IndexedDB
-            for (const p of communityPosts) {
-                if (p.mediaId && !p.media) {
-                    try {
-                        const stored = await IDB.loadAll();
-                        const found = stored.find(s => s.id === p.mediaId);
-                        if (found && found.blob) {
-                            const blob = new Blob([found.blob], { type: 'video/mp4' });
-                            p.media = URL.createObjectURL(blob);
-                        }
-                    } catch(e) {}
-                }
-            }
+            communityPosts = await loadPosts();
             if (!communityPosts.length) {
                 communityFeed.innerHTML = '<div class="community-empty">💬 还没有帖子，来发布第一条吧！</div>';
                 return;
             }
-            const uid = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}').name || 'user'; } catch(e){ return 'user'; }})();
+            const uid = currentUser ? currentUser.username : 'user';
             communityFeed.innerHTML = communityPosts.map(p => {
                 const isLiked = p.likedBy && p.likedBy.includes(uid);
                 const timeStr = new Date(p.time).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -3659,18 +3664,21 @@ function updateNav(items) {
             communityFeed.querySelectorAll('.post-like').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const pid = btn.dataset.postid;
-                    const idx = communityPosts.findIndex(p => p.id === pid);
-                    if (idx === -1) return;
-                    const post = communityPosts[idx];
-                    post.likedBy = post.likedBy || [];
-                    if (post.likedBy.includes(uid)) {
-                        post.likedBy = post.likedBy.filter(u => u !== uid);
+                    const dbPostId = parseInt(pid.replace('post_', ''));
+                    if (!dbPostId) return;
+                    const post = communityPosts.find(p => p.id === pid);
+                    if (!post) return;
+                    const alreadyLiked = post.likedBy.includes(currentUserId || uid);
+                    if (alreadyLiked) {
+                        await supabase.from('post_likes').delete().eq('post_id', dbPostId).eq('user_id', currentUserId);
                         post.likes = Math.max(0, (post.likes||1) - 1);
+                        post.likedBy = post.likedBy.filter(id => id !== currentUserId);
                     } else {
-                        post.likedBy.push(uid);
+                        await supabase.from('post_likes').insert({ post_id: dbPostId, user_id: currentUserId });
                         post.likes = (post.likes||0) + 1;
+                        post.likedBy.push(currentUserId);
                     }
-                    savePosts(communityPosts);
+                    await supabase.from('community_posts').update({ likes_count: post.likes }).eq('id', dbPostId);
                     renderFeed();
                 });
             });
@@ -3709,43 +3717,39 @@ function updateNav(items) {
 
             // Comment submit (with image support)
             communityFeed.querySelectorAll('.comment-submit').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
+                    if (!currentUserId) return;
                     const pid = btn.dataset.postid;
                     const input = communityFeed.querySelector(`.comment-input[data-postid="${pid}"]`);
                     if (!input) return;
                     const text = input.value.trim();
                     const img = commentPendingImgs[pid] || null;
                     if (!text && !img) return;
-                    const idx = communityPosts.findIndex(p => p.id === pid);
-                    if (idx === -1) return;
-                    const profile = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile') || '{}'); } catch(e){ return {}; }})();
-                    communityPosts[idx].comments = communityPosts[idx].comments || [];
-                    communityPosts[idx].comments.push({ name: profile.name || '用户', text, img });
+                    const dbPostId = parseInt(pid.replace('post_', ''));
+                    if (!dbPostId) return;
+                    await supabase.from('post_comments').insert({
+                        post_id: dbPostId, author_id: currentUserId, text: text, image_url: img || ''
+                    });
                     delete commentPendingImgs[pid];
-                    savePosts(communityPosts);
                     renderFeed();
                 });
             });
 
-            // Comment delete (author or comment owner)
+            // Comment delete
             communityFeed.querySelectorAll('.comment-delete').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const pid = btn.dataset.pid;
-                    const cidx = parseInt(btn.dataset.cidx);
-                    const idx = communityPosts.findIndex(p => p.id === pid);
-                    if (idx === -1 || !communityPosts[idx].comments) return;
-                    communityPosts[idx].comments.splice(cidx, 1);
-                    savePosts(communityPosts);
+                btn.addEventListener('click', async () => {
+                    const cid = btn.dataset.cid;
+                    if (cid) await supabase.from('post_comments').delete().eq('id', cid);
                     renderFeed();
                 });
             });
 
-            // Delete handlers
+            // Delete post
             communityFeed.querySelectorAll('.post-delete').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
                     const pid = btn.dataset.postid;
-                    communityPosts = communityPosts.filter(p => p.id !== pid);
-                    savePosts(communityPosts);
+                    const dbPostId = parseInt(pid.replace('post_', ''));
+                    if (dbPostId) await supabase.from('community_posts').delete().eq('id', dbPostId);
                     renderFeed();
                     showToast('已删除');
                 });
@@ -3803,48 +3807,15 @@ function updateNav(items) {
 
         syncComposerAvatar();
 
-        // ========== IndexedDB Storage ==========
-        const IDB = (function() {
-            const DB_NAME = 'WindWalkerUploads', STORE = 'files';
-            let db = null;
-            function open() {
-                return new Promise((resolve, reject) => {
-                    if (db) return resolve(db);
-                    const req = indexedDB.open(DB_NAME, 1);
-                    req.onupgradeneeded = e => { e.target.result.createObjectStore(STORE, { keyPath: 'id' }); };
-                    req.onsuccess = e => { db = e.target.result; resolve(db); };
-                    req.onerror = () => reject(req.error);
-                });
-            }
-            async function save(item) {
-                const d = await open();
-                return new Promise((resolve, reject) => {
-                    const tx = d.transaction(STORE, 'readwrite');
-                    tx.objectStore(STORE).put(item);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                });
-            }
-            async function loadAll() {
-                const d = await open();
-                return new Promise((resolve, reject) => {
-                    const tx = d.transaction(STORE, 'readonly');
-                    const req = tx.objectStore(STORE).getAll();
-                    req.onsuccess = () => resolve(req.result || []);
-                    req.onerror = () => reject(req.error);
-                });
-            }
-            async function remove(id) {
-                const d = await open();
-                return new Promise((resolve, reject) => {
-                    const tx = d.transaction(STORE, 'readwrite');
-                    tx.objectStore(STORE).delete(id);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                });
-            }
-            return { save, loadAll, remove };
-        })();
+        // ========== Supabase Storage Upload Helper ==========
+        async function uploadFileToStorage(bucket, file, folder) {
+            const ext = file.name.split('.').pop() || 'bin';
+            const path = `${folder || currentUserId}/${Date.now()}_${Math.random().toString(36).slice(2,6)}.${ext}`;
+            const { data, error } = await supabase.storage.from(bucket).upload(path, file);
+            if (error) { console.warn('Upload failed:', error); return null; }
+            const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(path);
+            return publicUrl.publicUrl;
+        }
 
         // ========== Upload ==========
         let uploadedItems = [];
@@ -4053,43 +4024,35 @@ function updateNav(items) {
 
             uploadedItems.push(newItem);
 
-            // Save file + cover blob to IndexedDB for persistence
+            // Upload file to Supabase Storage (async, non-blocking)
             if (pendingFile) {
-                const reader = new FileReader();
-                reader.onload = async () => {
-                    let coverBuf = null;
-                    if (pendingCoverFile) {
-                        coverBuf = await new Promise(resolve => {
-                            const cr = new FileReader();
-                            cr.onload = () => resolve(cr.result);
-                            cr.readAsArrayBuffer(pendingCoverFile);
+                const bucket = newItem.type === 'model' ? 'uploads' : 'uploads';
+                uploadFileToStorage(bucket, pendingFile, currentUserId).then(async fileUrl => {
+                    if (fileUrl) {
+                        newItem.file = fileUrl;
+                        // Also upload cover if exists
+                        let coverUrl = null;
+                        if (pendingCoverFile) {
+                            coverUrl = await uploadFileToStorage('uploads', pendingCoverFile, currentUserId + '/covers');
+                        }
+                        // Save metadata to Supabase
+                        await supabase.from('uploads').insert({
+                            user_id: currentUserId,
+                            title: newItem.title,
+                            category: newItem.cat,
+                            sub_category: newItem.subCat,
+                            file_type: newItem.type,
+                            file_url: fileUrl,
+                            cover_url: coverUrl || '',
+                            file_name: newItem.fileName
                         });
                     }
-                    IDB.save({
-                        id: newItem.id,
-                        blob: reader.result,
-                        fileName: pendingFile.name,
-                        type: newItem.type,
-                        cat: newItem.cat,
-                        subCat: newItem.subCat,
-                        title: newItem.title,
-                        author: newItem.author,
-                        coverBlob: coverBuf,
-                    }).catch((err) => { console.warn('IndexedDB save failed, file persisted in localStorage backup only:', err); });
-                };
-                reader.readAsArrayBuffer(pendingFile);
+                });
             }
 
             // Don't revoke — we need the URL for display
             pendingObjectURL = null;
             pendingCoverURL = null; pendingCoverFile = null;
-
-            // Backup metadata to localStorage (fallback if IDB fails)
-            try {
-                const backup = JSON.parse(localStorage.getItem('windwalker_upload_meta') || '[]');
-                backup.push({ id: newItem.id, title: newItem.title, type: newItem.type, cat: newItem.cat, subCat: newItem.subCat, author: newItem.author, fileName: newItem.fileName, time: Date.now() });
-                localStorage.setItem('windwalker_upload_meta', JSON.stringify(backup.slice(-50)));
-            } catch(e) {}
 
             showToast('✅ 已添加: ' + newItem.title);
             closeUploadModal();
@@ -4368,71 +4331,48 @@ function updateNav(items) {
 
         // ========== Init ==========
         async function init() {
-            // Load persisted uploads from IndexedDB
+            // 1. Check auth
+            const profile = await requireAuth();
+            if (!profile) return; // Redirected to login
+
+            // 2. Load profile into UI
+            loadProfile();
+            updateUserButton();
+
+            // 3. Load uploaded items from Supabase
             try {
-                const stored = await IDB.loadAll();
-                stored.forEach(item => {
-                    if (item.type === 'community_video') return;
-                    try {
-                        const blob = new Blob([item.blob], { type: (item.fileName||'').match(/\.(mp4|webm)$/i) ? 'video/mp4' : 'image/png' });
-                        const url = URL.createObjectURL(blob);
-                        let coverUrl = null;
-                        if (item.coverBlob && item.coverBlob.byteLength > 0) {
-                            const cblob = new Blob([item.coverBlob], { type: 'image/png' });
-                            coverUrl = URL.createObjectURL(cblob);
-                        }
-                        uploadedItems.push({
-                            id: item.id,
-                            file: url,
-                            cover: coverUrl,
-                            type: item.type,
-                            cat: item.cat,
-                            subCat: item.subCat || '',
-                            title: item.title,
-                            author: item.author || '',
-                            fileName: item.fileName,
-                            isUpload: true,
-                            persisted: true,
-                        });
-                    } catch(e) {
-                        // If blob creation fails, skip this item
-                        console.warn('Failed to restore upload:', item.title, e);
-                    }
-                });
-            } catch(e) { /* IDB not available */ }
-
-            // Fallback: if IDB failed to load anything, try localStorage backup
-            if (uploadedItems.length === 0) {
-                try {
-                    const backup = JSON.parse(localStorage.getItem('windwalker_upload_meta') || '[]');
-                    backup.forEach(meta => {
-                        // Metadata-only fallback — file will be missing but structure preserved
-                        uploadedItems.push({
-                            id: meta.id,
-                            file: '',
-                            cover: null,
-                            type: meta.type,
-                            cat: meta.cat,
-                            subCat: meta.subCat || '',
-                            title: meta.title + ' (需重新上传)',
-                            author: meta.author || '',
-                            fileName: meta.fileName,
-                            isUpload: true,
-                            persisted: false,
-                        });
+                const { data: uploads } = await supabase.from('uploads').select('*').order('created_at', { ascending: false }).limit(200);
+                (uploads || []).forEach(item => {
+                    uploadedItems.push({
+                        id: 'upload_' + item.id,
+                        file: item.file_url,
+                        cover: item.cover_url || null,
+                        type: item.file_type,
+                        cat: item.category,
+                        subCat: item.sub_category || '',
+                        title: item.title,
+                        author: currentUser.username,
+                        fileName: item.file_name,
+                        isUpload: true,
+                        persisted: true,
                     });
-                } catch(e2) {}
-            }
+                });
+            } catch(e) { /* No uploads or error */ }
 
+            // 4. Load gallery interactions
+            await UserActions.loadFromSupabase();
+
+            // 5. Render UI
             renderCategories();
             renderGallery();
             updateStats();
+            updateNotifyBadge();
 
-            // Start entrance animation
+            // 6. Start entrance animation
             animStart = performance.now();
             requestAnimationFrame(drawEntrance);
 
-            // Trigger card stagger after entrance
+            // 7. Trigger card stagger
             setTimeout(() => {
                 gallery.classList.add('animate-in');
                 const cards = galleryGrid.querySelectorAll('.model-card');
@@ -4446,24 +4386,7 @@ function updateNav(items) {
             }, 2000);
         }
 
-        // ========== Auto-sync to Server ==========
-        const origSetItem = localStorage.setItem.bind(localStorage);
-        localStorage.setItem = function(key, value) {
-            origSetItem(key, value);
-            if (key.startsWith('windwalker_') || key.startsWith('wa_')) {
-                clearTimeout(localStorage._ss);
-                localStorage._ss = setTimeout(() => {
-                    const data = {};
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const k = localStorage.key(i);
-                        if (k.startsWith('windwalker_') || k.startsWith('wa_')) {
-                            try { data[k] = JSON.parse(localStorage.getItem(k)); } catch(e) { data[k] = localStorage.getItem(k); }
-                        }
-                    }
-                    fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:'all',value:data}) }).catch(()=>{});
-                }, 800);
-            }
-        };
+        // Auto-sync removed — Supabase handles persistence directly
 
         init();
     })();
