@@ -2705,55 +2705,46 @@ function updateNav(items) {
             });
         });
 
-        // Stat click → show detail
+        // Stat click → show detail (Supabase version)
         document.querySelectorAll('.drawer-stat-click').forEach(s => {
-            s.addEventListener('click', () => {
+            s.addEventListener('click', async () => {
+                if (!currentUserId) return;
                 const type = s.dataset.show;
-                const me = getCurrentUser();
-                const social = getSocialData();
                 const detail = document.getElementById('drawerSocialDetail');
-                let list = [];
-                if (type === 'following') list = (social.following&&social.following[me])||[];
-                else if (type === 'followers') list = (social.followers&&social.followers[me])||[];
-                else if (type === 'friends') list = (social.friends&&social.friends[me])||[];
-                if (!list.length) { detail.style.display='block'; detail.innerHTML=`<span style="opacity:0.5;">暂无</span>`; return; }
+                let users = [];
+                try {
+                    if (type === 'following') {
+                        const { data } = await supabase.from('follows').select('following:following_id(username)').eq('follower_id', currentUserId);
+                        users = (data||[]).map(d => d.following?.username).filter(Boolean);
+                    } else if (type === 'followers') {
+                        const { data } = await supabase.from('follows').select('follower:follower_id(username)').eq('following_id', currentUserId);
+                        users = (data||[]).map(d => d.follower?.username).filter(Boolean);
+                    } else if (type === 'friends') {
+                        const { data } = await supabase.from('friendships').select('user_a:user_a_id(username),user_b:user_b_id(username)').or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
+                        users = (data||[]).map(d => (d.user_a?.username === currentUser?.username ? d.user_b?.username : d.user_a?.username)).filter(Boolean);
+                    }
+                } catch(e) { detail.innerHTML='<span style="opacity:0.5;">加载失败</span>'; detail.style.display='block'; return; }
+                if (!users.length) { detail.style.display='block'; detail.innerHTML='<span style="opacity:0.5;">暂无</span>'; return; }
                 detail.style.display='block';
-                detail.innerHTML = list.map(u => {
-                    const info = getUserInfoCard(u);
-                    return `<span style="display:inline-block;background:var(--bg);padding:3px 8px;border-radius:8px;margin:2px;font-size:0.75rem;cursor:pointer;" class="social-user-tag" data-user="${u}">👤 ${u} · ${info.works}作品</span>`;
-                }).join('');
+                detail.innerHTML = users.map(u => `<span style="display:inline-block;background:var(--bg);padding:3px 8px;border-radius:8px;margin:2px;font-size:0.75rem;cursor:pointer;" class="social-user-tag" data-user="${u}">👤 ${u}</span>`).join('');
                 detail.querySelectorAll('.social-user-tag').forEach(tag => {
-                    tag.addEventListener('click', (e) => {
+                    tag.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         const u = tag.dataset.user;
-                        const info = getUserInfoCard(u);
-                        const prof = (() => { try { return JSON.parse(localStorage.getItem('windwalker_profile')||'{}'); } catch(e){ return {}; }})();
-                        const isF = isFollowing(u);
+                        const info = await getUserInfoCard(u);
+                        const isF = await isFollowing(u);
                         detail.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;">
                             <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;margin:0 auto 6px;">${u.charAt(0)}</div>
-                            <strong>${u}</strong>
-                            <div style="font-size:0.75rem;color:var(--text-muted);">作品 ${info.works} · ${info.created}</div>
+                            <strong>${u}</strong><div style="font-size:0.75rem;color:var(--text-muted);">作品 ${info.works} · ${info.created}</div>
                             <div style="margin-top:6px;display:flex;gap:6px;justify-content:center;">
                                 <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;" id="cardFollowBtn">${isF?'已关注':'+ 关注'}</button>
                                 <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);" id="cardMsgBtn">✉ 私信</button>
                                 <button class="comment-submit" style="font-size:0.7rem;padding:4px 12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);" id="cardSearchBtn">🔍 作品</button>
                             </div>
-                            <button style="margin-top:6px;font-size:0.65rem;color:var(--text-muted);background:none;border:none;cursor:pointer;" id="cardCloseBtn">关闭</button>
-                        </div>`;
-                        document.getElementById('cardFollowBtn').addEventListener('click', () => {
-                            toggleFollow(u);
-                            document.getElementById('cardFollowBtn').textContent = isFollowing(u) ? '已关注' : '+ 关注';
-                        });
-                        document.getElementById('cardMsgBtn').addEventListener('click', () => {
-                            detail.style.display='none';
-                            openChatWith(u);
-                            document.getElementById('messagesModal').classList.add('open');
-                            document.body.style.overflow = 'hidden';
-                        });
-                        document.getElementById('cardSearchBtn').addEventListener('click', () => {
-                            searchInput.value = u; searchQ = u;
-                            renderGallery(); detail.style.display='none';
-                        });
+                            <button style="margin-top:6px;font-size:0.65rem;color:var(--text-muted);background:none;border:none;cursor:pointer;" id="cardCloseBtn">关闭</button></div>`;
+                        document.getElementById('cardFollowBtn').addEventListener('click', async () => { await toggleFollow(u); renderFeed(); });
+                        document.getElementById('cardMsgBtn').addEventListener('click', () => { detail.style.display='none'; openChatWith(u); });
+                        document.getElementById('cardSearchBtn').addEventListener('click', () => { searchInput.value = u; searchQ = u; renderGallery(); detail.style.display='none'; });
                         document.getElementById('cardCloseBtn').addEventListener('click', () => { detail.style.display='none'; });
                     });
                 });
@@ -3027,11 +3018,15 @@ function updateNav(items) {
             return { works: count || 0, created };
         }
 
-        function refreshFriendUI() {
+        async function refreshFriendUI() {
+            if (!currentUserId) return;
             const me = getCurrentUser();
-            const social = getSocialData();
-            const friends = (social.friends && social.friends[me]) ? social.friends[me] : [];
-            const requests = (social.friendRequests && social.friendRequests[me]) ? social.friendRequests[me] : [];
+            // Get friends from Supabase
+            const { data: friendRows } = await supabase.from('friendships').select('user_a:user_a_id(username),user_b:user_b_id(username)').or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
+            const friends = (friendRows||[]).map(r => r.user_a?.username === me ? r.user_b?.username : r.user_a?.username).filter(Boolean);
+            // Get pending requests
+            const { data: reqRows } = await supabase.from('friend_requests').select('from_user:from_id(username)').eq('to_id', currentUserId).eq('status', 'pending');
+            const requests = (reqRows||[]).map(r => r.from_user?.username).filter(Boolean);
             const friendList = document.getElementById('friendList');
             let html = '';
             if (requests.length) {
@@ -3068,15 +3063,12 @@ function updateNav(items) {
             });
             // Reject buttons
             friendList.querySelectorAll('[data-reject]').forEach(b => {
-                b.addEventListener('click', () => {
-                    const fromUser = b.dataset.reject;
-                    const soc = getSocialData();
-                    if (soc.friendRequests && soc.friendRequests[me]) {
-                        soc.friendRequests[me] = soc.friendRequests[me].filter(u => u !== fromUser);
-                        saveSocialData(soc);
-                        refreshFriendUI();
-                        showToast('已拒绝');
-                    }
+                b.addEventListener('click', async () => {
+                    const fromUsername = b.dataset.reject;
+                    const { data: fp } = await supabase.from('profiles').select('id').eq('username', fromUsername).single();
+                    if (fp) await supabase.from('friend_requests').delete().eq('from_id', fp.id).eq('to_id', currentUserId);
+                    refreshFriendUI();
+                    showToast('已拒绝');
                 });
             });
 
@@ -3853,10 +3845,10 @@ function updateNav(items) {
         });
         followingClose.addEventListener('click', () => { followingOverlay.classList.remove('open'); document.body.style.overflow = ''; });
 
-        function renderFollowingFeed() {
-            const me = getCurrentUser();
-            const social = getSocialData();
-            const following = (social.following && social.following[me]) ? social.following[me] : [];
+        async function renderFollowingFeed() {
+            if (!currentUserId) return;
+            const { data } = await supabase.from('follows').select('following:following_id(username)').eq('follower_id', currentUserId);
+            const following = (data||[]).map(d => d.following?.username).filter(Boolean);
             if (!following.length) {
                 followingFeedEl.innerHTML = '<div class="community-empty">你还没有关注任何人<br>去社区或搜索关注创作者吧！</div>';
                 return;
