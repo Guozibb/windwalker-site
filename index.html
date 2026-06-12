@@ -3662,7 +3662,7 @@ function updateNav(items) {
 
             // Like handlers
             communityFeed.querySelectorAll('.post-like').forEach(btn => {
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
                     const pid = btn.dataset.postid;
                     const dbPostId = parseInt(pid.replace('post_', ''));
                     if (!dbPostId) return;
