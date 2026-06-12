@@ -560,7 +560,9 @@
                 if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); resetBtn('注 册'); return; }
 
                 btnSubmitMain.textContent = '⏳ 注册中...';
-                const email = username + '@windwalker.app';
+                // 生成有效的邮箱（支持中文用户名）
+                const emailId = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+                const email = emailId + '@w.app';
 
                 try {
                     const { data, error } = await supabase.auth.signUp({ email, password: pwd, options: { data: { username } } });
@@ -580,9 +582,9 @@
                         if (!upErr) { const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.user.id + '_av.svg'); avatarUrl = pub.publicUrl; }
                     } catch(e) {}
 
-                    // 创建 profiles
+                    // 创建 profiles（存储邮箱映射）
                     const code = String(Math.floor(100000 + Math.random() * 900000));
-                    await supabase.from('profiles').upsert({ id: data.user.id, username, user_code: code, avatar_url: avatarUrl });
+                    await supabase.from('profiles').upsert({ id: data.user.id, username, user_code: code, avatar_url: avatarUrl, email_id: emailId });
 
                     // 确保有 session
                     if (!data.session) {
@@ -605,7 +607,10 @@
 
                 btnSubmitMain.textContent = '⏳ 登录中...';
                 try {
-                    const { data, error } = await supabase.auth.signInWithPassword({ email: username + '@windwalker.app', password: pwd });
+                    // 先从 profiles 查出邮箱映射
+                    const { data: pf } = await supabase.from('profiles').select('email_id').eq('username', username).single();
+                    const email = (pf?.email_id || username.replace(/[^\x00-\x7F]/g,'x')) + '@w.app';
+                    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
                     if (error) { showToast('账号或密码错误', 'err'); resetBtn('登 录'); return; }
                     if (!data.session) { showToast('登录失败，请重试', 'err'); resetBtn('登 录'); return; }
                     showToast('✅ 登录成功！', 'ok');

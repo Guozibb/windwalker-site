@@ -4412,19 +4412,43 @@ function updateNav(items) {
                 if(btn) btn.textContent = icons[season];
                 document.body.className = season;
 
-                const colors = { spring:'245,160,180', summer:'100,190,135', autumn:'230,150,80', winter:'140,185,230' };
+                const colors = { spring:'245,160,180', summer:'120,185,140', autumn:'220,140,60', winter:'160,200,240' };
                 function mkPetal() {
-                    return { x:Math.random()*W, y:-30, r:Math.random()*5+2, vy:Math.random()*1+0.3, vx:(Math.random()-0.5)*0.6, o:Math.random()*0.4+0.2 };
+                    const s = season;
+                    return { x:Math.random()*W, y:-30, r:Math.random()*4+2, vy:Math.random()*1+0.3, vx:(Math.random()-0.5)*0.8, o:Math.random()*0.45+0.15, rot:Math.random()*360, vrot:(Math.random()-0.5)*2, shape:s };
                 }
-                for(let i=0;i<25;i++) { const p=mkPetal(); p.y=Math.random()*H; pts.push(p); }
+                for(let i=0;i<30;i++) { const p=mkPetal(); p.y=Math.random()*H; pts.push(p); }
 
                 (function loop() {
                     ctx.clearRect(0,0,W,H);
                     const c = colors[season]||colors.spring;
                     for(const p of pts) {
-                        p.y+=p.vy; p.x+=p.vx+Math.sin(p.y*0.01)*0.3;
-                        if(p.y>H+30){const n=mkPetal();p.x=n.x;p.y=n.y;}
-                        ctx.fillStyle=`rgba(${c},${p.o})`; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+                        p.y+=p.vy; p.x+=p.vx+Math.sin(p.y*0.015)*0.3; p.rot+=p.vrot;
+                        if(p.y>H+30){const n=mkPetal();p.x=n.x;p.y=n.y;p.rot=n.rot;}
+
+                        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180); ctx.globalAlpha=p.o;
+                        ctx.fillStyle=`rgba(${c},1)`;
+
+                        if (p.shape==='spring') {
+                            // 🌸 樱花五瓣
+                            for(let i=0;i<5;i++){const a=i*Math.PI*2/5;ctx.beginPath();ctx.ellipse(Math.cos(a)*p.r*0.6,Math.sin(a)*p.r*0.6,p.r*0.55,p.r*0.25,a,0,7);ctx.fill();}
+                            ctx.fillStyle='rgba(255,200,180,0.8)';ctx.beginPath();ctx.arc(0,0,p.r*0.25,0,7);ctx.fill();
+                        } else if (p.shape==='summer') {
+                            // 🌿 绿叶
+                            ctx.beginPath();ctx.ellipse(0,0,p.r*1.2,p.r*0.5,0.2,0,7);ctx.fill();
+                            ctx.strokeStyle=`rgba(80,150,100,0.5)`;ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(0,-p.r*0.4);ctx.lineTo(0,p.r*0.4);ctx.stroke();
+                        } else if (p.shape==='autumn') {
+                            // 🍂 枫叶（简易星形）
+                            ctx.beginPath();const s=p.r;ctx.moveTo(0,-s);
+                            for(let i=0;i<5;i++){const a=i*Math.PI*2/5-Math.PI/2;const a2=a+Math.PI/5;ctx.lineTo(Math.cos(a)*s,Math.sin(a)*s);ctx.lineTo(Math.cos(a2)*s*0.4,Math.sin(a2)*s*0.4);}
+                            ctx.closePath();ctx.fill();
+                        } else {
+                            // ❄ 雪花
+                            ctx.beginPath();ctx.arc(0,0,p.r*0.6,0,7);ctx.fill();
+                            ctx.strokeStyle=`rgba(${c},0.7)`;ctx.lineWidth=0.6;
+                            for(let i=0;i<6;i++){const a=i*Math.PI/3;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*p.r,Math.sin(a)*p.r);ctx.stroke();}
+                        }
+                        ctx.restore();
                     }
                     requestAnimationFrame(loop);
                 })();
