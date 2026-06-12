@@ -2414,7 +2414,7 @@
 
             galleryGrid.innerHTML = items.map(m => {
                 if (m.type === 'video') {
-                    const thumb = m.thumb || '';
+                    const thumb = m.thumb || m.cover || '';
                     return `
                     <div class="model-card video-card" data-id="${m.id}">
                         ${thumb ? `<img src="${thumb}" alt="${m.title}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">` : ''}
@@ -3849,6 +3849,56 @@ function updateNav(items) {
             return publicUrl.publicUrl;
         }
 
+        // 🖼 图片压缩（Canvas，上传前处理）
+        async function compressImage(file, maxWidth = 1600, quality = 0.75) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width, h = img.height;
+                    if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(blob => {
+                        if (!blob) return reject(new Error('压缩失败'));
+                        const compressed = new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+                        resolve(compressed);
+                    }, 'image/jpeg', quality);
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+        }
+
+        // 🎬 视频封面生成（提取第2秒帧）
+        async function generateVideoCover(file, seekTime = 2) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+                video.onloadeddata = () => {
+                    video.currentTime = Math.min(seekTime, video.duration * 0.3 || 1);
+                };
+                video.onseeked = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+                    canvas.toBlob(blob => {
+                        URL.revokeObjectURL(video.src);
+                        if (!blob) return reject(new Error('封面生成失败'));
+                        const coverFile = new File([blob], file.name.replace(/\.\w+$/, '_cover.jpg'), { type: 'image/jpeg' });
+                        resolve(coverFile);
+                    }, 'image/jpeg', 0.8);
+                };
+                video.onerror = () => { URL.revokeObjectURL(video.src); reject(new Error('视频加载失败')); };
+                video.src = URL.createObjectURL(file);
+            });
+        }
+
         // ========== Upload ==========
 
         const uploadModal = document.getElementById('uploadModal');
@@ -4038,13 +4088,15 @@ function updateNav(items) {
                 return;
             }
 
+            const isVideo = /\.(mp4|webm|mov)$/i.test(pendingFile.name);
             const is3D = /\.(glb|fbx|obj|gltf)$/i.test(pendingFile.name);
+            const isImage = !isVideo && !is3D;
             const subCat = uploadCategory.value === '3D模型' ? uploadSubCategory.value : '';
             const newItem = {
                 id: 'upload_' + Date.now(),
                 file: pendingObjectURL,
                 cover: pendingCoverURL || null,
-                type: /\.(mp4|webm|mov)$/i.test(pendingFile.name) ? 'video' : is3D ? 'model' : 'image',
+                type: isVideo ? 'video' : is3D ? 'model' : 'image',
                 cat: uploadCategory.value,
                 subCat: subCat,
                 title: uploadTitle.value.trim(),
@@ -4056,16 +4108,48 @@ function updateNav(items) {
             btnSubmitUpload.textContent = '⏳ 上传中...';
             btnSubmitUpload.disabled = true;
 
-            // Upload file to Supabase Storage and wait for confirmation
+            // Upload file to Supabase Storage
             if (pendingFile) {
                 const bucket = 'uploads';
-                const fileUrl = await uploadFileToStorage(bucket, pendingFile, currentUserId);
+
+                // 🖼 图片：压缩后再上传
+                let fileToUpload = pendingFile;
+                if (isImage && pendingFile.size > 200 * 1024) {
+                    btnSubmitUpload.textContent = '⏳ 压缩中...';
+                    try {
+                        fileToUpload = await compressImage(pendingFile, 1600, 0.75);
+                        newItem.fileName = fileToUpload.name;
+                        showToast('图片已压缩 ' + Math.round((1 - fileToUpload.size / pendingFile.size) * 100) + '%', false);
+                    } catch(e) { /* 压缩失败则上传原图 */ }
+                }
+
+                btnSubmitUpload.textContent = '⏳ 上传中...';
+                const fileUrl = await uploadFileToStorage(bucket, fileToUpload, currentUserId);
                 if (!fileUrl) { showToast('上传失败，请重试', true); btnSubmitUpload.textContent = '确认上传到画廊'; btnSubmitUpload.disabled = false; return; }
                 newItem.file = fileUrl;
-                let coverUrl = null;
-                if (pendingCoverFile) {
-                    coverUrl = await uploadFileToStorage('uploads', pendingCoverFile, currentUserId + '/covers');
+                newItem.optimized = fileUrl; // 压缩版本身就是优化版
+
+                let coverUrl = pendingCoverFile ? await uploadFileToStorage('uploads', pendingCoverFile, currentUserId + '/covers') : null;
+
+                // 🎬 视频自动生成封面
+                if (isVideo && !coverUrl) {
+                    btnSubmitUpload.textContent = '⏳ 生成封面...';
+                    try {
+                        const coverFile = await generateVideoCover(pendingFile, 2);
+                        coverUrl = await uploadFileToStorage('uploads', coverFile, currentUserId + '/covers');
+                    } catch(e) { /* 封面生成失败不影响上传 */ }
                 }
+
+                // 🖼 图片自动生成卡片缩略图
+                if (isImage && !coverUrl && fileToUpload.size > 100 * 1024) {
+                    try {
+                        const thumbFile = await compressImage(pendingFile, 600, 0.65);
+                        coverUrl = await uploadFileToStorage('uploads', thumbFile, currentUserId + '/covers');
+                    } catch(e) {}
+                }
+
+                newItem.cover = coverUrl || newItem.cover;
+
                 // Save metadata to Supabase
                 const { error: saveErr } = await supabase.from('uploads').insert({
                     user_id: currentUserId,
@@ -4082,7 +4166,6 @@ function updateNav(items) {
 
             uploadedItems.push(newItem);
 
-            // Don't revoke — we need the URL for display
             pendingObjectURL = null;
             pendingCoverURL = null; pendingCoverFile = null;
 
