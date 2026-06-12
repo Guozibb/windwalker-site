@@ -193,7 +193,7 @@
     <div class="login-card" id="loginCard">
         <!-- Logo -->
         <div class="login-logo" id="loginLogo">
-            <div class="logo-circle">🐟</div>
+            <div class="logo-circle">🧊</div>
             <h2>风之旅人</h2>
             <p>3D 模型资源库</p>
         </div>
@@ -695,16 +695,27 @@
             return { playClick, toggleMusic, toggleSfx, isMusicOn: ()=>musicOn, isSfxOn: ()=>sfxOn };
         })();
 
-        // 🎵 音乐开关按钮
+        // 🎵 音乐开关 + 🔊 音效开关
         const btnMusic = document.createElement('button');
         btnMusic.textContent = '🎵'; btnMusic.title = '背景音乐';
-        btnMusic.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.8);cursor:pointer;font-size:1.1rem;backdrop-filter:blur(10px);transition:0.3s;';
+        btnMusic.style.cssText = 'position:fixed;top:16px;right:66px;z-index:100;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.8);cursor:pointer;font-size:1.1rem;backdrop-filter:blur(10px);';
         document.body.appendChild(btnMusic);
         btnMusic.addEventListener('click', (e) => {
             e.stopPropagation();
             const on = AudioSys.toggleMusic();
             btnMusic.textContent = on ? '🎵' : '🔇';
             btnMusic.style.opacity = on ? '1' : '0.5';
+        });
+
+        const btnSfx = document.createElement('button');
+        btnSfx.textContent = '🔔'; btnSfx.title = '按键音效';
+        btnSfx.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.8);cursor:pointer;font-size:1rem;backdrop-filter:blur(10px);';
+        document.body.appendChild(btnSfx);
+        btnSfx.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const on = AudioSys.toggleSfx();
+            btnSfx.textContent = on ? '🔔' : '🔕';
+            btnSfx.style.opacity = on ? '1' : '0.5';
         });
 
         // 🔊 所有按钮自动加点击音效
