@@ -25,23 +25,11 @@
             --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        body.light {
-            --bg: #f0f5f0;
-            --surface: #ffffff;
-            --surface2: #f5faf6;
-            --border: #dce8df;
-            --text: #3d5445;
-            --text-muted: #8ba892;
-            --accent: #6dbd8a;
-            --accent2: #8fb5d6;
-            --accent-glow: rgba(109,189,138,0.15);
-        }
-
-        /* 四季主题 */
-        body.spring { --season-accent: #f0a8b8; --season-accent2: #e8c8d0; --petal-color: #ffd0dc; }
-        body.summer { --season-accent: #7dc8a0; --season-accent2: #a8d8c0; --petal-color: #b8e8c8; }
-        body.autumn { --season-accent: #e8a860; --season-accent2: #f0c090; --petal-color: #f0c080; }
-        body.winter { --season-accent: #b8d0e8; --season-accent2: #c8ddf0; --petal-color: #e0eaf5; }
+        /* 四季主题色 */
+        body.spring { --accent: #f0a0b8; --accent2: #e8c0d0; }
+        body.summer { --accent: #7dc8a0; --accent2: #a0d8b8; }
+        body.autumn { --accent: #e0a060; --accent2: #e8c090; }
+        body.winter { --accent: #a0c0e0; --accent2: #c0d8f0; }
 
         html { scroll-behavior: smooth; }
 
@@ -55,15 +43,6 @@
             transition: background 0.5s ease, color 0.5s ease;
         }
 
-        body.light .grid-bg { opacity: 0.04; }
-        body.light .header { background: rgba(255,255,255,0.85); }
-        body.light .model-card { background: var(--surface); }
-        body.light .model-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
-        body.light .lightbox { background: rgba(255,255,255,0.95); }
-        body.light .lightbox-close,
-        body.light .lb-nav { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #333; }
-        body.light .card-overlay { background: linear-gradient(transparent 45%, rgba(255,255,255,0.9) 100%); }
-        body.light .card-overlay .card-title { color: #1e293b; }
 
         /* Subtle dot-grid background */
         body::before {
@@ -1942,8 +1921,7 @@
                 </button>
                 <button class="btn-music" id="btnMusicToggle" title="音乐开关">🎵</button>
                 <button class="btn-sfx" id="btnSfxToggle" title="音效开关">🔔</button>
-                <button class="btn-theme" id="btnThemeToggle" title="切换主题">🌙</button>
-                <button class="btn-music" id="btnSeason" title="切换季节" style="font-size:0.85rem;">🌸</button>
+                <button class="btn-music" id="btnSeason" title="切换季节" style="font-size:0.9rem;">🌸</button>
                 <button class="btn-community" id="btnOpenFollowing" style="background:linear-gradient(135deg,#f97316,#ec4899);">👁 关注</button>
                 <button class="btn-community" id="btnOpenCommunity">🏛 广场</button>
                 <button class="btn-upload" id="btnOpenUpload">
@@ -3456,19 +3434,6 @@ function updateNav(items) {
             if (e.target.closest('button,.cat-btn,.model-card') && !e.target.closest('#btnMusicToggle,#btnSfxToggle')) AudioSys.chime();
         });
 
-        // ========== Theme Toggle ==========
-        const btnThemeToggle = document.getElementById('btnThemeToggle');
-        function applyTheme(isLight) {
-            document.body.classList.toggle('light', isLight);
-            btnThemeToggle.textContent = isLight ? '☀️' : '🌙';
-            localStorage.setItem('windwalker_theme', isLight ? 'light' : 'dark');
-        }
-        btnThemeToggle.addEventListener('click', () => {
-            applyTheme(!document.body.classList.contains('light'));
-        });
-        // Load saved theme
-        if (localStorage.getItem('windwalker_theme') === 'light') applyTheme(true);
-
         // ========== Community ==========
         const communityOverlay = document.getElementById('communityOverlay');
         const btnOpenCommunity = document.getElementById('btnOpenCommunity');
@@ -4337,56 +4302,46 @@ function updateNav(items) {
 
         // Auto-sync removed — Supabase handles persistence directly
 
-        // ========== 🌸 花瓣飘落动画 ==========
-        setTimeout(() => {
+        // ========== 🌸 花瓣飘落动画（轻量安全版） ==========
+        (function() {
             try {
-                const canvas = document.getElementById('petalCanvas');
-                if (!canvas) return;
-                const ctx = canvas.getContext('2d');
-                let W, H, petals = [];
-                function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-                resize(); window.addEventListener('resize', resize);
+                const cvs = document.getElementById('petalCanvas');
+                if (!cvs) return;
+                const ctx = cvs.getContext('2d');
+                let W=cvs.width=innerWidth, H=cvs.height=innerHeight, pts=[];
+                onresize = () => { W=cvs.width=innerWidth; H=cvs.height=innerHeight; };
 
-                let currentSeason = localStorage.getItem('ww_season') || 'spring';
-                const seasons = { spring:'🌸', summer:'🌿', autumn:'🍂', winter:'❄' };
-                const seasonNames = { spring:'春日·樱花', summer:'夏日·绿叶', autumn:'秋日·枫叶', winter:'冬日·飘雪' };
-                const seasonBtn = document.getElementById('btnSeason');
-                if (seasonBtn) seasonBtn.textContent = seasons[currentSeason];
-                document.body.classList.add(currentSeason);
+                const season = localStorage.getItem('ww_season')||'spring';
+                const icons = { spring:'🌸',summer:'🌿',autumn:'🍂',winter:'❄' };
+                const btn = document.getElementById('btnSeason');
+                if(btn) btn.textContent = icons[season];
+                document.body.className = season;
 
-                function createPetal() {
-                    const s = currentSeason;
-                    const shape = s==='winter' ? function(c,x,y,z){c.fillStyle='rgba(220,230,250,0.7)';c.beginPath();c.arc(x,y,z*3,0,Math.PI*2);c.fill();}
-                        : s==='autumn' ? function(c,x,y,z){c.fillStyle='rgba(220,140,60,0.6)';c.beginPath();c.arc(x,y,z*3,0,Math.PI*2);c.fill();}
-                        : s==='summer' ? function(c,x,y,z){c.fillStyle='rgba(140,200,140,0.5)';c.beginPath();c.ellipse(x,y,z*4,z*2,0,0,Math.PI*2);c.fill();}
-                        : function(c,x,y,z){c.fillStyle='rgba(255,180,200,0.5)';c.beginPath();c.ellipse(x,y,z*5,z*2.5,0,0,Math.PI*2);c.fill();};
-                    return {x:Math.random()*W, y:-20, s:Math.random()*0.7+0.3, vy:Math.random()*0.8+0.2, vx:(Math.random()-0.5)*0.6, shape};
+                const colors = { spring:'255,180,200', summer:'140,200,140', autumn:'220,140,60', winter:'200,220,240' };
+                function mkPetal() {
+                    return { x:Math.random()*W, y:-30, r:Math.random()*5+2, vy:Math.random()*1+0.3, vx:(Math.random()-0.5)*0.6, o:Math.random()*0.4+0.2 };
                 }
-                for (let i=0;i<30;i++) { const p=createPetal(); p.y=Math.random()*H; petals.push(p); }
+                for(let i=0;i<25;i++) { const p=mkPetal(); p.y=Math.random()*H; pts.push(p); }
 
-                let animId;
-                function animate() {
+                (function loop() {
                     ctx.clearRect(0,0,W,H);
-                    for (const p of petals) {
-                        p.y+=p.vy; p.x+=p.vx+Math.sin(p.y*0.015)*0.2;
-                        if(p.y>H+20){const n=createPetal();p.x=n.x;p.y=n.y;p.vy=n.vy;}
-                        ctx.globalAlpha=0.5; p.shape(ctx,p.x,p.y,p.s);
+                    const c = colors[season]||colors.spring;
+                    for(const p of pts) {
+                        p.y+=p.vy; p.x+=p.vx+Math.sin(p.y*0.01)*0.3;
+                        if(p.y>H+30){const n=mkPetal();p.x=n.x;p.y=n.y;}
+                        ctx.fillStyle=`rgba(${c},${p.o})`; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
                     }
-                    animId=requestAnimationFrame(animate);
-                }
-                animate();
+                    requestAnimationFrame(loop);
+                })();
 
-                if (seasonBtn) seasonBtn.addEventListener('click', () => {
+                if(btn) btn.onclick = () => {
                     const keys=['spring','summer','autumn','winter'];
-                    currentSeason=keys[(keys.indexOf(currentSeason)+1)%4];
-                    localStorage.setItem('ww_season',currentSeason);
-                    seasonBtn.textContent=seasons[currentSeason];
-                    document.body.classList.remove('spring','summer','autumn','winter');
-                    document.body.classList.add(currentSeason);
-                    petals=[]; for(let i=0;i<30;i++) petals.push(createPetal());
-                });
-            } catch(e) { console.warn('Petal animation error:', e.message); }
-        }, 500);
+                    const next=keys[(keys.indexOf(season)+1)%4];
+                    localStorage.setItem('ww_season',next);
+                    location.reload();
+                };
+            } catch(e) {}
+        })();
 
         init();
     })();
