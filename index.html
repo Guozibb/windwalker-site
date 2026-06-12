@@ -2099,24 +2099,6 @@
                 <img class="avatar-img" id="avatarImg" src="" alt="" style="display:none;">
                 <span class="avatar-edit-badge">✎</span>
                 <input type="file" class="avatar-input" id="avatarInput" accept="image/*">
-                <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center;" id="presetAvatars">
-                    <span class="preset-avatar" data-emoji="🐱" style="font-size:1.3rem;cursor:pointer;">🐱</span>
-                    <span class="preset-avatar" data-emoji="🐶" style="font-size:1.3rem;cursor:pointer;">🐶</span>
-                    <span class="preset-avatar" data-emoji="🐰" style="font-size:1.3rem;cursor:pointer;">🐰</span>
-                    <span class="preset-avatar" data-emoji="🐼" style="font-size:1.3rem;cursor:pointer;">🐼</span>
-                    <span class="preset-avatar" data-emoji="🦊" style="font-size:1.3rem;cursor:pointer;">🦊</span>
-                    <span class="preset-avatar" data-emoji="🐨" style="font-size:1.3rem;cursor:pointer;">🐨</span>
-                    <span class="preset-avatar" data-emoji="🐸" style="font-size:1.3rem;cursor:pointer;">🐸</span>
-                    <span class="preset-avatar" data-emoji="🐯" style="font-size:1.3rem;cursor:pointer;">🐯</span>
-                    <span class="preset-avatar" data-emoji="🐻" style="font-size:1.3rem;cursor:pointer;">🐻</span>
-                    <span class="preset-avatar" data-emoji="🐥" style="font-size:1.3rem;cursor:pointer;">🐥</span>
-                    <span class="preset-avatar" data-emoji="🌸" style="font-size:1.3rem;cursor:pointer;">🌸</span>
-                    <span class="preset-avatar" data-emoji="🌺" style="font-size:1.3rem;cursor:pointer;">🌺</span>
-                    <span class="preset-avatar" data-emoji="🍀" style="font-size:1.3rem;cursor:pointer;">🍀</span>
-                    <span class="preset-avatar" data-emoji="⭐" style="font-size:1.3rem;cursor:pointer;">⭐</span>
-                    <span class="preset-avatar" data-emoji="🌈" style="font-size:1.3rem;cursor:pointer;">🌈</span>
-                    <span class="preset-avatar" data-emoji="💖" style="font-size:1.3rem;cursor:pointer;">💖</span>
-                </div>
             </div>
             <input class="drawer-name" id="drawerName" value="风之旅人" maxlength="20" placeholder="你的昵称">
             <textarea class="drawer-bio" id="drawerBio" placeholder="写一句个人简介..." maxlength="80" rows="1">3D 模型创作者</textarea>
@@ -2773,8 +2755,80 @@ function updateNav(items) {
             }
         });
 
-        // Avatar upload - save immediately
-        avatarWrapper.addEventListener('click', () => avatarInput.click());
+        // 大头照头像（彩色渐变背景+可爱小图标）
+        const PRESET_AVATARS = [
+            { color: '#ffb8c6', icon: '🐱', bg: '#ffe0e5' },
+            { color: '#ffc8a0', icon: '🐶', bg: '#fff0e0' },
+            { color: '#f0c0e0', icon: '🐰', bg: '#fef0f8' },
+            { color: '#b8d8f0', icon: '🐼', bg: '#e0f0f8' },
+            { color: '#f0c8a0', icon: '🦊', bg: '#fff5e8' },
+            { color: '#c0e0c8', icon: '🐸', bg: '#e8f8e8' },
+            { color: '#e0d0b8', icon: '🐻', bg: '#faf0e0' },
+            { color: '#ffd0d0', icon: '🐥', bg: '#fff0f0' },
+            { color: '#d0c8f0', icon: '🦄', bg: '#f0ecff' },
+            { color: '#c8e8d0', icon: '🌿', bg: '#eaf8ec' },
+            { color: '#ffe0b0', icon: '⭐', bg: '#fff8e8' },
+            { color: '#e0d8f8', icon: '🌙', bg: '#f5f0ff' },
+        ];
+
+        function genPresetAvatar(color, icon, bg) {
+            return `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+                <rect width="200" height="200" rx="100" fill="${bg}"/>
+                <circle cx="100" cy="100" r="70" fill="${color}" opacity="0.6"/>
+                <text x="100" y="125" text-anchor="middle" font-size="65">${icon}</text>
+            </svg>`;
+        }
+
+        async function setPresetAvatar(color, icon, bg) {
+            if (!currentUserId) return;
+            const svg = genPresetAvatar(color, icon, bg);
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const file = new File([blob], 'avatar.svg', { type: 'image/svg+xml' });
+            const path = currentUserId + '_av.svg';
+            const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+            if (error) { showToast('设置失败: ' + error.message, true); return; }
+            const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+            const url = pub.publicUrl + '?t=' + Date.now();
+            avatarImg.src = url; avatarImg.style.display = 'block'; avatarPlaceholder.style.display = 'none';
+            currentUser.avatar_url = url;
+            await supabase.from('profiles').update({ avatar_url: url }).eq('id', currentUserId);
+            updateUserButton(); showToast('头像已更新！');
+        }
+
+        // 头像点击 → 弹出选择面板
+        avatarWrapper.addEventListener('click', (e) => {
+            if (e.target.closest('.avatar-edit-badge')) return; // badge triggers file input
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:24px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto;">
+                <h4 style="text-align:center;margin-bottom:16px;">更换头像</h4>
+                <button id="avUploadBtn" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:14px;cursor:pointer;font-weight:600;margin-bottom:12px;font-size:0.9rem;">🖼 从相册上传</button>
+                <div style="font-size:0.8rem;color:var(--text-muted);text-align:center;margin-bottom:8px;">— 或选择自带头像 —</div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+                    ${PRESET_AVATARS.map(a => {
+                        const svg = genPresetAvatar(a.color, a.icon, a.bg);
+                        const dataUrl = 'data:image/svg+xml;base64,' + btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_,p1) => String.fromCharCode('0x'+p1)));
+                        return `<div style="cursor:pointer;text-align:center;padding:6px;border-radius:12px;border:2px solid transparent;transition:all 0.2s;" class="preset-opt" data-color="${a.color}" data-icon="${a.icon}" data-bg="${a.bg}">
+                            <img src="${dataUrl}" style="width:60px;height:60px;border-radius:50%;display:block;margin:0 auto 4px;">
+                            <span style="font-size:0.65rem;">${a.icon}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+                <button id="avCloseBtn" style="display:block;margin:12px auto 0;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;">取消</button>
+            </div>`;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+            document.getElementById('avCloseBtn').addEventListener('click', () => overlay.remove());
+            document.getElementById('avUploadBtn').addEventListener('click', () => { overlay.remove(); avatarInput.click(); });
+            overlay.querySelectorAll('.preset-opt').forEach(opt => {
+                opt.addEventListener('click', async () => {
+                    opt.style.border = '2px solid var(--accent)';
+                    await setPresetAvatar(opt.dataset.color, opt.dataset.icon, opt.dataset.bg);
+                    overlay.remove();
+                });
+            });
+        });
+
         avatarInput.addEventListener('change', () => {
             const f = avatarInput.files[0];
             if (!f || !f.type.startsWith('image/')) return;
@@ -2786,31 +2840,6 @@ function updateNav(items) {
                 saveProfile(); updateUserButton();
             };
             reader.readAsDataURL(f);
-        });
-
-        // 预设头像选择
-        document.querySelectorAll('.preset-avatar').forEach(el => {
-            el.addEventListener('click', async () => {
-                const emoji = el.dataset.emoji;
-                // 生成可爱的 SVG 头像
-                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#fef5f7"/><text x="100" y="135" text-anchor="middle" font-size="100">${emoji}</text></svg>`;
-                const blob = new Blob([svg], { type: 'image/svg+xml' });
-                const file = new File([blob], 'avatar.svg', { type: 'image/svg+xml' });
-                // 上传到 Supabase Storage
-                const path = currentUserId + '_' + Date.now() + '.svg';
-                const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-                if (error) { showToast('头像设置失败: ' + error.message, true); return; }
-                const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
-                const url = pub.publicUrl;
-                // 更新本地和 Supabase
-                avatarImg.src = url;
-                avatarImg.style.display = 'block';
-                avatarPlaceholder.style.display = 'none';
-                currentUser.avatar_url = url;
-                await supabase.from('profiles').update({ avatar_url: url }).eq('id', currentUserId);
-                updateUserButton();
-                showToast('头像已更新！');
-            });
         });
 
         // Name / bio edit → save on blur
