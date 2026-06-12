@@ -1040,10 +1040,19 @@
         }
 
         .gallery-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
+            display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            gap: 16px;
+            padding-bottom: 12px;
+            scroll-behavior: smooth;
+            cursor: grab;
         }
+        .gallery-grid:active { cursor: grabbing; }
+        .gallery-grid::-webkit-scrollbar { height: 6px; }
+        .gallery-grid::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
 
         /* ========== Card ========== */
         .model-card {
@@ -1054,9 +1063,9 @@
             border: 1px solid var(--border);
             cursor: pointer;
             transition: var(--transition);
-            aspect-ratio: 16/11;
-            content-visibility: auto;
-            contain-intrinsic-size: 300px 206px;
+            flex: 0 0 300px;
+            height: 220px;
+            scroll-snap-align: start;
         }
 
         .model-card:hover {
@@ -1250,7 +1259,7 @@
 
         /* ========== No Results ========== */
         .no-results {
-            grid-column: 1 / -1;
+            flex: 1 0 100%;
             text-align: center;
             padding: 80px 20px;
             color: var(--text-muted);
@@ -1879,10 +1888,8 @@
             .search-wrapper input { width: 120px; }
             .search-wrapper input:focus { width: 160px; }
 
-            .gallery-grid {
-                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-                gap: 12px;
-            }
+            .gallery-grid { gap: 12px; }
+            .model-card { flex: 0 0 200px; height: 160px; }
 
             .btn-upload { padding: 8px 14px; font-size: 0.78rem; }
             .btn-upload .ulabel { display: none; }
@@ -1896,7 +1903,8 @@
         }
 
         @media (max-width: 480px) {
-            .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .gallery-grid { gap: 8px; }
+            .model-card { flex: 0 0 160px; height: 140px; }
             .cat-btn { padding: 5px 12px; font-size: 0.76rem; }
             .search-wrapper input { width: 90px; }
             .search-wrapper input:focus { width: 130px; }
@@ -4400,6 +4408,26 @@ function updateNav(items) {
         }
 
         // Auto-sync removed — Supabase handles persistence directly
+
+        // ========== 画廊拖拽滑动 ==========
+        (function() {
+            const grid = document.getElementById('galleryGrid');
+            let isDown = false, startX, scrollLeft;
+            grid.addEventListener('mousedown', e => {
+                if (e.target.closest('.card-quick-actions') || e.target.closest('button')) return;
+                isDown = true; grid.style.cursor = 'grabbing';
+                startX = e.pageX - grid.offsetLeft;
+                scrollLeft = grid.scrollLeft;
+            });
+            grid.addEventListener('mouseleave', () => { isDown = false; grid.style.cursor = 'grab'; });
+            grid.addEventListener('mouseup', () => { isDown = false; grid.style.cursor = 'grab'; });
+            grid.addEventListener('mousemove', e => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - grid.offsetLeft;
+                grid.scrollLeft = scrollLeft - (x - startX) * 2;
+            });
+        })();
 
         init();
     })();
