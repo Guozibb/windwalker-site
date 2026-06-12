@@ -3617,7 +3617,7 @@ function updateNav(items) {
             let mediaUrl = '';
             let mediaType = composerPendingType || null;
 
-            // Upload media (optional - fails silently if bucket missing)
+            // Upload media to Supabase Storage
             if (composerPendingFile) {
                 try {
                     const bucket = 'community-media';
@@ -3628,9 +3628,9 @@ function updateNav(items) {
                         const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(path);
                         mediaUrl = publicUrl.publicUrl;
                     } else {
-                        console.warn('Media upload failed (bucket may not exist):', uploadErr.message);
+                        showToast('图片上传失败: ' + uploadErr.message, true);
                     }
-                } catch(e) { console.warn('Media upload exception:', e.message); }
+                } catch(e) { showToast('图片上传异常: 请确认已创建 community-media 存储桶', true); }
             }
 
             const postId = await savePostToDb({ text, media: mediaUrl, mediaType });
@@ -3719,23 +3719,27 @@ function updateNav(items) {
             // Like handlers
             communityFeed.querySelectorAll('.post-like').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const pid = btn.dataset.postid;
-                    const dbPostId = parseInt(pid.replace('post_', ''));
-                    if (!dbPostId) return;
-                    const post = communityPosts.find(p => p.id === pid);
-                    if (!post) return;
-                    const alreadyLiked = post.likedBy.includes(currentUserId || uid);
-                    if (alreadyLiked) {
-                        await supabase.from('post_likes').delete().eq('post_id', dbPostId).eq('user_id', currentUserId);
-                        post.likes = Math.max(0, (post.likes||1) - 1);
-                        post.likedBy = post.likedBy.filter(id => id !== currentUserId);
-                    } else {
-                        await supabase.from('post_likes').insert({ post_id: dbPostId, user_id: currentUserId });
-                        post.likes = (post.likes||0) + 1;
-                        post.likedBy.push(currentUserId);
-                    }
-                    await supabase.from('community_posts').update({ likes_count: post.likes }).eq('id', dbPostId);
-                    renderFeed();
+                    try {
+                        const pid = btn.dataset.postid;
+                        const dbPostId = parseInt(pid.replace('post_', ''));
+                        if (!dbPostId) return;
+                        const post = communityPosts.find(p => p.id === pid);
+                        if (!post) return;
+                        const alreadyLiked = post.likedBy.includes(currentUserId || uid);
+                        if (alreadyLiked) {
+                            const { error: delErr } = await supabase.from('post_likes').delete().eq('post_id', dbPostId).eq('user_id', currentUserId);
+                            if (delErr) { console.warn('Unlike failed:', delErr.message); return; }
+                            post.likes = Math.max(0, (post.likes||1) - 1);
+                            post.likedBy = post.likedBy.filter(id => id !== currentUserId);
+                        } else {
+                            const { error: insErr } = await supabase.from('post_likes').insert({ post_id: dbPostId, user_id: currentUserId });
+                            if (insErr) { console.warn('Like failed:', insErr.message); showToast('点赞失败，请确认post_likes表已创建', true); return; }
+                            post.likes = (post.likes||0) + 1;
+                            post.likedBy.push(currentUserId);
+                        }
+                        await supabase.from('community_posts').update({ likes_count: post.likes }).eq('id', dbPostId);
+                        renderFeed();
+                    } catch(e) { console.warn('Like error:', e.message); }
                 });
             });
 
@@ -3774,20 +3778,23 @@ function updateNav(items) {
             // Comment submit (with image support)
             communityFeed.querySelectorAll('.comment-submit').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    if (!currentUserId) return;
-                    const pid = btn.dataset.postid;
-                    const input = communityFeed.querySelector(`.comment-input[data-postid="${pid}"]`);
-                    if (!input) return;
-                    const text = input.value.trim();
-                    const img = commentPendingImgs[pid] || null;
-                    if (!text && !img) return;
-                    const dbPostId = parseInt(pid.replace('post_', ''));
-                    if (!dbPostId) return;
-                    await supabase.from('post_comments').insert({
-                        post_id: dbPostId, author_id: currentUserId, text: text, image_url: img || ''
-                    });
-                    delete commentPendingImgs[pid];
-                    renderFeed();
+                    try {
+                        if (!currentUserId) return;
+                        const pid = btn.dataset.postid;
+                        const input = communityFeed.querySelector(`.comment-input[data-postid="${pid}"]`);
+                        if (!input) return;
+                        const text = input.value.trim();
+                        const img = commentPendingImgs[pid] || null;
+                        if (!text && !img) return;
+                        const dbPostId = parseInt(pid.replace('post_', ''));
+                        if (!dbPostId) return;
+                        const { error } = await supabase.from('post_comments').insert({
+                            post_id: dbPostId, author_id: currentUserId, text: text, image_url: img || ''
+                        });
+                        if (error) { showToast('评论失败: ' + error.message, true); return; }
+                        delete commentPendingImgs[pid];
+                        renderFeed();
+                    } catch(e) { console.warn('Comment error:', e.message); }
                 });
             });
 
