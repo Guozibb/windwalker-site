@@ -55,7 +55,7 @@ async function compressAll() {
         const thumbOut = path.join(thumbDir, name + '.webp');
         await sharp(srcPath)
             .resize(1200, undefined, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality: 65 })
+            .webp({ quality: 80 })
             .toFile(thumbOut);
         const thumbSize = fs.statSync(thumbOut).size;
 
