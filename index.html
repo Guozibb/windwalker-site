@@ -2594,15 +2594,16 @@ function updateNav(items) {
 
         // ========== Auth Check ==========
         async function requireAuth() {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) { window.location.href = 'login.html'; return null; }
+            // 先刷新 session token
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            const session = refreshData.session || (await supabase.auth.getSession()).data.session;
+            if (!session) { console.log('No session, redirecting to login'); window.location.href = 'login.html'; return null; }
             currentUserId = session.user.id;
             let { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
             if (!profile) {
-                // Profile missing — auto-create from auth metadata
                 const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'user';
                 const code = String(Math.floor(100000 + Math.random() * 900000));
-                await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code });
+                await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code }).catch(() => {});
                 profile = { id: currentUserId, username: username, bio: '', avatar_url: '', user_code: code, created_at: new Date().toISOString() };
             }
             currentUser = profile;
