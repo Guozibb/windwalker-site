@@ -558,60 +558,138 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ========== 🎨 鼠标互动粒子系统 ==========
+        // ========== 🐟 鱼塘背景 ==========
         const canvas = document.getElementById('particleCanvas');
         const ctx = canvas.getContext('2d');
-        let W, H, mx = -999, my = -999;
+        let W, H, mx = -999, my = -999, time = 0;
 
         function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
         resize(); window.addEventListener('resize', resize);
-
-        // 鼠标追踪
         document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
         document.addEventListener('mouseleave', () => { mx = -999; my = -999; });
-        // 移动端触摸
         document.addEventListener('touchmove', e => { mx = e.touches[0].clientX; my = e.touches[0].clientY; }, {passive:true});
 
-        const pts = [];
-        for (let i = 0; i < 60; i++) pts.push({ x: Math.random()*W, y: Math.random()*H, r: Math.random()*3+1, vx: 0, vy: 0, ox: Math.random()*W, oy: Math.random()*H });
-
-        function drawPts() {
-            ctx.clearRect(0, 0, W, H);
-            for (const p of pts) {
-                // 粒子向鼠标靠近
-                const dx = mx - p.x, dy = my - p.y, dist = Math.hypot(dx, dy) || 1;
-                if (dist < 200 && mx > 0) {
-                    p.vx += (dx / dist) * 0.08;
-                    p.vy += (dy / dist) * 0.08;
-                }
-                // 回到原始位置
-                p.vx += (p.ox - p.x) * 0.0005;
-                p.vy += (p.oy - p.y) * 0.0005;
-                p.vx *= 0.96; p.vy *= 0.96;
-                p.x += p.vx; p.y += p.vy;
-                if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
-                if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
-
-                // 连线
-                for (const q of pts) {
-                    const d = Math.hypot(p.x-q.x, p.y-q.y);
-                    if (d < 80) { ctx.strokeStyle = `rgba(125,211,168,${0.08*(1-d/80)})`; ctx.lineWidth=0.5; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); }
-                }
-                ctx.fillStyle = 'rgba(125,180,160,0.6)';
-                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
-            }
-            requestAnimationFrame(drawPts);
+        // 鱼
+        const fishes = [];
+        const fishColors = ['#f5a090','#f8c0a0','#ffe8d0','#f0c0b0','#ffd0c0','#e8c8b8'];
+        for (let i=0;i<4;i++) {
+            fishes.push({
+                x: Math.random()*W, y: 100+Math.random()*(H-200),
+                vx: (Math.random()-0.5)*1.5, vy: (Math.random()-0.5)*0.5,
+                size: 20+Math.random()*25, color: fishColors[i%fishColors.length],
+                tailPhase: Math.random()*6, facingLeft: Math.random()>0.5
+            });
         }
-        drawPts();
+        // 莲花
+        const lotuses = [];
+        for (let i=0;i<3;i++) lotuses.push({ x: Math.random()*W, y: 40+Math.random()*(H*0.3), size: 15+Math.random()*20, phase: Math.random()*6 });
+        // 水草
+        const plants = [];
+        for (let i=0;i<8;i++) plants.push({ x: Math.random()*W, h: 40+Math.random()*80, w: 5+Math.random()*8, phase: Math.random()*6 });
+        // 气泡
+        const bubbles = [];
+        function addBubble() { bubbles.push({ x:Math.random()*W, y:H+10, r:2+Math.random()*5, vy:0.3+Math.random()*0.5, o:0.3+Math.random()*0.4 }); }
+        for (let i=0;i<15;i++) { const b={x:Math.random()*W,y:Math.random()*H,r:2+Math.random()*5,vy:0,o:0};bubbles.push(b); }
+        // 涟漪
+        const ripples = [];
+        document.addEventListener('click', e => { ripples.push({ x:e.clientX, y:e.clientY, r:0, maxR:60, o:0.6 }); });
 
-        // ========== ✨ 点击涟漪效果 ==========
-        document.addEventListener('click', e => {
-            const ripple = document.createElement('div');
-            const size = 60;
-            ripple.style.cssText = `position:fixed;left:${e.clientX-size/2}px;top:${e.clientY-size/2}px;width:${size}px;height:${size}px;border-radius:50%;border:2px solid var(--accent);pointer-events:none;z-index:9999;animation:rippleOut 0.6s ease-out forwards;`;
-            document.body.appendChild(ripple);
-            setTimeout(() => ripple.remove(), 600);
-        });
+        function drawFish(f) {
+            ctx.save(); ctx.translate(f.x, f.y);
+            const dir = f.vx>0 ? 1 : -1;
+            ctx.scale(dir, 1);
+            // 身体
+            const grad = ctx.createRadialGradient(0,0,2,0,0,f.size);
+            grad.addColorStop(0,'#fff'); grad.addColorStop(0.4,f.color); grad.addColorStop(1,'rgba(0,0,0,0.1)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.ellipse(0,0,f.size,f.size*0.45,0,0,Math.PI*2); ctx.fill();
+            // 尾巴
+            ctx.fillStyle = f.color;
+            ctx.beginPath(); ctx.moveTo(-f.size*0.7,0);
+            ctx.quadraticCurveTo(-f.size*1.3, -f.size*0.4+Math.sin(time*0.15+f.tailPhase)*5, -f.size*1.1, -f.size*0.5);
+            ctx.quadraticCurveTo(-f.size*1.3, 0, -f.size*1.1, f.size*0.5);
+            ctx.quadraticCurveTo(-f.size*1.3, f.size*0.4+Math.sin(time*0.15+f.tailPhase)*5, -f.size*0.7, 0);
+            ctx.fill();
+            // 眼
+            ctx.fillStyle='#333'; ctx.beginPath(); ctx.arc(f.size*0.35,-f.size*0.1,f.size*0.12,0,7); ctx.fill();
+            ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(f.size*0.37,-f.size*0.12,f.size*0.04,0,7); ctx.fill();
+            // 鳍
+            ctx.strokeStyle = f.color; ctx.lineWidth=1.5; ctx.globalAlpha=0.5;
+            ctx.beginPath(); ctx.moveTo(0,-f.size*0.35); ctx.quadraticCurveTo(5,-f.size*0.55,0,-f.size*0.3); ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawLotus(l) {
+            ctx.save(); ctx.translate(l.x, l.y);
+            // 花瓣
+            const petalCount = 6;
+            for (let i=0;i<petalCount;i++) {
+                const a = i*Math.PI*2/petalCount + Math.sin(time*0.02+l.phase)*0.1;
+                ctx.fillStyle = `rgba(255,200,210,0.7)`;
+                ctx.beginPath(); ctx.ellipse(Math.cos(a)*l.size*0.5, Math.sin(a)*l.size*0.5, l.size*0.4, l.size*0.25, a, 0, Math.PI*2); ctx.fill();
+            }
+            // 花心
+            ctx.fillStyle='#f0e080'; ctx.beginPath(); ctx.arc(0,0,l.size*0.25,0,7); ctx.fill();
+            // 莲叶
+            ctx.fillStyle='rgba(120,190,140,0.6)';
+            ctx.beginPath(); ctx.ellipse(0, l.size*0.3, l.size*1.2, l.size*0.6, 0, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPlant(p) {
+            ctx.strokeStyle='rgba(100,180,120,0.5)'; ctx.lineWidth=p.w; ctx.lineCap='round';
+            ctx.beginPath(); ctx.moveTo(p.x, H);
+            for (let i=0;i<4;i++) {
+                const t = i/4;
+                const sway = Math.sin(time*0.03+p.phase+i)*15;
+                ctx.lineTo(p.x+sway, H-p.h*t);
+            }
+            ctx.stroke();
+        }
+
+        function drawPond() {
+            ctx.clearRect(0,0,W,H);
+            // 水背景渐变
+            const water = ctx.createLinearGradient(0,0,0,H);
+            water.addColorStop(0,'#d4eaf0'); water.addColorStop(0.3,'#c8e8f0'); water.addColorStop(0.7,'#b0d8e8'); water.addColorStop(1,'#90c0d8');
+            ctx.fillStyle=water; ctx.fillRect(0,0,W,H);
+            // 水面波纹
+            for (let x=0;x<W;x+=60) {
+                const y = 20+Math.sin(time*0.05+x*0.05)*3;
+                ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+                ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+40,y+Math.sin(time*0.05+(x+40)*0.05)*3); ctx.stroke();
+            }
+            // 水草
+            for (const p of plants) drawPlant(p);
+            // 鱼
+            for (const f of fishes) {
+                const dx=mx-f.x, dy=my-f.y, dist=Math.hypot(dx,dy)||1;
+                if (dist<180 && mx>0) { f.vx+=(dx/dist)*0.04; f.vy+=(dy/dist)*0.04; }
+                f.vx+=(Math.random()-0.5)*0.1; f.vy+=(Math.random()-0.5)*0.05;
+                f.vx*=0.98; f.vy*=0.98;
+                f.x+=f.vx; f.y+=f.vy;
+                if (f.x<-60) f.x=W+60; if (f.x>W+60) f.x=-60;
+                if (f.y<30) f.y=30; if (f.y>H-30) f.y=H-30;
+                drawFish(f);
+            }
+            // 莲花
+            for (const l of lotuses) { l.x+=Math.sin(time*0.01+l.phase)*0.2; l.y+=Math.cos(time*0.015+l.phase)*0.15; drawLotus(l); }
+            // 气泡
+            for (let i=bubbles.length-1;i>=0;i--) {
+                const b=bubbles[i]; b.y-=b.vy; b.x+=Math.sin(time*0.03+i)*0.3;
+                if (b.y<-20) { b.y=H+10; b.x=Math.random()*W; }
+                ctx.fillStyle=`rgba(255,255,255,${b.o})`; ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,7); ctx.fill();
+            }
+            if (Math.random()<0.03) addBubble();
+            // 涟漪
+            for (let i=ripples.length-1;i>=0;i--) {
+                const r=ripples[i]; r.r+=1.5; r.o-=0.015;
+                if (r.o<=0) { ripples.splice(i,1); continue; }
+                ctx.strokeStyle=`rgba(255,255,255,${r.o})`; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,7); ctx.stroke();
+            }
+            time++; requestAnimationFrame(drawPond);
+        }
+        drawPond();
 
         // ========== 🔐 密码错误抖动 ==========
         function shakeForm() {
