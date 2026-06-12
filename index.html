@@ -3497,6 +3497,7 @@ function updateNav(items) {
         async function savePostToDb(post) {
             if (!currentUserId) { showToast('请先登录再发帖', true); return null; }
             try {
+                console.log('savePostToDb: author_id=' + currentUserId + ' text=' + (post.text || '').substring(0, 20));
                 const { data, error } = await supabase.from('community_posts').insert({
                     author_id: currentUserId,
                     text: post.text || '',
@@ -3505,13 +3506,14 @@ function updateNav(items) {
                     likes_count: 0
                 }).select('id').single();
                 if (error) {
-                    console.error('Post insert error:', error);
-                    showToast('发布失败: ' + (error.message || '未知错误'), true);
+                    console.error('Post insert error:', JSON.stringify(error));
+                    showToast('发布失败: ' + (error.message || error.code || JSON.stringify(error)), true);
                     return null;
                 }
+                console.log('Post saved, id=' + data.id);
                 return data.id;
             } catch(e) {
-                console.error('Post exception:', e);
+                console.error('Post exception:', e.message, e);
                 showToast('发布异常: ' + (e.message || '网络错误'), true);
                 return null;
             }
