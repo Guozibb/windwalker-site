@@ -3686,6 +3686,11 @@ function updateNav(items) {
                 }else{
                     await supabase.from('post_likes').insert({post_id:pid,user_id:currentUserId});
                     post.likes++; post.likedBy=[...(post.likedBy||[]),currentUserId];
+                    // 通知帖主
+                    const { data: cp } = await supabase.from('community_posts').select('author_id').eq('id',pid).single();
+                    if (cp && cp.author_id !== currentUserId) {
+                        await supabase.from('notifications').insert({user_id:cp.author_id,type:'like',from_user_id:currentUserId,text:'赞了你的帖子',read:false});
+                    }
                 }
                 await supabase.from('community_posts').update({likes_count:post.likes}).eq('id',pid);
                 renderPlaza();
@@ -3701,6 +3706,11 @@ function updateNav(items) {
                 const pid=parseInt(b.dataset.pid); if(!pid) return;
                 const {error}=await supabase.from('post_comments').insert({post_id:pid,author_id:currentUserId,text:input.value.trim()});
                 if(error){showToast('回复失败: '+error.message,true);return;}
+                // 通知帖主
+                const { data: cp } = await supabase.from('community_posts').select('author_id').eq('id',pid).single();
+                if (cp && cp.author_id !== currentUserId) {
+                    await supabase.from('notifications').insert({user_id:cp.author_id,type:'comment',from_user_id:currentUserId,text:'回复了你的帖子',read:false});
+                }
                 renderPlaza();
             }));
             // 删除
@@ -3729,34 +3739,41 @@ function updateNav(items) {
 
         async function renderFollowingFeed() {
             if (!currentUserId) return;
-            const { data } = await supabase.from('follows').select('following:following_id(username)').eq('follower_id', currentUserId);
-            const following = (data||[]).map(d => d.following?.username).filter(Boolean);
+            const { data } = await supabase.from('follows').select('following:following_id(username,id,avatar_url)').eq('follower_id', currentUserId);
+            const following = (data||[]).map(d => d.following).filter(Boolean);
             if (!following.length) {
                 followingFeedEl.innerHTML = '<div class="community-empty">你还没有关注任何人<br>去广场或搜索关注创作者吧！</div>';
                 return;
             }
-            const all = allItems();
-            const followedWorks = all.filter(m => m.author && following.includes(m.author));
-            if (!followedWorks.length) {
-                followingFeedEl.innerHTML = '<div class="community-empty">关注的用户还没有发布作品</div>';
+            const followingNames = following.map(f => f.username);
+            // 查关注的用户的广场帖子和上传作品
+            const followingIds = following.map(f => f.id);
+            const { data: posts } = await supabase.from('community_posts').select('*, author:author_id(username,avatar_url)').in('author_id', followingIds).order('created_at', { ascending: false }).limit(30);
+            const { data: works } = await supabase.from('uploads').select('*').in('user_id', followingIds).order('created_at', { ascending: false }).limit(20);
+
+            const items = [];
+            (posts||[]).forEach(p => {
+                items.push({ type:'post', title: p.text||'分享了一条动态', author: p.author?.username||'未知', avatar: p.author?.avatar_url||'', time: new Date(p.created_at).getTime(), media: p.media_url, mediaType: p.media_type });
+            });
+            (works||[]).forEach(w => {
+                items.push({ type:'work', title: w.title, author: following.find(f=>f.id===w.user_id)?.username||'未知', avatar: '', time: new Date(w.created_at).getTime(), media: w.cover_url||w.file_url, mediaType: w.file_type });
+            });
+            items.sort((a,b) => b.time - a.time);
+
+            if (!items.length) {
+                followingFeedEl.innerHTML = '<div class="community-empty">关注的用户还没有发布内容</div>';
                 return;
             }
-            followingFeedEl.innerHTML = followedWorks.slice(0, 30).map(m => {
-                const thumb = m.type === 'video' ? '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px;font-size:2rem;">▶</div>'
-                    : m.type === 'model' ? '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px;font-size:2rem;">🧊</div>'
-                    : `<img src="${m.file}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">`;
-                return `<div class="post-card" data-wid="${m.id}" style="cursor:pointer;">
-                    <div class="post-header"><div class="post-avatar">${(m.author||'?').charAt(0)}</div>
-                    <div class="post-meta"><div class="post-name">${m.author||'风之旅人'}</div><div class="post-time">${m.cat}${m.subCat?' · '+m.subCat:''}</div></div></div>
-                    <div style="display:flex;gap:10px;"><div style="width:160px;flex-shrink:0;">${thumb}</div>
-                    <div style="flex:1;"><div style="font-weight:600;margin-bottom:4px;">${m.title}</div></div></div>
+            followingFeedEl.innerHTML = items.slice(0, 40).map(m => {
+                const t = new Date(m.time).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                const thumb = m.media ? (m.mediaType==='video' ? '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px;font-size:2rem;">▶</div>' : `<img src="${m.media}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">`) : '';
+                return `<div class="post-card">
+                    <div class="post-header"><div class="post-avatar">${m.avatar?`<div style="width:100%;height:100%;background-image:url(${m.avatar});background-size:cover;border-radius:50%;"></div>`:(m.author||'?')[0]}</div>
+                    <div class="post-meta"><div class="post-name">${m.author}</div><div class="post-time">${t} · ${m.type==='post'?'广场':'上传'}</div></div></div>
+                    <div style="display:flex;gap:10px;">${thumb?`<div style="width:160px;flex-shrink:0;">${thumb}</div>`:''}
+                    <div style="flex:1;"><div style="font-weight:600;margin-bottom:4px;">${m.title||''}</div></div></div>
                 </div>`;
             }).join('');
-            followingFeedEl.querySelectorAll('.post-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const wid = card.dataset.wid;
-                    const id = wid && wid.startsWith('upload_') ? wid : parseInt(wid);
-                    followingOverlay.classList.remove('open');
                     document.body.style.overflow = '';
                     setTimeout(() => openLightbox(id), 300);
                 });
