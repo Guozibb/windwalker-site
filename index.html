@@ -2858,21 +2858,20 @@ function updateNav(items) {
 
         function refreshDrawerWorks() {
             const all = allItems();
+            const me = currentUser?.username || '';
+            // 只显示当前用户的作品
+            const myUploads = uploadedItems.filter(m => m.author === me);
             const liked = UserActions.getLikedItems(all);
             const booked = UserActions.getBookmarkedItems(all);
-            drawerWorkCount.textContent = all.length;
-            drawerUploadCount.textContent = uploadedItems.length;
 
-            // Update only work/like/book counts (don't overwrite follow/fans/friends)
-            drawerWorkCount.textContent = all.length;
-            drawerUploadCount.textContent = uploadedItems.length;
+            drawerWorkCount.textContent = myUploads.length;
+            drawerUploadCount.textContent = myUploads.length;
 
             // Select items based on active tab
-            const myWorks = uploadedItems.filter(m => m.isUpload);
             let showItems;
             if (drawerActiveTab === 'likes') showItems = liked;
             else if (drawerActiveTab === 'bookmarks') showItems = booked;
-            else showItems = myWorks;
+            else showItems = myUploads;
 
             const emptyMsgs = { works: '还没有上传作品<br>点击 ⬆ 上传 发布你的第一个作品', likes: '还没有点赞的作品<br>去资源中心逛逛吧', bookmarks: '还没有收藏的作品<br>去资源中心逛逛吧' };
 
@@ -2882,8 +2881,8 @@ function updateNav(items) {
             }
 
             drawerWorksGrid.innerHTML = showItems.slice(0, 30).map(m => {
-                const isUploaded = m.isUpload;
-                const delBtn = isUploaded ? `<button class="drawer-work-delete" data-delete="${m.id}" title="删除">✕</button>` : '';
+                const isMine = m.author === me;
+                const delBtn = isMine && m.isUpload ? `<button class="drawer-work-delete" data-delete="${m.id}" title="删除">✕</button>` : '';
                 if (m.type === 'video') {
                     return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}<div class="work-type-icon">▶</div></div>`;
                 }
