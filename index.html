@@ -2597,12 +2597,13 @@ function updateNav(items) {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return null; }
             currentUserId = session.user.id;
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
+            let { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
             if (!profile) {
-                // Profile not found — sign out and redirect
-                await supabase.auth.signOut();
-                window.location.href = 'login.html';
-                return null;
+                // Profile missing — auto-create from auth metadata
+                const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'user';
+                const code = String(Math.floor(100000 + Math.random() * 900000));
+                await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code });
+                profile = { id: currentUserId, username: username, bio: '', avatar_url: '', user_code: code, created_at: new Date().toISOString() };
             }
             currentUser = profile;
             return profile;
