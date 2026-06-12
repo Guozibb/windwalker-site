@@ -87,6 +87,7 @@
             position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px);
             background: #fff; border-radius: 11px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); z-index: 0;
+            pointer-events: none;
         }
         .login-tabs.register-active .tab-slider { transform: translateX(100%); }
         .login-tabs.register-active .login-tab:first-child { color: #94a3b8; }
@@ -626,9 +627,9 @@
             t._tid = setTimeout(() => t.classList.remove('show'), 2500);
         }
 
-        // ========== Pure Music Audio System (Login) ==========
+        // ========== 🎵 背景轻音乐 + 🔊 按键音效 ==========
         const AudioSys = (function() {
-            let ctx = null, musicNodes = null, musicOn = true, musicVolume = 0.015;
+            let ctx = null, musicOn = true, sfxOn = true;
 
             function ensureCtx() {
                 if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -636,124 +637,79 @@
                 return ctx;
             }
 
-            // Soft chime
-            function chime() {
+            // 🔊 点击音效（轻柔水滴声）
+            function playClick() {
+                if (!sfxOn) return;
                 try {
                     const c = ensureCtx(), t = c.currentTime;
-                    const n = [523, 659, 784][Math.floor(Math.random() * 3)];
                     const o = c.createOscillator(), g = c.createGain();
-                    o.type = 'sine'; o.frequency.value = n;
-                    g.gain.setValueAtTime(0, t);
-                    g.gain.linearRampToValueAtTime(0.05, t + 0.02);
-                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                    o.type = 'sine'; o.frequency.setValueAtTime(800, t); o.frequency.exponentialRampToValueAtTime(400, t+0.08);
+                    g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.08);
                     o.connect(g).connect(c.destination);
-                    o.start(t); o.stop(t + 0.35);
-                } catch(e){}
+                    o.start(t); o.stop(t+0.08);
+                } catch(e) {}
             }
 
-            // Gentle pure music melody (slower, lower volume for login)
+            // 🎵 背景轻音乐（卡林巴/八音盒风格）
             const MELODY = [
-                { n: 262, d: 1.2 },{ n: 330, d: 0.8 },{ n: 392, d: 1.0 },{ n: 330, d: 0.6 },
-                { n: 294, d: 0.8 },{ n: 262, d: 1.0 },{ n: 220, d: 0.7 },{ n: 262, d: 1.4 },
-                { n: 330, d: 0.9 },{ n: 294, d: 0.7 },{ n: 262, d: 1.0 },{ n: 196, d: 1.2 },
+                { n:523, d:1.2 },{ n:659, d:0.8 },{ n:784, d:1.0 },{ n:659, d:0.6 },
+                { n:587, d:0.8 },{ n:523, d:1.0 },{ n:440, d:0.7 },{ n:523, d:1.4 },
+                { n:659, d:0.9 },{ n:587, d:0.7 },{ n:523, d:1.0 },{ n:392, d:1.2 },
+                { n:440, d:0.8 },{ n:523, d:1.0 },{ n:587, d:0.7 },{ n:659, d:1.5 },
+                { n:784, d:0.6 },{ n:880, d:0.8 },{ n:784, d:1.0 },{ n:659, d:0.7 },
+                { n:523, d:1.0 },{ n:587, d:0.7 },{ n:523, d:1.2 },{ n:440, d:1.4 },
             ];
-            let mIdx = 0, mTimer = null;
+            let mIdx = 0, mTimer = null, mNodes = null;
 
             function playNote() {
-                if (!musicOn || !musicNodes) return;
+                if (!musicOn) return;
                 try {
-                    const c = ensureCtx();
-                    const { n, d } = MELODY[mIdx];
+                    const c = ensureCtx(), { n, d } = MELODY[mIdx];
                     const o = c.createOscillator(), g = c.createGain();
-                    o.type = 'sine'; o.frequency.value = n;
-                    const dur = d * 0.7;
+                    o.type = 'triangle'; o.frequency.value = n;
+                    const dur = d*0.65;
                     g.gain.setValueAtTime(0, c.currentTime);
-                    g.gain.linearRampToValueAtTime(musicVolume * 3, c.currentTime + 0.08);
-                    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
-                    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 800;
-                    o.connect(g).connect(f).connect(c.destination);
-                    o.start(); o.stop(c.currentTime + dur + 0.1);
-                    mIdx = (mIdx + 1) % MELODY.length;
-                    mTimer = setTimeout(playNote, d * 1000);
-                } catch(e){ mTimer = setTimeout(playNote, 800); }
+                    g.gain.linearRampToValueAtTime(0.025, c.currentTime+0.06);
+                    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime+dur);
+                    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1200; f.Q.value = 3;
+                    const dly = c.createDelay(0.2); dly.delayTime.value = 0.15;
+                    const fbg = c.createGain(); fbg.gain.value = 0.3;
+                    o.connect(g).connect(f);
+                    f.connect(c.destination);
+                    f.connect(dly); dly.connect(fbg); fbg.connect(f);
+                    o.start(); o.stop(c.currentTime+dur+0.2);
+                    mIdx = (mIdx+1)%MELODY.length;
+                    mTimer = setTimeout(playNote, d*950);
+                } catch(e) { mTimer = setTimeout(playNote, 1000); }
             }
 
-            function startMusic() {
-                if (musicNodes) return;
-                try {
-                    const c = ensureCtx();
-                    const pad = c.createOscillator(), pg = c.createGain();
-                    pad.type = 'sine'; pad.frequency.value = 55;
-                    pg.gain.value = musicVolume * 1.0;
-                    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 150;
-                    pad.connect(pg).connect(f).connect(c.destination);
-                    pad.start();
-                    musicNodes = { pad, pg, f };
-                    mIdx = 0; playNote();
-                } catch(e){}
-            }
+            function startMusic() { if (mTimer) return; mIdx = 0; playNote(); }
+            function stopMusic() { if (mTimer) { clearTimeout(mTimer); mTimer = null; } }
+            function toggleMusic() { musicOn = !musicOn; musicOn ? startMusic() : stopMusic(); return musicOn; }
+            function toggleSfx() { sfxOn = !sfxOn; return sfxOn; }
 
-            function stopMusic() {
-                if (mTimer) { clearTimeout(mTimer); mTimer = null; }
-                if (!musicNodes) return;
-                try { Object.values(musicNodes).forEach(n => { try{n.stop?.()}catch(e){} try{n.disconnect?.()}catch(e){} }); } catch(e){}
-                musicNodes = null;
-            }
+            document.addEventListener('click', function once() {
+                if (musicOn) startMusic();
+            }, { once: true });
 
-            function setVolume(v) {
-                musicVolume = Math.max(0.003, Math.min(0.04, v));
-                if (musicNodes) musicNodes.pg.gain.value = musicVolume * 1.0;
-            }
-
-            function toggle() { musicOn = !musicOn; musicOn ? startMusic() : stopMusic(); return musicOn; }
-            function initOnTouch() { if (musicOn) startMusic(); }
-
-            return { chime, toggle, isOn: ()=>musicOn, initOnTouch, setVolume, startMusic, stopMusic };
+            return { playClick, toggleMusic, toggleSfx, isMusicOn: ()=>musicOn, isSfxOn: ()=>sfxOn };
         })();
 
-        // Volume slider & toggle
-        const btnMusicMini = document.getElementById('btnMusicMini');
-        let volSliderEl = null;
-
-        btnMusicMini.addEventListener('click', e => {
+        // 🎵 音乐开关按钮
+        const btnMusic = document.createElement('button');
+        btnMusic.textContent = '🎵'; btnMusic.title = '背景音乐';
+        btnMusic.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.8);cursor:pointer;font-size:1.1rem;backdrop-filter:blur(10px);transition:0.3s;';
+        document.body.appendChild(btnMusic);
+        btnMusic.addEventListener('click', (e) => {
             e.stopPropagation();
-            const on = AudioSys.toggle();
-            btnMusicMini.textContent = on ? '🎵' : '🔇';
-            btnMusicMini.classList.toggle('muted', !on);
+            const on = AudioSys.toggleMusic();
+            btnMusic.textContent = on ? '🎵' : '🔇';
+            btnMusic.style.opacity = on ? '1' : '0.5';
         });
 
-        // Long press or right click for volume control
-        btnMusicMini.addEventListener('contextmenu', e => {
-            e.preventDefault();
-            showVolumeSlider();
-        });
-        btnMusicMini.addEventListener('dblclick', e => {
-            e.stopPropagation();
-            showVolumeSlider();
-        });
-
-        function showVolumeSlider() {
-            if (volSliderEl) { volSliderEl.remove(); volSliderEl = null; return; }
-            volSliderEl = document.createElement('input');
-            volSliderEl.type = 'range';
-            volSliderEl.min = '0.3'; volSliderEl.max = '4'; volSliderEl.step = '0.1';
-            volSliderEl.value = '1.5';
-            volSliderEl.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;width:200px;accent-color:#38bdf8;';
-            volSliderEl.addEventListener('input', () => {
-                AudioSys.setVolume(parseFloat(volSliderEl.value) * 0.01);
-            });
-            document.body.appendChild(volSliderEl);
-            setTimeout(() => { if (volSliderEl) { volSliderEl.remove(); volSliderEl = null; } }, 5000);
-        }
-
-        document.addEventListener('click', function once() { AudioSys.initOnTouch(); }, { once: true });
+        // 🔊 所有按钮自动加点击音效
         document.addEventListener('click', e => {
-            if (e.target.closest('button') && !e.target.closest('#btnMusicMini') && !e.target.closest('input')) AudioSys.chime();
-        });
-
-        // ========== Social ==========
-        document.querySelectorAll('.social-btn').forEach(b => {
-            b.addEventListener('click', () => showToast('第三方登录开发中', 'err'));
+            if (e.target.closest('button') || e.target.closest('a')) AudioSys.playClick();
         });
     })();
     </script>
