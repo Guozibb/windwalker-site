@@ -3494,17 +3494,26 @@ function updateNav(items) {
             return result;
         }
         async function savePostToDb(post) {
-            // Determine author UUID from username
-            const authorId = currentUserId;
-            const { data, error } = await supabase.from('community_posts').insert({
-                author_id: authorId,
-                text: post.text,
-                media_url: post.media || '',
-                media_type: post.mediaType || null,
-                likes_count: 0
-            }).select('id').single();
-            if (error) { showToast('发布失败: ' + error.message, true); return null; }
-            return data.id;
+            if (!currentUserId) { showToast('请先登录再发帖', true); return null; }
+            try {
+                const { data, error } = await supabase.from('community_posts').insert({
+                    author_id: currentUserId,
+                    text: post.text || '',
+                    media_url: post.media || '',
+                    media_type: post.mediaType || null,
+                    likes_count: 0
+                }).select('id').single();
+                if (error) {
+                    console.error('Post insert error:', error);
+                    showToast('发布失败: ' + (error.message || '未知错误'), true);
+                    return null;
+                }
+                return data.id;
+            } catch(e) {
+                console.error('Post exception:', e);
+                showToast('发布异常: ' + (e.message || '网络错误'), true);
+                return null;
+            }
         }
 
         // Sync user profile to community
