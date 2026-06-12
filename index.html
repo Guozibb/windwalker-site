@@ -4156,7 +4156,7 @@ function updateNav(items) {
                 newItem.cover = coverUrl || newItem.cover;
 
                 // Save metadata to Supabase
-                const { error: saveErr } = await supabase.from('uploads').insert({
+                const { data: insertedRow, error: saveErr } = await supabase.from('uploads').insert({
                     user_id: currentUserId,
                     title: newItem.title,
                     category: newItem.cat,
@@ -4165,8 +4165,11 @@ function updateNav(items) {
                     file_url: fileUrl,
                     cover_url: coverUrl || '',
                     file_name: newItem.fileName
-                });
-                if (saveErr) { showToast('保存失败: ' + saveErr.message, true); btnSubmitUpload.textContent = '确认上传到画廊'; btnSubmitUpload.disabled = false; return; }
+                }).select('id').single();
+                if (saveErr || !insertedRow) { showToast('保存失败: ' + (saveErr?.message || '未知错误'), true); btnSubmitUpload.textContent = '确认上传到画廊'; btnSubmitUpload.disabled = false; return; }
+                // 用数据库真实 ID 替换临时时间戳 ID
+                newItem.id = 'upload_' + insertedRow.id;
+                newItem.persisted = true;
             }
 
             uploadedItems.push(newItem);
