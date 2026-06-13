@@ -207,7 +207,8 @@ function startMusic(){
     try{
         if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
         if(audioCtx.state==='suspended')audioCtx.resume();
-        musicGain=audioCtx.createGain();musicGain.gain.value=0.08;musicGain.connect(audioCtx.destination);
+        let vol=parseFloat(localStorage.getItem('ww_music_vol')||'0.6');
+        musicGain=audioCtx.createGain();musicGain.gain.value=vol;musicGain.connect(audioCtx.destination);
         const notes=getMusicNotes(theme);
         function playNote(){
             if(!musicEnabled||!audioCtx||!musicGain)return;
@@ -227,12 +228,24 @@ function startMusic(){
 }
 function stopMusic(){if(musicTimer){clearTimeout(musicTimer);musicTimer=null;}if(musicGain){try{musicGain.disconnect();}catch(_){}}musicGain=null;if(musicIdx)musicIdx=0;}
 
-// 🎵 音乐开关
+// 🎵 音乐开关 + 音量滑块
 document.getElementById('musicToggle').addEventListener('click',()=>{
     musicEnabled=!musicEnabled;
     document.getElementById('musicToggle').textContent=musicEnabled?'🎵':'🔇';
+    document.getElementById('volSlider').style.display=musicEnabled?'block':'none';
     if(musicEnabled)startMusic();else stopMusic();
 });
+const volSlider=document.createElement('input');
+volSlider.type='range';volSlider.id='volSlider';volSlider.min='0';volSlider.max='1';volSlider.step='0.05';
+volSlider.value=localStorage.getItem('ww_music_vol')||'0.6';
+volSlider.style.cssText='position:fixed;top:56px;right:114px;z-index:101;width:80px;accent-color:#74b9ff;display:none;';
+document.body.appendChild(volSlider);
+volSlider.addEventListener('input',()=>{
+    const v=parseFloat(volSlider.value);
+    localStorage.setItem('ww_music_vol',v);
+    if(musicGain)musicGain.gain.value=v;
+});
+if(musicEnabled)volSlider.style.display='block';
 // 🔊 音效开关（已有按钮 darkToggle，作为音效切换）
 const sfxToggleBtn=document.createElement('button');
 sfxToggleBtn.className='dark-toggle';sfxToggleBtn.id='sfxToggle';sfxToggleBtn.title='音效开关';
@@ -282,7 +295,7 @@ function drawSky(){
         const ox=mx>0?(mx/W-0.5)*20*(i+1)*0.25:Math.sin(time*0.002+i)*10;
         const oy=my>0?(my/H-0.5)*10*(i+1)*0.2:Math.cos(time*0.0025+i)*5;
         const cx=c.x+ox,cy=c.y+oy;
-        ctx.fillStyle='rgba(255,255,255,0.75)';
+        ctx.fillStyle='rgba(255,255,255,0.92)';
         const parts=[{dx:0,dy:0,r:c.h*0.55},{dx:-c.w*0.25,dy:c.h*0.05,r:c.h*0.35},{dx:c.w*0.25,dy:c.h*0.05,r:c.h*0.35},{dx:-c.w*0.12,dy:-c.h*0.3,r:c.h*0.3},{dx:c.w*0.12,dy:-c.h*0.3,r:c.h*0.3},{dx:0,dy:-c.h*0.38,r:c.h*0.26}];
         parts.forEach(p=>{ctx.beginPath();ctx.arc(cx+p.dx,cy+p.dy,p.r,0,Math.PI*2);ctx.fill();});
     });
@@ -313,7 +326,7 @@ let duneOff1=0,duneOff2=0;
 function drawDesert(){
     const g=ctx.createLinearGradient(0,0,0,H);
     const isDark=document.body.classList.contains('dark');
-    if(isDark){g.addColorStop(0,'#1a1208');g.addColorStop(0.5,'#2d1f0e');g.addColorStop(1,'#3d2a14');}
+    if(isDark){g.addColorStop(0,'#2a1f18');g.addColorStop(0.5,'#3d2e22');g.addColorStop(1,'#4d3a2a');}
     else{g.addColorStop(0,'#fff3e0');g.addColorStop(0.5,'#ffe0b2');g.addColorStop(1,'#ffcc80');}
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     duneOff1+=0.2;duneOff2+=0.4;
@@ -337,15 +350,18 @@ function drawParticles(){
         if(theme==='desert'){if(p.x>W+20){p.x=-10;p.y=Math.random()*H*0.7;}}
         return p.y>-30&&p.y<H+30&&p.x>-30&&p.x<W+30;
     });
+    const isDark=document.body.classList.contains('dark');
     particles.forEach(p=>{
         const c=theme==='sky'?'255,255,255':theme==='ocean'?'220,245,255':'255,224,178';
-        ctx.fillStyle=`rgba(${c},${p.a})`;
+        if(isDark){ctx.shadowColor=`rgba(${c},0.8)`;ctx.shadowBlur=8+p.r*3;}
+        ctx.fillStyle=`rgba(${c},${isDark?Math.min(1,p.a*1.3):p.a})`;
         ctx.beginPath();
         if(theme==='sky'){ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
-            ctx.fillStyle=`rgba(${c},${p.a*0.4})`;ctx.beginPath();ctx.arc(p.x,p.y,p.r*2.5,0,Math.PI*2);ctx.fill();}
+            ctx.fillStyle=`rgba(${c},${isDark?p.a*0.7:p.a*0.4})`;ctx.beginPath();ctx.arc(p.x,p.y,p.r*2.5,0,Math.PI*2);ctx.fill();}
         else if(theme==='ocean'){ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
             ctx.fillStyle='rgba(255,255,255,0.5)';ctx.beginPath();ctx.arc(p.x-p.r*0.2,p.y-p.r*0.3,p.r*0.25,0,Math.PI*2);ctx.fill();}
         else{ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}
+        ctx.shadowColor='transparent';ctx.shadowBlur=0;
     });
 }
 
