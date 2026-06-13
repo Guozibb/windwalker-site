@@ -1,754 +1,317 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>风之旅人 · 登录</title>
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>风之旅人 · 登录</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+    --card-bg:rgba(255,255,255,0.85);
+    --card-shadow:0 8px 40px rgba(70,130,180,0.15);
+    --text:#2c3e50;--text-muted:#94a3b8;
+    --input-bg:#f7fafc;--input-border:#e2e8f0;
+    --btn-bg:#74b9ff;--btn-hover:#0984e3;
+    --tab-bg:#f0f4f8;--tab-slider:#fff;
+}
+body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;transition:background 0.8s;
+}
+#bgCanvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+.theme-switcher{position:fixed;top:60px;right:16px;z-index:100;display:flex;flex-direction:column;gap:8px;}
+.theme-btn{width:38px;height:38px;border-radius:50%;border:2px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.2);cursor:pointer;font-size:1.1rem;backdrop-filter:blur(8px);transition:all 0.3s;}
+.theme-btn.active{border-color:#fff;background:rgba(255,255,255,0.5);transform:scale(1.12);}
+.dark-toggle{position:fixed;top:16px;right:16px;z-index:100;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);cursor:pointer;font-size:1.1rem;backdrop-filter:blur(8px);color:#fff;}
 
-        :root {
-            --bg: #06080d;
-            --surface: #0c0f16;
-            --border: #1e2636;
-            --text: #e2e8f0;
-            --text-muted: #7c8aa0;
-            --accent: #38bdf8;
-            --accent2: #818cf8;
-            --accent-glow: rgba(56,189,248,0.2);
-        }
+.login-card{
+    position:relative;z-index:1;width:420px;max-width:92vw;
+    background:var(--card-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-radius:28px;padding:36px 32px 28px;box-shadow:var(--card-shadow);
+    animation:cardUp 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards;opacity:0;
+    transition:background 0.5s,box-shadow 0.5s;
+}
+@keyframes cardUp{0%{opacity:0;transform:translateY(30px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
+.login-logo{text-align:center;margin-bottom:20px;}
+.logo-circle{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#e0f0f8,#f0e8f4);display:flex;align-items:center;justify-content:center;font-size:2.2rem;margin:0 auto 8px;box-shadow:0 4px 16px rgba(0,0,0,0.06);}
+.login-logo h2{font-size:1.2rem;font-weight:700;color:var(--text);margin:0;}
+.login-logo p{font-size:0.72rem;color:var(--text-muted);margin:2px 0 0;letter-spacing:1px;}
 
-        /* Ambient glow */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background:
-                radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.08) 0%, transparent 60%),
-                radial-gradient(ellipse at 50% 100%, rgba(129,140,248,0.05) 0%, transparent 50%);
-            pointer-events: none;
-        }
+.login-tabs{display:flex;position:relative;background:var(--tab-bg);border-radius:14px;padding:4px;margin-bottom:20px;}
+.login-tab{flex:1;text-align:center;padding:10px;border-radius:12px;cursor:pointer;font-size:0.88rem;font-weight:600;transition:0.3s;border:none;background:transparent;color:#94a3b8;position:relative;z-index:1;}
+.login-tab.active{color:var(--text);}
+.tab-slider{position:absolute;top:4px;left:4px;width:calc(50% - 4px);height:calc(100% - 8px);background:var(--tab-slider);border-radius:11px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);z-index:0;pointer-events:none;}
+.login-tabs.register-active .tab-slider{transform:translateX(100%);}
+.login-tabs.register-active .login-tab:first-child{color:#94a3b8;}
+.login-tabs.register-active .login-tab:last-child{color:var(--text);}
 
-        /* Canvas particles */
-        #particleCanvas {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            pointer-events: none;
-        }
+.input-wrap{display:flex;align-items:center;gap:10px;background:var(--input-bg);border:1.5px solid var(--input-border);border-radius:14px;padding:0 14px;margin-bottom:12px;transition:0.3s;}
+.input-wrap:focus-within{border-color:#a0c4e8;box-shadow:0 0 0 3px rgba(160,196,232,0.15);background:#fff;}
+.input-icon{font-size:1rem;flex-shrink:0;}
+.input-wrap input{flex:1;padding:13px 0;border:none;background:transparent;font-size:0.9rem;font-family:inherit;color:var(--text);outline:none;}
+.input-wrap input::placeholder{color:#c0c8d0;}
 
-        /* ========== 登录卡片 ========== */
-        .login-card {
-            position: relative; z-index: 1;
-            width: 400px; max-width: 90vw;
-            background: rgba(255,255,255,0.92);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border-radius: 28px;
-            padding: 36px 32px 28px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
-            animation: cardUp 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards;
-            opacity: 0;
-            transition: transform 0.15s ease-out;
-        }
-        @keyframes cardUp { 0%{opacity:0;transform:translateY(30px);} 100%{opacity:1;transform:translateY(0);} }
+.btn-login{width:100%;padding:14px;margin-top:6px;background:var(--btn-bg);color:#fff;border:none;border-radius:14px;font-size:0.95rem;font-weight:700;cursor:pointer;transition:0.3s;letter-spacing:0.5px;}
+.btn-login:hover{background:var(--btn-hover);transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,0.15);}
+.btn-login:active{transform:scale(0.98);}
+.btn-login:disabled{opacity:0.5;cursor:not-allowed;}
+.agreement{text-align:center;margin-top:16px;font-size:0.7rem;color:#c0c8d0;}
+.agreement a{color:#a0c4e8;text-decoration:none;}
 
-        .login-logo { text-align: center; margin-bottom: 20px; }
-        .logo-circle {
-            width: 64px; height: 64px; border-radius: 50%;
-            background: linear-gradient(135deg, #e0f0f8, #f0e8f4);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 2.2rem; margin: 0 auto 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-        }
-        .login-logo h2 { font-size: 1.2rem; font-weight: 700; color: #4a5568; margin: 0; }
-        .login-logo p { font-size: 0.72rem; color: #a0aec0; margin: 2px 0 0; letter-spacing: 1px; }
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(120px);padding:10px 22px;border-radius:20px;font-weight:500;font-size:0.85rem;z-index:200;opacity:0;transition:all 0.4s ease;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.ok{background:#34d399;color:#000;}
+.toast.err{background:#f87171;color:#fff;}
 
-        .login-body { transition: opacity 0.4s; }
-
-        /* 标签 */
-        .login-tabs { display: flex; position: relative; background: #f0f4f8; border-radius: 14px; padding: 4px; margin-bottom: 22px; }
-        .login-tab {
-            flex: 1; text-align: center; padding: 10px; border-radius: 12px; cursor: pointer;
-            font-size: 0.88rem; font-weight: 600; transition: 0.3s; border: none; background: transparent;
-            color: #94a3b8; position: relative; z-index: 1;
-        }
-        .login-tab.active { color: #4a5568; }
-        .tab-slider {
-            position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px);
-            background: #fff; border-radius: 11px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); z-index: 0;
-            pointer-events: none;
-        }
-        .login-tabs.register-active .tab-slider { transform: translateX(100%); }
-        .login-tabs.register-active .login-tab:first-child { color: #94a3b8; }
-        .login-tabs.register-active .login-tab:last-child { color: #4a5568; }
-
-        /* 输入框 */
-        .input-wrap {
-            display: flex; align-items: center; gap: 10px;
-            background: #f7fafc; border: 1.5px solid #e2e8f0; border-radius: 14px;
-            padding: 0 14px; margin-bottom: 12px; transition: 0.3s;
-        }
-        .input-wrap:focus-within { border-color: #a0c4e8; box-shadow: 0 0 0 3px rgba(160,196,232,0.15); background: #fff; }
-        .input-icon { font-size: 1rem; flex-shrink: 0; }
-        .input-wrap input {
-            flex: 1; padding: 13px 0; border: none; background: transparent;
-            font-size: 0.9rem; font-family: inherit; color: #4a5568; outline: none;
-        }
-        .input-wrap input::placeholder { color: #c0c8d0; }
-
-        /* 按钮 */
-        .btn-login {
-            width: 100%; padding: 14px; margin-top: 6px;
-            background: linear-gradient(135deg, #a0c8e8, #c8b8e0);
-            color: #fff; border: none; border-radius: 14px;
-            font-size: 0.95rem; font-weight: 700; cursor: pointer;
-            transition: 0.3s; letter-spacing: 0.5px;
-            position: relative; overflow: hidden;
-        }
-        .btn-login:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(160,196,232,0.3); }
-        .btn-login:active { transform: scale(0.98); }
-        .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .forgot-link {
-            display: block; text-align: center; margin-top: 10px;
-            color: #a0aec0; font-size: 0.78rem; text-decoration: none; transition: 0.2s;
-        }
-        .forgot-link:hover { color: #7b8ba0; }
-
-        .agreement {
-            text-align: center; margin-top: 16px; font-size: 0.7rem; color: #c0c8d0;
-        }
-        .agreement a { color: #a0c4e8; text-decoration: none; }
-
-        /* ========== Toast ========== */
-        .toast {
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%) translateY(120px);
-            padding: 10px 22px;
-            border-radius: 20px;
-            font-weight: 500;
-            font-size: 0.85rem;
-            z-index: 100;
-            opacity: 0;
-            transition: all 0.4s ease;
-        }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .toast.ok { background: #34d399; color: #000; }
-        .toast.err { background: #f87171; color: #fff; }
-
-        /* ========== Responsive ========== */
-        /* 涟漪动画 */
-        @keyframes rippleOut {
-            0% { transform: scale(0); opacity: 0.8; }
-            100% { transform: scale(3); opacity: 0; }
-        }
-        /* 抖动动画 */
-        @keyframes shake {
-            0%,100% { transform: translateX(0); }
-            20% { transform: translateX(-8px); }
-            40% { transform: translateX(8px); }
-            60% { transform: translateX(-5px); }
-            80% { transform: translateX(5px); }
-        }
-        /* 按钮粒子爆发 */
-        .btn-login:active::after {
-            content: ''; position: absolute; inset: -10px;
-            background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-            animation: rippleOut 0.5s ease-out forwards; pointer-events: none; border-radius: 50%;
-        }
-
-        @media (max-width: 440px) {
-            .phone-frame {
-                width: calc(100vw - 32px);
-                border-radius: 24px;
-                padding: 32px 20px 24px;
-            }
-        }
-        /* 暗黑模式 */
-        body.dark { --bg:#0f172a; --surface:#1e293b; --border:#334155; --text:#e2e8f0; --text-muted:#94a3b8; }
-        body.dark .login-card { background:rgba(15,23,42,0.92); }
-        body.dark .login-logo h2 { color:#e2e8f0; }
-        body.dark .login-logo p { color:#94a3b8; }
-        body.dark .login-tabs { background:#1e293b; }
-        body.dark .login-tab { color:#94a3b8; }
-        body.dark .login-tab.active, body.dark .login-tabs.register-active .login-tab:last-child { color:#e2e8f0; }
-        body.dark .tab-slider { background:#334155; }
-        body.dark .input-wrap { background:#1e293b; border-color:#334155; }
-        body.dark .input-wrap input { color:#e2e8f0; }
-        body.dark .input-wrap input::placeholder { color:#64748b; }
-        body.dark .input-wrap:focus-within { border-color:#6366f1; background:#1e293b; }
-        body.dark .forgot-link { color:#94a3b8; }
-        body.dark .agreement { color:#64748b; }
-        .theme-toggle-login { position:fixed; top:16px; right:16px; z-index:100; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); cursor:pointer; font-size:1.1rem; backdrop-filter:blur(10px); color:#fff; }
-        body.dark .theme-toggle-login { background:rgba(0,0,0,0.3); border-color:rgba(255,255,255,0.1); }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+@media(max-width:440px){.login-card{padding:32px 20px 24px;border-radius:24px;}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
-    <button class="theme-toggle-login" id="themeToggleLogin" title="切换主题">🌙</button>
-    <div style="position:fixed;top:60px;right:16px;z-index:100;display:flex;flex-direction:column;gap:8px;" id="bgThemeSwitcher">
-        <button class="bg-theme-btn active" data-bg="sky" title="天空">☁</button>
-        <button class="bg-theme-btn" data-bg="desert" title="沙漠">🏜</button>
-        <button class="bg-theme-btn" data-bg="ocean" title="海洋">🌊</button>
+<canvas id="bgCanvas"></canvas>
+<div class="theme-switcher" id="themeSwitcher">
+    <button class="theme-btn active" data-theme="sky" title="晴空絮语">☁</button>
+    <button class="theme-btn" data-theme="ocean" title="浅海涟漪">🌊</button>
+    <button class="theme-btn" data-theme="desert" title="金沙流影">🏜</button>
+</div>
+<button class="dark-toggle" id="darkToggle" title="暗黑模式">🌙</button>
+
+<div class="login-card" id="loginCard">
+    <div class="login-logo">
+        <div class="logo-circle">🧊</div>
+        <h2>风之旅人</h2>
+        <p>3D 模型资源库</p>
     </div>
-    <style>
-        .bg-theme-btn { width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);cursor:pointer;font-size:1rem;backdrop-filter:blur(8px);transition:all 0.3s; }
-        .bg-theme-btn.active { border-color:#fff;background:rgba(255,255,255,0.35);transform:scale(1.15); }
-    </style>
-    <canvas id="bgCanvas"></canvas>
-
-    <!-- ========== 登录卡片 ========== -->
-    <div class="login-card" id="loginCard">
-        <!-- Logo -->
-        <div class="login-logo" id="loginLogo">
-            <div class="logo-circle">🧊</div>
-            <h2>风之旅人</h2>
-            <p>3D 模型资源库</p>
-        </div>
-
-        <!-- 主体 -->
-        <div class="login-body" id="loginBody">
-            <!-- 标签切换 -->
-            <div class="login-tabs">
-                <button class="login-tab active" data-mode="password">登 录</button>
-                <button class="login-tab" data-mode="register">注 册</button>
-                <div class="tab-slider"></div>
-            </div>
-
-            <form id="loginForm" novalidate>
-                <div id="passwordMode">
-                    <div class="input-wrap">
-                        <span class="input-icon">👤</span>
-                        <input type="text" id="phoneInput" placeholder="用户名" required>
-                    </div>
-                    <div class="input-wrap">
-                        <span class="input-icon">🔒</span>
-                        <input type="password" id="passwordInput" placeholder="密码" required>
-                    </div>
-                </div>
-
-                <div id="registerMode" style="display:none;">
-                    <div class="input-wrap">
-                        <span class="input-icon">👤</span>
-                        <input type="text" id="regUsername" placeholder="设置用户名 (3-16位)" maxlength="16">
-                    </div>
-                    <div class="input-wrap">
-                        <span class="input-icon">🔒</span>
-                        <input type="password" id="regPassword" placeholder="设置密码 (6-20位)" maxlength="20">
-                    </div>
-                    <div class="input-wrap">
-                        <span class="input-icon">🔒</span>
-                        <input type="password" id="regPassword2" placeholder="确认密码">
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-login" id="btnSubmitMain">登 录</button>
-
-                <a href="#" id="forgotPwdLink" class="forgot-link">忘记密码？</a>
-            </form>
-
-            <div id="forgotPwdPanel" style="display:none;text-align:center;">
-                <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:10px;">输入用户名找回密码</p>
-                <div class="input-wrap"><span class="input-icon">👤</span><input type="text" id="forgotUsername" placeholder="用户名"></div>
-                <button id="forgotSubmit" class="btn-login" style="margin-top:10px;">发送重置链接</button>
-                <a href="#" id="forgotBack" style="display:block;margin-top:10px;color:var(--accent);font-size:0.8rem;">← 返回登录</a>
-            </div>
-
-            <div class="agreement">登录即表示同意 <a href="#">用户协议</a> 和 <a href="#">隐私政策</a></div>
-        </div>
+    <div class="login-tabs" id="loginTabs">
+        <button class="login-tab active" data-mode="login">登 录</button>
+        <button class="login-tab" data-mode="register">注 册</button>
+        <div class="tab-slider"></div>
     </div>
+    <form id="loginForm" novalidate>
+        <div id="loginFields">
+            <div class="input-wrap"><span class="input-icon">👤</span><input type="text" id="loginUser" placeholder="用户名" required></div>
+            <div class="input-wrap"><span class="input-icon">🔒</span><input type="password" id="loginPass" placeholder="密码" required></div>
+        </div>
+        <div id="registerFields" style="display:none;">
+            <div class="input-wrap"><span class="input-icon">👤</span><input type="text" id="regUser" placeholder="设置用户名 (3-16位)" maxlength="16"></div>
+            <div class="input-wrap"><span class="input-icon">🔒</span><input type="password" id="regPass" placeholder="设置密码 (6-20位)" maxlength="20"></div>
+            <div class="input-wrap"><span class="input-icon">🔒</span><input type="password" id="regPass2" placeholder="确认密码"></div>
+        </div>
+        <button type="submit" class="btn-login" id="btnSubmit">登 录</button>
+    </form>
+    <div class="agreement">登录即表示同意 <a href="terms.html">用户协议</a> 和 <a href="terms.html">隐私政策</a></div>
+</div>
+<div class="toast" id="toast"></div>
 
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
+<script>
+(function(){
+const SUPABASE_URL='https://gxbeztgssxniuqwawsrz.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_CEoUalap5DiFEfkBBuqJCw_DL21vR5o';
+const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-    <script>
-    (function() {
-        // ============================================================
-        // ⚙ Supabase 配置 — 替换为你的 Supabase 项目信息
-        //    在 Supabase 后台 → Settings → API 里找到这两个值
-        // ============================================================
-        const SUPABASE_URL = 'https://gxbeztgssxniuqwawsrz.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_CEoUalap5DiFEfkBBuqJCw_DL21vR5o';
+// ======== 三主题背景 ========
+const cvs=document.getElementById('bgCanvas'),ctx=cvs.getContext('2d');
+let W,H,mx=-999,my=-999,time=0;
+let theme=localStorage.getItem('ww_bg_theme')||'sky';
+let particles=[],ripples=[];
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const themeColors={
+    sky:{grad:['#e0f0ff','#f8fafc','#ffffff'],btnBg:'#74b9ff',btnHover:'#0984e3',text:'#2c3e50',cardShadow:'rgba(70,130,180,0.15)'},
+    ocean:{grad:['#e0f7fa','#b2ebf2','#80deea'],btnBg:'#4dd0e1',btnHover:'#00acc1',text:'#006064',cardShadow:'rgba(80,160,180,0.15)'},
+    desert:{grad:['#fff3e0','#ffe0b2','#ffcc80'],btnBg:'#ffb74d',btnHover:'#f57c00',text:'#5d4037',cardShadow:'rgba(180,140,100,0.15)'},
+};
+function applyTheme(t){
+    theme=t;const c=themeColors[t];
+    document.documentElement.style.setProperty('--btn-bg',c.btnBg);
+    document.documentElement.style.setProperty('--btn-hover',c.btnHover);
+    document.documentElement.style.setProperty('--text',c.text);
+    document.documentElement.style.setProperty('--card-shadow','0 8px 40px '+c.cardShadow);
+    particles=[];ripples=[];
+}
+applyTheme(theme);
 
-        // ========== 🌌 三主题背景系统 ==========
-        const bgCanvas = document.getElementById('bgCanvas');
-        const bgCtx = bgCanvas.getContext('2d');
-        let bgW, bgH, bgMx = -999, bgMy = -999, bgTime = 0, bgTheme = localStorage.getItem('ww_bg_theme') || 'sky';
-        let bgParticles = [], bgRipples = [], bgMouseTrail = [];
+function resize(){W=cvs.width=innerWidth;H=cvs.height=innerHeight;}
+resize();window.addEventListener('resize',resize);
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+document.addEventListener('mouseleave',()=>{mx=-999;my=-999;});
+document.addEventListener('touchmove',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;},{passive:true});
+document.addEventListener('click',e=>{if(theme==='ocean')ripples.push({x:e.clientX,y:e.clientY,r:0,maxR:80,life:1});});
 
-        function bgResize() { bgW = bgCanvas.width = innerWidth; bgH = bgCanvas.height = innerHeight; }
-        bgResize(); window.addEventListener('resize', bgResize);
-        document.addEventListener('mousemove', e => { bgMx = e.clientX; bgMy = e.clientY; });
-        document.addEventListener('mouseleave', () => { bgMx = -999; bgMy = -999; });
-        document.addEventListener('touchmove', e => { bgMx = e.touches[0].clientX; bgMy = e.touches[0].clientY; }, {passive:true});
+// 主题按钮
+document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.theme-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');applyTheme(b.dataset.theme);
+    localStorage.setItem('ww_bg_theme',theme);
+}));
+document.querySelector(`.theme-btn[data-theme="${theme}"]`)?.classList.add('active');
 
-        // 主题按钮
-        const card = document.querySelector('.login-card');
-        const cardStyles = {
-            sky:    'background:rgba(255,255,255,0.85);box-shadow:0 8px 40px rgba(70,130,180,0.15);',
-            desert: 'background:rgba(255,250,245,0.88);box-shadow:0 8px 40px rgba(180,140,100,0.15);',
-            ocean:  'background:rgba(245,250,255,0.85);box-shadow:0 8px 40px rgba(80,160,180,0.15);',
-        };
-        document.querySelectorAll('.bg-theme-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.bg-theme-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active'); bgTheme = btn.dataset.bg;
-                localStorage.setItem('ww_bg_theme', bgTheme);
-                if (card) card.style.cssText = cardStyles[bgTheme] || '';
-                bgParticles = []; bgRipples = []; bgMouseTrail = [];
-            });
-        });
-        // 初始应用卡片色调
-        if (card) card.style.cssText = cardStyles[bgTheme] || '';
-        // 初始激活按钮
-        document.querySelector(`.bg-theme-btn[data-bg="${bgTheme}"]`)?.classList.add('active');
-
-        // === 天空场景 ===
-        function drawCloud(cx, cy, size) {
-            // 蓬松云朵：多个圆叠加
-            const parts = [
-                {dx:0, dy:0, r:size*0.55},
-                {dx:-size*0.4, dy:size*0.05, r:size*0.35},
-                {dx:size*0.4, dy:size*0.05, r:size*0.35},
-                {dx:-size*0.2, dy:-size*0.3, r:size*0.32},
-                {dx:size*0.2, dy:-size*0.3, r:size*0.32},
-                {dx:0, dy:-size*0.4, r:size*0.28},
-            ];
-            parts.forEach(p => {
-                bgCtx.beginPath();
-                bgCtx.arc(cx + p.dx, cy + p.dy, p.r, 0, Math.PI*2);
-                bgCtx.fill();
-            });
+// === 晴空絮语 ===
+function drawSky(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#e0f0ff');g.addColorStop(0.5,'#f8fafc');g.addColorStop(1,'#ffffff');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    const clouds=[{x:W*0.12,y:H*0.1,w:260,h:100},{x:W*0.45,y:H*0.18,w:340,h:120},{x:W*0.78,y:H*0.08,w:280,h:105},{x:W*0.3,y:H*0.35,w:220,h:85},{x:W*0.65,y:H*0.3,w:240,h:90}];
+    clouds.forEach((c,i)=>{
+        const ox=mx>0?(mx/W-0.5)*20*(i+1)*0.25:Math.sin(time*0.002+i)*10;
+        const oy=my>0?(my/H-0.5)*10*(i+1)*0.2:Math.cos(time*0.0025+i)*5;
+        const cx=c.x+ox,cy=c.y+oy;
+        ctx.fillStyle='rgba(255,255,255,0.75)';
+        const parts=[{dx:0,dy:0,r:c.h*0.55},{dx:-c.w*0.25,dy:c.h*0.05,r:c.h*0.35},{dx:c.w*0.25,dy:c.h*0.05,r:c.h*0.35},{dx:-c.w*0.12,dy:-c.h*0.3,r:c.h*0.3},{dx:c.w*0.12,dy:-c.h*0.3,r:c.h*0.3},{dx:0,dy:-c.h*0.38,r:c.h*0.26}];
+        parts.forEach(p=>{ctx.beginPath();ctx.arc(cx+p.dx,cy+p.dy,p.r,0,Math.PI*2);ctx.fill();});
+    });
+    if(particles.length<60&&Math.random()<0.3){particles.push({x:Math.random()*W,y:Math.random()*H,r:2+Math.random()*4,a:0.3+Math.random()*0.5,va:0.005+Math.random()*0.01,vy:-(0.3+Math.random()*0.5),vx:(Math.random()-0.5)*0.3,phase:Math.random()*6});}
+}
+// === 浅海涟漪 ===
+function drawOcean(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#e0f7fa');g.addColorStop(0.5,'#b2ebf2');g.addColorStop(1,'#80deea');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    for(let layer=0;layer<3;layer++){
+        ctx.strokeStyle=`rgba(255,255,255,${0.25-layer*0.07})`;ctx.lineWidth=2+layer;
+        ctx.beginPath();
+        for(let x=0;x<=W;x+=6){
+            const y=H*(0.35+layer*0.18)+Math.sin(x*0.012+time*0.012*(0.5+layer*0.25)+layer*2)*18+Math.sin(x*0.025+time*0.018)*8;
+            x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
         }
+        ctx.stroke();
+    }
+    ripples=ripples.filter(r=>{r.r+=1.5;r.life-=0.015;return r.life>0;});
+    ripples.forEach(r=>{ctx.strokeStyle=`rgba(255,255,255,${r.life*0.4})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke();});
+    if(particles.length<55&&Math.random()<0.25){particles.push({x:Math.random()*W,y:H+5,r:3+Math.random()*4,a:0.4+Math.random()*0.3,vy:-(0.4+Math.random()*0.6),vx:(Math.random()-0.5)*0.25,phase:Math.random()*6});}
+}
+// === 金沙流影 ===
+let duneOff1=0,duneOff2=0;
+function drawDesert(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#fff3e0');g.addColorStop(0.5,'#ffe0b2');g.addColorStop(1,'#ffcc80');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    duneOff1+=0.2;duneOff2+=0.4;
+    ctx.fillStyle='rgba(255,204,128,0.4)';
+    ctx.beginPath();ctx.moveTo(0,H);
+    for(let x=0;x<=W;x+=15){const y=H*0.6+Math.sin((x+duneOff1)*0.005)*35+Math.sin((x+duneOff1)*0.015)*20;ctx.lineTo(x,y);}
+    ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,183,77,0.5)';
+    ctx.beginPath();ctx.moveTo(0,H);
+    for(let x=0;x<=W;x+=12){const y=H*0.72+Math.sin((x+duneOff2)*0.004)*30+Math.sin((x+duneOff2)*0.012)*18;ctx.lineTo(x,y);}
+    ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+    if(particles.length<70&&Math.random()<0.35){particles.push({x:-10,y:Math.random()*H*0.7,r:1+Math.random()*3,a:0.3+Math.random()*0.4,vy:-(0.2+Math.random()*0.3),vx:0.5+Math.random()*0.7,phase:Math.random()*6});}
+}
 
-        function drawSky() {
-            // 更蓝的天空渐变
-            const grad = bgCtx.createLinearGradient(0, 0, 0, bgH);
-            grad.addColorStop(0, '#5b9ecf'); grad.addColorStop(0.35, '#8ab8e0'); grad.addColorStop(0.7, '#c5ddf2'); grad.addColorStop(1, '#e8f0f8');
-            bgCtx.fillStyle = grad; bgCtx.fillRect(0, 0, bgW, bgH);
-            // 蓬松云朵
-            const clouds = [
-                {x:bgW*0.15,y:bgH*0.12,s:90},{x:bgW*0.5,y:bgH*0.2,s:75},
-                {x:bgW*0.8,y:bgH*0.08,s:85},{x:bgW*0.35,y:bgH*0.32,s:60},
-                {x:bgW*0.7,y:bgH*0.28,s:55},{x:bgW*0.05,y:bgH*0.35,s:50},
-            ];
-            clouds.forEach((c,i) => {
-                const ox = bgMx > 0 ? (bgMx/bgW - 0.5) * 25 * (i+1)*0.25 : Math.sin(bgTime*0.0025 + i)*12;
-                const oy = bgMy > 0 ? (bgMy/bgH - 0.5) * 12 * (i+1)*0.2 : Math.cos(bgTime*0.003 + i)*6;
-                const cx = c.x + ox, cy = c.y + oy;
-                bgCtx.fillStyle = 'rgba(255,255,255,0.85)';
-                drawCloud(cx, cy, c.s);
-                // 阴影
-                bgCtx.fillStyle = 'rgba(240,245,255,0.6)';
-                drawCloud(cx - c.s*0.05, cy + c.s*0.08, c.s*0.85);
-            });
-            // 羽毛粒子
-            if (Math.random() < 0.03) bgParticles.push({x:Math.random()*bgW,y:-10,r:1.5+Math.random()*3,vy:0.15+Math.random()*0.3,vx:(Math.random()-0.5)*0.3,rot:Math.random()*360,vrot:(Math.random()-0.5)*2,life:1});
-        }
+// 粒子渲染
+function drawParticles(){
+    particles=particles.filter(p=>{
+        p.y+=p.vy;p.x+=p.vx;
+        if(theme==='sky'){p.a+=p.va*Math.sin(time*0.03+p.phase);p.a=Math.max(0.15,Math.min(0.8,p.a));}
+        if(theme==='ocean'){if(p.y<-20||p.x<-20||p.x>W+20)return false;}
+        if(theme==='desert'){if(p.x>W+20){p.x=-10;p.y=Math.random()*H*0.7;}}
+        return p.y>-30&&p.y<H+30&&p.x>-30&&p.x<W+30;
+    });
+    particles.forEach(p=>{
+        const c=theme==='sky'?'255,255,255':theme==='ocean'?'220,245,255':'255,224,178';
+        ctx.fillStyle=`rgba(${c},${p.a})`;
+        ctx.beginPath();
+        if(theme==='sky'){ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle=`rgba(${c},${p.a*0.4})`;ctx.beginPath();ctx.arc(p.x,p.y,p.r*2.5,0,Math.PI*2);ctx.fill();}
+        else if(theme==='ocean'){ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='rgba(255,255,255,0.5)';ctx.beginPath();ctx.arc(p.x-p.r*0.2,p.y-p.r*0.3,p.r*0.25,0,Math.PI*2);ctx.fill();}
+        else{ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();}
+    });
+}
 
-        // === 沙漠场景 ===
-        function drawDesert() {
-            const grad = bgCtx.createLinearGradient(0, 0, 0, bgH);
-            grad.addColorStop(0, '#e8d5c0'); grad.addColorStop(0.4, '#f0e0cc'); grad.addColorStop(0.7, '#e8d0b8'); grad.addColorStop(1, '#dcc8b0');
-            bgCtx.fillStyle = grad; bgCtx.fillRect(0, 0, bgW, bgH);
-            // 沙丘
-            for (let i = 0; i < 5; i++) {
-                const baseY = bgH * (0.35 + i * 0.12);
-                bgCtx.fillStyle = `rgba(${210+i*8},${175-i*10},${155-i*8},0.4)`;
-                bgCtx.beginPath(); bgCtx.moveTo(0, bgH);
-                for (let x = 0; x <= bgW; x += 20) {
-                    const y = baseY + Math.sin(x*0.008 + i*1.5 + bgTime*0.002) * 25 + Math.sin(x*0.02 + i) * 15;
-                    bgCtx.lineTo(x, y);
-                }
-                bgCtx.lineTo(bgW, bgH); bgCtx.closePath(); bgCtx.fill();
-            }
-            // 鼠标沙流
-            if (bgMx > 0) bgMouseTrail.push({x:bgMx,y:bgMy,life:1});
-            bgMouseTrail = bgMouseTrail.filter(t => { t.life -= 0.008; return t.life > 0; });
-            bgMouseTrail.forEach(t => {
-                bgCtx.fillStyle = `rgba(210,180,155,${t.life*0.3})`;
-                bgCtx.beginPath(); bgCtx.arc(t.x, t.y, 4 + (1-t.life)*12, 0, Math.PI*2); bgCtx.fill();
-            });
-            // 金粒
-            if (Math.random() < 0.04) bgParticles.push({x:Math.random()*bgW,y:-5,r:1+Math.random()*2,vy:0.2+Math.random()*0.4,vx:(Math.random()-0.5)*0.4,life:1,color:'218,180,130'});
-        }
+function bgLoop(){
+    ctx.clearRect(0,0,W,H);
+    if(theme==='sky')drawSky();else if(theme==='ocean')drawOcean();else drawDesert();
+    drawParticles();time++;requestAnimationFrame(bgLoop);
+}
+bgLoop();
 
-        // === 海洋场景 ===
-        function drawOcean() {
-            const grad = bgCtx.createLinearGradient(0, 0, 0, bgH);
-            grad.addColorStop(0, '#b8d8e8'); grad.addColorStop(0.5, '#c8e4f0'); grad.addColorStop(1, '#a8c8d8');
-            bgCtx.fillStyle = grad; bgCtx.fillRect(0, 0, bgW, bgH);
-            // 波浪
-            for (let layer = 0; layer < 3; layer++) {
-                bgCtx.strokeStyle = `rgba(255,255,255,${0.25-layer*0.07})`;
-                bgCtx.lineWidth = 2 + layer;
-                bgCtx.beginPath();
-                for (let x = 0; x <= bgW; x += 8) {
-                    const y = bgH * (0.3 + layer * 0.18) + Math.sin(x*0.01 + bgTime*0.015 + layer*2) * 18 + Math.sin(x*0.03 + bgTime*0.02) * 8;
-                    if (x === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y);
-                }
-                bgCtx.stroke();
-            }
-            // 鼠标涟漪
-            if (bgMx > 0 && Math.random() < 0.3) bgRipples.push({x:bgMx,y:bgMy,r:0,maxR:60+Math.random()*40,life:1});
-            bgRipples = bgRipples.filter(r => { r.r += 1.5; r.life -= 0.015; return r.life > 0; });
-            bgRipples.forEach(r => {
-                bgCtx.strokeStyle = `rgba(255,255,255,${r.life*0.4})`;
-                bgCtx.lineWidth = 1.5;
-                bgCtx.beginPath(); bgCtx.arc(r.x, r.y, r.r, 0, Math.PI*2); bgCtx.stroke();
-            });
-            // 气泡
-            if (Math.random() < 0.05) bgParticles.push({x:Math.random()*bgW,y:bgH+5,r:1.5+Math.random()*4,vy:-(0.15+Math.random()*0.4),vx:(Math.random()-0.5)*0.2,life:1,color:'200,230,245'});
-        }
+// ======== 暗黑模式 ========
+const darkBtn=document.getElementById('darkToggle');
+const savedDark=localStorage.getItem('ww_theme')||'light';
+if(savedDark==='dark'){document.body.style.background='#0f172a';darkBtn.textContent='☀';}
+darkBtn.addEventListener('click',()=>{
+    const isDark=document.body.style.background==='rgb(15, 23, 42)';
+    document.body.style.background=isDark?'':'#0f172a';
+    localStorage.setItem('ww_theme',isDark?'light':'dark');
+    darkBtn.textContent=isDark?'🌙':'☀';
+});
 
-        // === 通用粒子渲染 ===
-        function drawParticles() {
-            bgParticles = bgParticles.filter(p => { p.y += p.vy; p.x += p.vx; p.life -= (bgTheme==='ocean'?0.003:0.006); return p.life > 0 && p.y > -30 && p.y < bgH+30; });
-            bgParticles.forEach(p => {
-                const c = p.color || '255,255,255';
-                bgCtx.save(); bgCtx.translate(p.x, p.y);
-                if (bgTheme === 'sky') {
-                    bgCtx.rotate(p.rot * Math.PI / 180); p.rot += p.vrot;
-                    bgCtx.fillStyle = `rgba(${c},${p.life*0.4})`;
-                    bgCtx.beginPath(); bgCtx.ellipse(0, 0, p.r, p.r*0.3, 0.2, 0, Math.PI*2); bgCtx.fill();
-                } else if (bgTheme === 'ocean') {
-                    bgCtx.fillStyle = `rgba(${c},${p.life*0.5})`;
-                    bgCtx.beginPath(); bgCtx.arc(0, 0, p.r, 0, Math.PI*2); bgCtx.fill();
-                } else {
-                    bgCtx.fillStyle = `rgba(${c},${p.life*0.45})`;
-                    bgCtx.beginPath(); bgCtx.arc(0, 0, p.r, 0, Math.PI*2); bgCtx.fill();
-                }
-                bgCtx.restore();
-            });
-        }
+// ======== 登录/注册 ========
+const tabs=document.querySelectorAll('.login-tab');
+const loginFields=document.getElementById('loginFields');
+const registerFields=document.getElementById('registerFields');
+const btnSubmit=document.getElementById('btnSubmit');
+const loginTabs=document.getElementById('loginTabs');
+let mode='login';
 
-        function bgLoop() {
-            bgCtx.clearRect(0, 0, bgW, bgH);
-            if (bgTheme === 'sky') drawSky();
-            else if (bgTheme === 'desert') drawDesert();
-            else drawOcean();
-            drawParticles();
-            bgTime++;
-            requestAnimationFrame(bgLoop);
-        }
-        bgLoop();
+tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');mode=t.dataset.mode;
+    loginFields.style.display=mode==='login'?'block':'none';
+    registerFields.style.display=mode==='register'?'block':'none';
+    btnSubmit.textContent=mode==='register'?'注 册':'登 录';
+    if(mode==='register')loginTabs.classList.add('register-active');
+    else loginTabs.classList.remove('register-active');
+}));
 
-        // 旧鱼塘代码已移除，以下保留原有登录逻辑
-        // 点击涟漪
-        document.addEventListener('click', e => { bgRipples.push({x:e.clientX,y:e.clientY,r:0,maxR:80,life:1}); });
+function showToast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+(err?'err':'ok');t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2500);}
+function shakeCard(){const c=document.getElementById('loginCard');c.style.animation='none';c.offsetHeight;c.style.animation='shake 0.5s ease';setTimeout(()=>{c.style.animation='cardUp 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards';},500);}
 
-        // ========== 🔐 密码错误抖动 ==========
-        // ========== 🔐 密码错误抖动 ==========
-        function shakeForm() {
-            const card = document.querySelector('.login-card');
-            if (!card) return;
-            card.style.animation = 'none';
-            card.offsetHeight;
-            card.style.animation = 'shake 0.5s ease';
-            setTimeout(() => { if (card) card.style.animation = 'cardUp 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards'; }, 500);
-        }
-        // ========== 🎮 卡片3D倾斜 ==========
-        const loginCard = document.getElementById('loginCard');
-        document.addEventListener('mousemove', e => {
-            if (!loginCard) return;
-            const rect = loginCard.getBoundingClientRect();
-            const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
-            const rx = (e.clientY - cy) / (rect.height/2) * -5;
-            const ry = (e.clientX - cx) / (rect.width/2) * 5;
-            loginCard.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg)`;
-        });
-        document.addEventListener('mouseleave', () => {
-            if (loginCard) loginCard.style.transform = '';
-        });
+document.getElementById('loginForm').addEventListener('submit',async e=>{
+    e.preventDefault();btnSubmit.disabled=true;
+    if(mode==='register'){
+        const u=document.getElementById('regUser').value.trim();
+        const p=document.getElementById('regPass').value.trim();
+        const p2=document.getElementById('regPass2').value.trim();
+        if(u.length<3){showToast('用户名至少3个字符',true);shakeCard();btnSubmit.disabled=false;return;}
+        if(p.length<6){showToast('密码至少6位',true);shakeCard();btnSubmit.disabled=false;return;}
+        if(p!==p2){showToast('两次密码不一致',true);shakeCard();btnSubmit.disabled=false;return;}
+        btnSubmit.textContent='⏳ 注册中...';
+        const isAscii=/^[a-zA-Z0-9]+$/.test(u);
+        const emailId=isAscii?u:('u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5));
+        const email=emailId+'@windwalker.app';
+        try{
+            const{data,error}=await supabase.auth.signUp({email,password:p,options:{data:{username:u}}});
+            if(error){const msg=error.message.includes('already')?'用户名已存在':error.message;showToast(msg,true);btnSubmit.textContent='注 册';btnSubmit.disabled=false;return;}
+            if(!data.user){showToast('注册失败',true);btnSubmit.textContent='注 册';btnSubmit.disabled=false;return;}
+            const randomAvatar=[{c:'#ffb8c6',i:'🐱'},{c:'#ffc8a0',i:'🐶'},{c:'#f0c0e0',i:'🐰'},{c:'#b8d8f0',i:'🐼'},{c:'#f0c8a0',i:'🦊'},{c:'#c0e0c8',i:'🐸'},{c:'#e0d0b8',i:'🐻'},{c:'#ffd0d0',i:'🐥'},{c:'#d0c8f0',i:'🦄'},{c:'#c8e8d0',i:'🌿'},{c:'#ffe0b0',i:'⭐'},{c:'#e0d8f8',i:'🌙'}][Math.floor(Math.random()*12)];
+            const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" rx="100" fill="#fff"/><circle cx="100" cy="100" r="70" fill="${randomAvatar.c}" opacity="0.5"/><text x="100" y="125" text-anchor="middle" font-size="65">${randomAvatar.i}</text></svg>`;
+            let avatarUrl='';
+            try{const blob=new Blob([svg],{type:'image/svg+xml'});const{error:upErr}=await supabase.storage.from('avatars').upload(data.user.id+'_av.svg',blob,{upsert:true});if(!upErr){const{data:pub}=supabase.storage.from('avatars').getPublicUrl(data.user.id+'_av.svg');avatarUrl=pub.publicUrl;}}catch(_){}
+            const code=String(Math.floor(100000+Math.random()*900000));
+            const pf={id:data.user.id,username:u,user_code:code,avatar_url:avatarUrl};
+            if(!isAscii)pf.email_id=emailId;
+            await supabase.from('profiles').upsert(pf);
+            if(!data.session){btnSubmit.textContent='⏳ 登录中...';const{error:loginErr}=await supabase.auth.signInWithPassword({email,password:p});if(loginErr){showToast('注册成功但登录失败，请手动登录',true);btnSubmit.textContent='注 册';btnSubmit.disabled=false;return;}}
+            showToast('✅ 注册成功！');
+            setTimeout(()=>window.location.href='index.html',800);
+        }catch(_){showToast('网络错误',true);btnSubmit.textContent='注 册';btnSubmit.disabled=false;}
+    }else{
+        const u=document.getElementById('loginUser').value.trim();
+        const p=document.getElementById('loginPass').value.trim();
+        if(!u){showToast('请输入用户名',true);shakeCard();btnSubmit.disabled=false;return;}
+        if(!p){showToast('请输入密码',true);shakeCard();btnSubmit.disabled=false;return;}
+        btnSubmit.textContent='⏳ 登录中...';
+        try{
+            const{data:pf}=await supabase.from('profiles').select('email_id').eq('username',u).maybeSingle();
+            const email=(pf?.email_id||u)+'@windwalker.app';
+            const{data,error}=await supabase.auth.signInWithPassword({email,password:p});
+            if(error){showToast('账号或密码错误',true);shakeCard();btnSubmit.textContent='登 录';btnSubmit.disabled=false;return;}
+            showToast('✅ 登录成功！');
+            setTimeout(()=>window.location.href='index.html',800);
+        }catch(_){showToast('网络错误',true);btnSubmit.textContent='登 录';btnSubmit.disabled=false;}
+    }
+});
 
-        // ========== Tab switch ==========
-        const loginTabs = document.querySelector('.login-tabs');
-        const tabs = document.querySelectorAll('.login-tab');
-        const passwordMode = document.getElementById('passwordMode');
-        const registerMode = document.getElementById('registerMode');
-        const passwordInput = document.getElementById('passwordInput');
-        const phoneInput = document.getElementById('phoneInput');
-        const btnSubmitMain = document.getElementById('btnSubmitMain');
-        let loginMode = 'password';
-
-        tabs.forEach(t => {
-            t.addEventListener('click', () => {
-                tabs.forEach(x => x.classList.remove('active'));
-                t.classList.add('active');
-                loginMode = t.dataset.mode;
-                passwordMode.style.display = loginMode === 'password' ? 'block' : 'none';
-                registerMode.style.display = loginMode === 'register' ? 'block' : 'none';
-                btnSubmitMain.textContent = loginMode === 'register' ? '注 册' : '登 录';
-                // 滑块动画
-                if (loginMode === 'register') loginTabs.classList.add('register-active');
-                else loginTabs.classList.remove('register-active');
-            });
-        });
-
-        // ========== Submit (login or register via Supabase) ==========
-        const loginForm = document.getElementById('loginForm');
-        loginForm.addEventListener('submit', async e => {
-            e.preventDefault();
-            btnSubmitMain.disabled = true;
-
-            if (loginMode === 'register') {
-                const username = document.getElementById('regUsername').value.trim();
-                const pwd = document.getElementById('regPassword').value.trim();
-                const pwd2 = document.getElementById('regPassword2').value.trim();
-
-                if (username.length < 3) { showToast('用户名至少3个字符', 'err'); resetBtn('注 册'); return; }
-                if (pwd.length < 6) { showToast('密码至少6位', 'err'); resetBtn('注 册'); return; }
-                if (pwd !== pwd2) { showToast('两次密码不一致', 'err'); resetBtn('注 册'); return; }
-
-                btnSubmitMain.textContent = '⏳ 注册中...';
-                // 生成有效的邮箱（英文直接用作前缀，中文生成随机ID）
-                const isAscii = /^[a-zA-Z0-9]+$/.test(username);
-                const emailId = isAscii ? username : ('u' + Date.now().toString(36) + Math.random().toString(36).slice(2,5));
-                const email = emailId + '@windwalker.app';
-
-                try {
-                    const { data, error } = await supabase.auth.signUp({ email, password: pwd, options: { data: { username } } });
-                    if (error) {
-                        const msg = error.message.includes('already') ? '用户名已存在' : '注册失败: ' + error.message;
-                        showToast(msg, 'err'); resetBtn('注 册'); return;
-                    }
-                    if (!data.user) { showToast('注册失败，请重试', 'err'); resetBtn('注 册'); return; }
-
-                    // 随机分配一个头像
-                    const randomAvatar = [{c:'#ffb8c6',i:'🐱'},{c:'#ffc8a0',i:'🐶'},{c:'#f0c0e0',i:'🐰'},{c:'#b8d8f0',i:'🐼'},{c:'#f0c8a0',i:'🦊'},{c:'#c0e0c8',i:'🐸'},{c:'#e0d0b8',i:'🐻'},{c:'#ffd0d0',i:'🐥'},{c:'#d0c8f0',i:'🦄'},{c:'#c8e8d0',i:'🌿'},{c:'#ffe0b0',i:'⭐'},{c:'#e0d8f8',i:'🌙'}][Math.floor(Math.random()*12)];
-                    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" rx="100" fill="#fff"/><circle cx="100" cy="100" r="70" fill="${randomAvatar.c}" opacity="0.5"/><text x="100" y="125" text-anchor="middle" font-size="65">${randomAvatar.i}</text></svg>`;
-                    let avatarUrl = '';
-                    try {
-                        const blob = new Blob([svg], { type: 'image/svg+xml' });
-                        const { error: upErr } = await supabase.storage.from('avatars').upload(data.user.id + '_av.svg', blob, { upsert: true });
-                        if (!upErr) { const { data: pub } = supabase.storage.from('avatars').getPublicUrl(data.user.id + '_av.svg'); avatarUrl = pub.publicUrl; }
-                    } catch(e) {}
-
-                    // 创建 profiles
-                    const code = String(Math.floor(100000 + Math.random() * 900000));
-                    // 只有非英文用户名才存 email_id
-                    const profileData = { id: data.user.id, username, user_code: code, avatar_url: avatarUrl };
-                    if (!isAscii) profileData.email_id = emailId;
-                    await supabase.from('profiles').upsert(profileData);
-
-                    // 确保有 session
-                    if (!data.session) {
-                        btnSubmitMain.textContent = '⏳ 登录中...';
-                        const { error: loginErr } = await supabase.auth.signInWithPassword({ email, password: pwd });
-                        if (loginErr) { showToast('注册成功但自动登录失败，请手动登录', 'err'); resetBtn('注 册'); return; }
-                    }
-                    showToast('✅ 注册成功！', 'ok');
-                    setTimeout(() => window.location.href = 'index.html', 800);
-                } catch(ex) {
-                    showToast('网络错误，请检查连接后重试', 'err');
-                    resetBtn('注 册');
-                }
-            } else {
-                const username = phoneInput.value.trim();
-                const pwd = passwordInput.value.trim();
-
-                if (!username) { showToast('请输入用户名', 'err'); resetBtn('登 录'); return; }
-                if (!pwd) { showToast('请输入密码', 'err'); resetBtn('登 录'); return; }
-
-                btnSubmitMain.textContent = '⏳ 登录中...';
-                try {
-                    // 先从 profiles 查出邮箱映射（兼容旧账号）
-                    const { data: pf } = await supabase.from('profiles').select('email_id').eq('username', username).maybeSingle();
-                    const email = (pf?.email_id || username) + '@windwalker.app';
-                    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
-                    if (error) { showToast('账号或密码错误', 'err'); resetBtn('登 录'); return; }
-                    if (!data.session) { showToast('登录失败，请重试', 'err'); resetBtn('登 录'); return; }
-                    showToast('✅ 登录成功！', 'ok');
-                    setTimeout(() => window.location.href = 'index.html', 800);
-                } catch(ex) {
-                    showToast('网络错误，请检查连接后重试', 'err');
-                    resetBtn('登 录');
-                }
-            }
-        });
-
-        function resetBtn(text) { btnSubmitMain.disabled = false; btnSubmitMain.textContent = text; }
-
-        // ========== 忘记密码 ==========
-        const forgotPwdLink = document.getElementById('forgotPwdLink');
-        const forgotPwdPanel = document.getElementById('forgotPwdPanel');
-        const forgotBack = document.getElementById('forgotBack');
-        const forgotSubmit = document.getElementById('forgotSubmit');
-        const forgotUsername = document.getElementById('forgotUsername');
-
-        forgotPwdLink.addEventListener('click', e => {
-            e.preventDefault();
-            loginForm.style.display = 'none';
-            forgotPwdPanel.style.display = 'block';
-        });
-        forgotBack.addEventListener('click', e => {
-            e.preventDefault();
-            loginForm.style.display = '';
-            forgotPwdPanel.style.display = 'none';
-        });
-        forgotSubmit.addEventListener('click', async () => {
-            const username = forgotUsername.value.trim();
-            if (!username) { showToast('请输入用户名', 'err'); return; }
-            forgotSubmit.disabled = true; forgotSubmit.textContent = '发送中...';
-            const { data: pfp } = await supabase.from('profiles').select('email_id').eq('username', username).maybeSingle();
-            const email = (pfp?.email_id || username) + '@windwalker.app';
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin + window.location.pathname.replace('login.html','') + 'reset-password.html'
-            });
-            if (error) { showToast('发送失败: ' + error.message, 'err'); }
-            else { showToast('如果账号存在，重置链接已发送（请检查Supabase Auth后台的邮件日志）', 'ok'); }
-            forgotSubmit.disabled = false; forgotSubmit.textContent = '发送重置链接';
-        });
-
-        function goToIndex() {
-            setTimeout(() => {
-                document.body.style.transition = 'opacity 0.4s ease';
-                document.body.style.opacity = '0';
-                setTimeout(() => { window.location.href = 'index.html'; }, 400);
-            }, 600);
-        }
-
-        // ========== Toast ==========
-        function showToast(msg, type) {
-            if (type === 'err') shakeForm();
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = 'toast ' + (type || 'ok');
-            t.classList.add('show');
-            clearTimeout(t._tid);
-            t._tid = setTimeout(() => t.classList.remove('show'), 2500);
-        }
-
-        // ========== 🎵 背景轻音乐 + 🔊 按键音效 ==========
-        const AudioSys = (function() {
-            let ctx = null, musicOn = true, sfxOn = true;
-
-            function ensureCtx() {
-                if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-                if (ctx.state === 'suspended') ctx.resume();
-                return ctx;
-            }
-
-            // 🔊 点击音效（轻柔水滴声）
-            function playClick() {
-                if (!sfxOn) return;
-                try {
-                    const c = ensureCtx(), t = c.currentTime;
-                    const o = c.createOscillator(), g = c.createGain();
-                    o.type = 'sine'; o.frequency.setValueAtTime(800, t); o.frequency.exponentialRampToValueAtTime(400, t+0.08);
-                    g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.08);
-                    o.connect(g).connect(c.destination);
-                    o.start(t); o.stop(t+0.08);
-                } catch(e) {}
-            }
-
-            // 🎵 背景轻音乐（卡林巴/八音盒风格）
-            const MELODY = [
-                { n:523, d:1.2 },{ n:659, d:0.8 },{ n:784, d:1.0 },{ n:659, d:0.6 },
-                { n:587, d:0.8 },{ n:523, d:1.0 },{ n:440, d:0.7 },{ n:523, d:1.4 },
-                { n:659, d:0.9 },{ n:587, d:0.7 },{ n:523, d:1.0 },{ n:392, d:1.2 },
-                { n:440, d:0.8 },{ n:523, d:1.0 },{ n:587, d:0.7 },{ n:659, d:1.5 },
-                { n:784, d:0.6 },{ n:880, d:0.8 },{ n:784, d:1.0 },{ n:659, d:0.7 },
-                { n:523, d:1.0 },{ n:587, d:0.7 },{ n:523, d:1.2 },{ n:440, d:1.4 },
-            ];
-            let mIdx = 0, mTimer = null, mNodes = null;
-
-            function playNote() {
-                if (!musicOn) return;
-                try {
-                    const c = ensureCtx(), { n, d } = MELODY[mIdx];
-                    const o = c.createOscillator(), g = c.createGain();
-                    o.type = 'triangle'; o.frequency.value = n;
-                    const dur = d*0.65;
-                    g.gain.setValueAtTime(0, c.currentTime);
-                    g.gain.linearRampToValueAtTime(0.025, c.currentTime+0.06);
-                    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime+dur);
-                    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1200; f.Q.value = 3;
-                    const dly = c.createDelay(0.2); dly.delayTime.value = 0.15;
-                    const fbg = c.createGain(); fbg.gain.value = 0.3;
-                    o.connect(g).connect(f);
-                    f.connect(c.destination);
-                    f.connect(dly); dly.connect(fbg); fbg.connect(f);
-                    o.start(); o.stop(c.currentTime+dur+0.2);
-                    mIdx = (mIdx+1)%MELODY.length;
-                    mTimer = setTimeout(playNote, d*950);
-                } catch(e) { mTimer = setTimeout(playNote, 1000); }
-            }
-
-            function startMusic() { if (mTimer) return; mIdx = 0; playNote(); }
-            function stopMusic() { if (mTimer) { clearTimeout(mTimer); mTimer = null; } }
-            function toggleMusic() { musicOn = !musicOn; musicOn ? startMusic() : stopMusic(); return musicOn; }
-            function toggleSfx() { sfxOn = !sfxOn; return sfxOn; }
-
-            document.addEventListener('click', function once() {
-                if (musicOn) startMusic();
-            }, { once: true });
-
-            return { playClick, toggleMusic, toggleSfx, isMusicOn: ()=>musicOn, isSfxOn: ()=>sfxOn };
-        })();
-
-        // 🎵 音乐开关 + 🔊 音效开关
-        const btnMusic = document.createElement('button');
-        btnMusic.textContent = '🎵'; btnMusic.title = '背景音乐';
-        btnMusic.style.cssText = 'position:fixed;top:16px;right:66px;z-index:100;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.8);cursor:pointer;font-size:1.1rem;backdrop-filter:blur(10px);';
-        document.body.appendChild(btnMusic);
-        btnMusic.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const on = AudioSys.toggleMusic();
-            btnMusic.textContent = on ? '🎵' : '🔇';
-            btnMusic.style.opacity = on ? '1' : '0.5';
-        });
-
-        const btnSfx = document.createElement('button');
-        btnSfx.textContent = '🔔'; btnSfx.title = '按键音效';
-        btnSfx.style.cssText = 'position:fixed;top:16px;right:16px;z-index:100;width:40px;height:40px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:rgba(255,255,255,0.8);cursor:pointer;font-size:1rem;backdrop-filter:blur(10px);';
-        document.body.appendChild(btnSfx);
-        btnSfx.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const on = AudioSys.toggleSfx();
-            btnSfx.textContent = on ? '🔔' : '🔕';
-            btnSfx.style.opacity = on ? '1' : '0.5';
-        });
-
-        // 🔊 所有按钮自动加点击音效
-        document.addEventListener('click', e => {
-            if (e.target.closest('button') || e.target.closest('a')) AudioSys.playClick();
-        });
-
-        // 暗黑模式切换
-        (function(){
-            const saved = localStorage.getItem('ww_theme') || 'light';
-            const btn = document.getElementById('themeToggleLogin');
-            if (saved === 'dark') { document.body.classList.add('dark'); btn.textContent = '☀'; }
-            btn.addEventListener('click', () => {
-                const isDark = document.body.classList.toggle('dark');
-                localStorage.setItem('ww_theme', isDark ? 'dark' : 'light');
-                btn.textContent = isDark ? '☀' : '🌙';
-            });
-        })();
-    })();
-    </script>
+// 卡片3D倾斜
+const card=document.getElementById('loginCard');
+document.addEventListener('mousemove',e=>{const r=card.getBoundingClientRect();const cx=r.left+r.width/2,cy=r.top+r.height/2;const rx=(e.clientY-cy)/(r.height/2)*-5;const ry=(e.clientX-cx)/(r.width/2)*5;card.style.transform=`perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg)`;});
+document.addEventListener('mouseleave',()=>{card.style.transform='';});
+})();
+</script>
 </body>
 </html>
