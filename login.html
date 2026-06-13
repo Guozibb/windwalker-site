@@ -305,32 +305,64 @@
         document.addEventListener('touchmove', e => { bgMx = e.touches[0].clientX; bgMy = e.touches[0].clientY; }, {passive:true});
 
         // 主题按钮
+        const card = document.querySelector('.login-card');
+        const cardStyles = {
+            sky:    'background:rgba(255,255,255,0.85);box-shadow:0 8px 40px rgba(70,130,180,0.15);',
+            desert: 'background:rgba(255,250,245,0.88);box-shadow:0 8px 40px rgba(180,140,100,0.15);',
+            ocean:  'background:rgba(245,250,255,0.85);box-shadow:0 8px 40px rgba(80,160,180,0.15);',
+        };
         document.querySelectorAll('.bg-theme-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.bg-theme-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active'); bgTheme = btn.dataset.bg;
                 localStorage.setItem('ww_bg_theme', bgTheme);
+                if (card) card.style.cssText = cardStyles[bgTheme] || '';
                 bgParticles = []; bgRipples = []; bgMouseTrail = [];
             });
         });
+        // 初始应用卡片色调
+        if (card) card.style.cssText = cardStyles[bgTheme] || '';
         // 初始激活按钮
         document.querySelector(`.bg-theme-btn[data-bg="${bgTheme}"]`)?.classList.add('active');
 
         // === 天空场景 ===
+        function drawCloud(cx, cy, size) {
+            // 蓬松云朵：多个圆叠加
+            const parts = [
+                {dx:0, dy:0, r:size*0.55},
+                {dx:-size*0.4, dy:size*0.05, r:size*0.35},
+                {dx:size*0.4, dy:size*0.05, r:size*0.35},
+                {dx:-size*0.2, dy:-size*0.3, r:size*0.32},
+                {dx:size*0.2, dy:-size*0.3, r:size*0.32},
+                {dx:0, dy:-size*0.4, r:size*0.28},
+            ];
+            parts.forEach(p => {
+                bgCtx.beginPath();
+                bgCtx.arc(cx + p.dx, cy + p.dy, p.r, 0, Math.PI*2);
+                bgCtx.fill();
+            });
+        }
+
         function drawSky() {
-            // 渐变天空
+            // 更蓝的天空渐变
             const grad = bgCtx.createLinearGradient(0, 0, 0, bgH);
-            grad.addColorStop(0, '#c9dce9'); grad.addColorStop(0.5, '#e0eaf2'); grad.addColorStop(1, '#f0f4f8');
+            grad.addColorStop(0, '#5b9ecf'); grad.addColorStop(0.35, '#8ab8e0'); grad.addColorStop(0.7, '#c5ddf2'); grad.addColorStop(1, '#e8f0f8');
             bgCtx.fillStyle = grad; bgCtx.fillRect(0, 0, bgW, bgH);
-            // 云朵（随鼠标漂移）
-            const clouds = [{x:bgW*0.2,y:bgH*0.15,r:80},{x:bgW*0.55,y:bgH*0.22,r:65},{x:bgW*0.78,y:bgH*0.1,r:70},{x:bgW*0.4,y:bgH*0.3,r:50},{x:bgW*0.85,y:bgH*0.35,r:55}];
+            // 蓬松云朵
+            const clouds = [
+                {x:bgW*0.15,y:bgH*0.12,s:90},{x:bgW*0.5,y:bgH*0.2,s:75},
+                {x:bgW*0.8,y:bgH*0.08,s:85},{x:bgW*0.35,y:bgH*0.32,s:60},
+                {x:bgW*0.7,y:bgH*0.28,s:55},{x:bgW*0.05,y:bgH*0.35,s:50},
+            ];
             clouds.forEach((c,i) => {
-                const ox = bgMx > 0 ? (bgMx/bgW - 0.5) * 30 * (i+1)*0.3 : Math.sin(bgTime*0.003 + i)*15;
-                const oy = bgMy > 0 ? (bgMy/bgH - 0.5) * 15 * (i+1)*0.2 : Math.cos(bgTime*0.004 + i)*8;
-                bgCtx.fillStyle = 'rgba(255,255,255,0.7)';
-                bgCtx.beginPath(); bgCtx.ellipse(c.x+ox, c.y+oy, c.r, c.r*0.45, 0, 0, Math.PI*2); bgCtx.fill();
-                bgCtx.fillStyle = 'rgba(255,255,255,0.5)';
-                bgCtx.beginPath(); bgCtx.ellipse(c.x+ox-c.r*0.25, c.y+oy-c.r*0.08, c.r*0.6, c.r*0.35, -0.2, 0, Math.PI*2); bgCtx.fill();
+                const ox = bgMx > 0 ? (bgMx/bgW - 0.5) * 25 * (i+1)*0.25 : Math.sin(bgTime*0.0025 + i)*12;
+                const oy = bgMy > 0 ? (bgMy/bgH - 0.5) * 12 * (i+1)*0.2 : Math.cos(bgTime*0.003 + i)*6;
+                const cx = c.x + ox, cy = c.y + oy;
+                bgCtx.fillStyle = 'rgba(255,255,255,0.85)';
+                drawCloud(cx, cy, c.s);
+                // 阴影
+                bgCtx.fillStyle = 'rgba(240,245,255,0.6)';
+                drawCloud(cx - c.s*0.05, cy + c.s*0.08, c.s*0.85);
             });
             // 羽毛粒子
             if (Math.random() < 0.03) bgParticles.push({x:Math.random()*bgW,y:-10,r:1.5+Math.random()*3,vy:0.15+Math.random()*0.3,vx:(Math.random()-0.5)*0.3,rot:Math.random()*360,vrot:(Math.random()-0.5)*2,life:1});
