@@ -2971,11 +2971,22 @@
         // ========== Lightbox ==========
         async function openLightbox(id) {
             const sid = String(id);
-            const items = filtered();
-            // 兼容字符串和数字 ID
-            lightboxIdx = items.findIndex(m => String(m.id) === sid);
-            if (lightboxIdx === -1) { console.log('openLightbox: item not found for id=' + sid); return; }
-            console.log('openLightbox: found', items[lightboxIdx].title);
+            // 从全部作品中查找（不受当前筛选影响）
+            const all = allItems();
+            let foundIdx = all.findIndex(m => String(m.id) === sid);
+            // 如果在「全部」中没找到，尝试在 filtered 中找（兼容展开 index）
+            if (foundIdx === -1) {
+                const filteredItems = filtered();
+                foundIdx = filteredItems.findIndex(m => String(m.id) === sid);
+                if (foundIdx !== -1) lightboxIdx = foundIdx;
+                else { console.log('openLightbox: item not found, id=' + sid); return; }
+            } else {
+                // 在 allItems 找到了，使用 filtered 的 index（用于前后导航）
+                const filteredItems = filtered();
+                lightboxIdx = filteredItems.findIndex(m => String(m.id) === sid);
+                if (lightboxIdx === -1) lightboxIdx = foundIdx;
+            }
+            console.log('openLightbox: found', all[foundIdx].title);
             // 👁 浏览量+1
             try {
                 const { data: row } = await supabase.from('item_views').select('views').eq('item_id', sid).maybeSingle();
@@ -2983,10 +2994,10 @@
             } catch(e) { viewCounts[sid] = (viewCounts[sid]||0) + 1; }
             supabase.from('item_views').upsert({item_id:sid, views:viewCounts[sid]}).then();
             renderGallery();
-            showInLightbox(items[lightboxIdx]);
+            showInLightbox(all[foundIdx]);
             lightbox.classList.add('open');
             document.body.style.overflow = 'hidden';
-            updateNav(items);
+            updateNav(lightboxIdx >= 0 ? filtered() : all);
         }
 
         function showInLightbox(m) {
