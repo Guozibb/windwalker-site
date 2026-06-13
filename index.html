@@ -5501,7 +5501,19 @@ function updateNav(items) {
                         <div class="admin-stat-card"><div class="val">+${newUsers||0}</div><div class="lbl">7天新用户</div></div>
                         <div class="admin-stat-card"><div class="val">+${newWorks||0}</div><div class="lbl">7天新作品</div></div>
                         <div class="admin-stat-card"><div class="val">${(works||0)?Math.round(totalViews/(works||1)):0}</div><div class="lbl">均浏览/作品</div></div>
+                    </div>
+                    <h3 style="margin-top:16px;">🚩 最近举报</h3>
+                    <div id="adminReportsList" style="font-size:0.82rem;">⏳ 加载中...</div>`;
+                // 加载举报列表
+                const { data: rpts } = await supabase.from('reports').select('*, reporter:reporter_id(username)').order('created_at',{ascending:false}).limit(20);
+                const rptHtml = (rpts||[]).length ? rpts.map(r => {
+                    const t = new Date(r.created_at).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                    return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+                        <strong>${r.reporter?.username||'?'}</strong> 举报了 ${r.target_type==='post'?'帖子':r.target_type==='comment'?'评论':'作品'} #${r.target_id}
+                        <div style="color:var(--text-muted);font-size:0.72rem;">原因：${r.reason} · ${t}</div>
                     </div>`;
+                }).join('') : '<div style="color:var(--text-muted);">暂无举报</div>';
+                document.getElementById('adminReportsList').innerHTML = rptHtml;
             } catch(e) { document.getElementById('adminDashContent').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;">加载失败</div>'; }
         });
         document.getElementById('adminDashClose').addEventListener('click', () => document.getElementById('adminDashOverlay').classList.remove('open'));
@@ -5651,6 +5663,17 @@ function updateNav(items) {
             if (!reason) return;
             try {
                 await supabase.from('reports').insert({ reporter_id: currentUserId, target_type: targetType, target_id: String(targetId), reason });
+                // 通知所有管理员
+                const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+                if (admins) {
+                    for (const admin of admins) {
+                        await supabase.from('notifications').insert({
+                            user_id: admin.id, type: 'system', from_user_id: currentUserId,
+                            text: `举报了${targetType==='post'?'帖子':targetType==='comment'?'评论':'作品'}：${reason}`,
+                            read: false
+                        });
+                    }
+                }
                 showToast('✅ 举报已提交，我们会尽快处理');
             } catch(e) { showToast('举报失败: ' + e.message, true); }
         }
