@@ -5202,15 +5202,13 @@ function updateNav(items) {
                     const av = avMap[name];
                     const initChar = name[0];
                     return `
-                ${(() => {
                     const isCreatorUser = creatorSet.has(name);
                     return `
                     <div class="hp-creator-card" onclick="showCreatorProfile('${name}')">
                         <div class="${isCreatorUser ? 'avatar-has-v' : ''}" style="position:relative;display:inline-block;">
                             ${av ? `<div class="hp-cc-avatar" style="background-image:url(${av});background-size:cover;"></div>` : `<div class="hp-cc-avatar">${initChar}</div>`}
                             ${isCreatorUser ? '<span class="creator-v-badge v-blue">✓</span>' : ''}
-                        </div>`;
-                })()}
+                        </div>
                         <div class="hp-cc-name">${name}${info.badge?renderBadge(info.badge):''}</div>
                         <div class="hp-cc-count">${info.count} 个作品</div>
                     </div>`;
