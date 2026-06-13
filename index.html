@@ -2465,6 +2465,8 @@
                     <button class="msg-sidebar-tab" data-mtab="system">系统通知</button>
                 </div>
                 <div class="msg-search"><input type="text" id="msgSearchInput" placeholder="搜索会话..."></div>
+                <div class="msg-search" style="border-bottom:1px solid var(--border);padding-bottom:10px;"><input type="text" id="msgNewSearchInput" placeholder="🔍 搜索用户开始新对话..."></div>
+                <div id="msgNewSearchResults" style="display:none;max-height:150px;overflow-y:auto;border-bottom:1px solid var(--border);"></div>
                 <div class="msg-conv-list" id="msgConvList"></div>
             </div>
             <!-- Chat Area -->
@@ -2685,7 +2687,7 @@
         <div class="drawer-friends" style="border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:8px;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span class="drawer-works-title" style="margin:0;">✉ 私信</span>
-                <button class="comment-submit" id="btnOpenMessages" style="font-size:0.7rem;padding:4px 10px;">查看</button>
+                <button class="comment-submit" id="btnOpenMessagesDrawer" style="font-size:0.7rem;padding:4px 10px;">查看</button>
             </div>
             <div id="msgUnread" style="font-size:0.72rem;color:var(--accent);"></div>
         </div>
@@ -4004,6 +4006,8 @@ function updateNav(items) {
         }
         // Open messaging
         document.getElementById('btnOpenMessages').addEventListener('click',()=>{msgOverlay.classList.add('open');renderConvList();});
+        const drawerMsgBtn=document.getElementById('btnOpenMessagesDrawer');
+        if(drawerMsgBtn)drawerMsgBtn.addEventListener('click',()=>{msgOverlay.classList.add('open');renderConvList();});
         document.getElementById('msgClose').addEventListener('click',()=>msgOverlay.classList.remove('open'));
         document.getElementById('msgChatClose').addEventListener('click',()=>{msgPartner=null;msgPartnerId=null;msgContainer.classList.remove('chat-open');document.getElementById('msgChatBody').innerHTML='<div style="text-align:center;color:var(--text-muted);padding:60px;">选择一位用户开始聊天</div>';document.getElementById('msgChatName').textContent='';renderConvList();});
         document.getElementById('msgChatBack').addEventListener('click',()=>{msgPartner=null;msgPartnerId=null;msgContainer.classList.remove('chat-open');document.getElementById('msgChatBody').innerHTML='<div style="text-align:center;color:var(--text-muted);padding:60px;">选择一位用户开始聊天</div>';document.getElementById('msgChatName').textContent='';renderConvList();});
@@ -4028,7 +4032,18 @@ function updateNav(items) {
                     <div class="msg-conv-meta"><div class="msg-conv-time">${timeStr}</div>${unread?`<span class="msg-conv-badge">${unread}</span>`:''}</div>
                 </div>`;
             }).join(''):'<div style="text-align:center;color:var(--text-muted);padding:40px;">暂无会话</div>';
-            document.getElementById('msgSearchInput').addEventListener('input',renderConvList);
+            // 搜索新用户（不在已有会话中的）
+        document.getElementById('msgNewSearchInput').addEventListener('input',async function(){
+            const q=this.value.trim();const res=document.getElementById('msgNewSearchResults');
+            if(!q||q.length<1){res.style.display='none';return;}
+            const{data}=await supabase.from('profiles').select('username,avatar_url,is_creator').ilike('username',`%${q}%`).neq('username',getCurrentUser()).limit(8);
+            const filtered=(data||[]).filter(u=>!document.querySelector(`.msg-conv-item[onclick*="${u.username}"]`));
+            res.style.display='block';res.innerHTML=filtered.length?filtered.map(u=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="window.openMsgChat('${u.username}');document.getElementById('msgNewSearchInput').value='';document.getElementById('msgNewSearchResults').style.display='none';">
+                <div class="msg-conv-avatar" style="width:32px;height:32px;font-size:0.8rem;">${u.username[0]}</div>
+                <div style="flex:1;font-size:0.82rem;">${u.username}${u.is_creator?' <span class="creator-nameplate">创作者</span>':''}</div>
+            </div>`).join(''):'<div style="padding:10px 14px;font-size:0.78rem;color:var(--text-muted);">未找到用户</div>';
+        });
+        document.getElementById('msgSearchInput').addEventListener('input',renderConvList);
         }
         function msgConvCtx(name,e){
             const opts=[{t:'置顶',f:()=>showToast('已置顶')},{t:'标记已读',f:async()=>{if(msgPartnerId)await supabase.from('messages').update({read:true}).eq('to_id',currentUserId).eq('from_id',msgPartnerId);renderConvList();}},{t:'删除',f:()=>{showToast('会话已删除');renderConvList();}}];
@@ -5114,7 +5129,7 @@ function updateNav(items) {
                 // Reopen with updated data
                 setTimeout(() => showUserCard(user), 100);
             });
-            document.getElementById('ucMsgBtn').addEventListener('click', () => { overlay.remove(); openChatWith(user.username); chatPanel.style.display='flex'; });
+            document.getElementById('ucMsgBtn').addEventListener('click', () => { overlay.remove(); openChatWithUser(user.username); });
             document.getElementById('ucFriendBtn').addEventListener('click', async () => { await sendFriendRequest(user.username); overlay.remove(); });
         }
 
