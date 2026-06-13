@@ -3589,17 +3589,31 @@ function updateNav(items) {
             });
         });
 
-        avatarInput.addEventListener('change', () => {
+        avatarInput.addEventListener('change', async () => {
             const f = avatarInput.files[0];
             if (!f || !f.type.startsWith('image/')) return;
+            if (!currentUserId) { showToast('请先登录', true); return; }
+            // 压缩头像图片
+            let fileToUpload = f;
+            try { fileToUpload = await compressImage(f, 400, 0.75); } catch(e) {}
+            const path = currentUserId + '_av.' + (fileToUpload.type === 'image/png' ? 'png' : 'jpg');
+            const { error } = await supabase.storage.from('avatars').upload(path, fileToUpload, { upsert: true });
+            if (error) { showToast('头像上传失败: ' + error.message, true); return; }
+            const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+            const url = pub.publicUrl + '?t=' + Date.now();
+            // 本地预览
             const reader = new FileReader();
             reader.onload = () => {
                 avatarImg.src = reader.result;
                 avatarImg.style.display = 'block';
                 avatarPlaceholder.style.display = 'none';
-                saveProfile(); updateUserButton();
             };
             reader.readAsDataURL(f);
+            // 持久化到数据库
+            currentUser.avatar_url = url;
+            await supabase.from('profiles').update({ avatar_url: url }).eq('id', currentUserId);
+            updateUserButton();
+            showToast('头像已更新！');
         });
 
         // Name / bio edit → save on blur
@@ -4022,6 +4036,7 @@ function updateNav(items) {
             const container = document.getElementById('model3DViewer');
             if (!container || !url) return;
             ext = (ext || '').toLowerCase();
+            console.log('[3D] 开始加载:', ext, url.slice(0, 80));
             // 清理旧 viewer
             if (model3DViewerActive) {
                 model3DViewerActive.controls.dispose();
@@ -4029,18 +4044,24 @@ function updateNav(items) {
                 if (model3DViewerActive.animationFrame) cancelAnimationFrame(model3DViewerActive.animationFrame);
                 model3DViewerActive = null;
             }
-            container.innerHTML = '<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载模型中...</div>';
+            container.innerHTML = '<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载模型中...<br><span style="font-size:0.7rem;opacity:0.6;">' + ext.toUpperCase() + ' 格式</span></div>';
             try {
                 // 根据格式动态导入对应加载器
-                const imports = [import('three'), import('three/addons/controls/OrbitControls.js')];
-                if (['glb','gltf'].includes(ext)) imports.push(import('three/addons/loaders/GLTFLoader.js'));
-                else if (ext === 'fbx') imports.push(import('three/addons/loaders/FBXLoader.js'));
-                else if (ext === 'obj') imports.push(import('three/addons/loaders/OBJLoader.js'));
-                else if (ext === 'stl') imports.push(import('three/addons/loaders/STLLoader.js'));
-                else if (ext === 'dae') imports.push(import('three/addons/loaders/ColladaLoader.js'));
-                else imports.push(import('three/addons/loaders/GLTFLoader.js')); // 回退
+                let loaderPromise;
+                if (['glb','gltf'].includes(ext)) loaderPromise = import('three/addons/loaders/GLTFLoader.js');
+                else if (ext === 'fbx') loaderPromise = import('three/addons/loaders/FBXLoader.js');
+                else if (ext === 'obj') loaderPromise = import('three/addons/loaders/OBJLoader.js');
+                else if (ext === 'stl') loaderPromise = import('three/addons/loaders/STLLoader.js');
+                else if (ext === 'dae') loaderPromise = import('three/addons/loaders/ColladaLoader.js');
+                else loaderPromise = import('three/addons/loaders/GLTFLoader.js');
 
-                const [THREE, { OrbitControls }, loaderModule] = await Promise.all(imports);
+                const [THREE, { OrbitControls }, loaderModule] = await Promise.all([
+                    import('three'),
+                    import('three/addons/controls/OrbitControls.js'),
+                    loaderPromise
+                ]);
+                console.log('[3D] 模块加载成功, 开始解析模型...');
+
                 container.innerHTML = '';
                 const w = container.clientWidth, h = container.clientHeight;
                 const scene = new THREE.Scene();
@@ -4065,29 +4086,48 @@ function updateNav(items) {
                 controls.autoRotate = true; controls.autoRotateSpeed = 1.5;
                 controls.target.set(0, 0.3, 0); controls.update();
 
-                // 根据格式加载模型
+                // 根据格式加载模型（用 Promise 包装以支持进度回调）
                 let model;
+                const loadWithTimeout = (loadFn, timeoutMs = 60000) => new Promise((resolve, reject) => {
+                    const timer = setTimeout(() => reject(new Error('加载超时（>60秒），文件可能过大或格式不兼容')), timeoutMs);
+                    loadFn().then(r => { clearTimeout(timer); resolve(r); }).catch(e => { clearTimeout(timer); reject(e); });
+                });
+
                 if (['glb','gltf'].includes(ext)) {
                     const loader = new loaderModule.GLTFLoader();
-                    const result = await loader.loadAsync(url);
+                    const result = await loadWithTimeout(() => loader.loadAsync(url));
                     model = result.scene;
                 } else if (ext === 'fbx') {
                     const loader = new loaderModule.FBXLoader();
-                    model = await loader.loadAsync(url);
+                    model = await loadWithTimeout(() => new Promise((resolve, reject) => {
+                        loader.load(url, resolve, p => {
+                            if (p && p.total) {
+                                const pct = Math.round(p.loaded / p.total * 100);
+                                container.innerHTML = `<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载 FBX... ${pct}%</div>`;
+                            }
+                        }, reject);
+                    }));
                 } else if (ext === 'obj') {
                     const loader = new loaderModule.OBJLoader();
-                    model = await loader.loadAsync(url);
+                    model = await loadWithTimeout(() => new Promise((resolve, reject) => {
+                        loader.load(url, resolve, undefined, reject);
+                    }));
                 } else if (ext === 'stl') {
                     const loader = new loaderModule.STLLoader();
-                    const geometry = await loader.loadAsync(url);
+                    const geometry = await loadWithTimeout(() => new Promise((resolve, reject) => {
+                        loader.load(url, resolve, undefined, reject);
+                    }));
                     const material = new THREE.MeshStandardMaterial({ color: 0x8899cc, roughness: 0.5, metalness: 0.1 });
                     model = new THREE.Mesh(geometry, material);
                 } else if (ext === 'dae') {
                     const loader = new loaderModule.ColladaLoader();
-                    const result = await loader.loadAsync(url);
+                    const result = await loadWithTimeout(() => new Promise((resolve, reject) => {
+                        loader.load(url, resolve, undefined, reject);
+                    }));
                     model = result.scene;
                 }
-                if (!model) throw new Error('无法解析模型');
+                if (!model) throw new Error('无法解析模型结构');
+                console.log('[3D] 模型解析成功, 开始渲染...');
 
                 // 居中模型
                 const box = new THREE.Box3().setFromObject(model);
@@ -4117,7 +4157,8 @@ function updateNav(items) {
                     if (w2 > 0 && h2 > 0) { camera.aspect = w2/h2; camera.updateProjectionMatrix(); renderer.setSize(w2, h2); }
                 }).observe(container);
             } catch(e) {
-                container.innerHTML = `<div style="color:var(--red);text-align:center;padding-top:40%;">模型加载失败<br><span style="font-size:0.8rem;">${e.message||'请确认文件格式正确'} — 支持的格式: GLB/GLTF/FBX/OBJ/STL/DAE</span></div>`;
+                console.error('[3D] 加载失败:', ext, e.message);
+                container.innerHTML = `<div style="color:var(--red);text-align:center;padding:40px 20px;">❌ 模型加载失败<br><span style="font-size:0.78rem;display:block;margin-top:8px;">${e.message||'请确认文件格式正确'}</span><span style="font-size:0.7rem;display:block;margin-top:12px;opacity:0.7;">支持的格式: GLB / GLTF / FBX / OBJ / STL / DAE<br>如 FBX 加载失败，建议转为 GLB 格式上传以获得最佳兼容性</span></div>`;
             }
         }
         window.initModel3DViewer = initModel3DViewer;
@@ -4328,7 +4369,7 @@ function updateNav(items) {
                     (c || []).forEach(cmt => {
                         const sid = String(cmt.item_id);
                         if (!itemComments[sid]) itemComments[sid] = [];
-                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', badge: badgeMap[cmt.author_id] || '', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id, isPinned: cmt.is_pinned || false });
+                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', badge: badgeMap[cmt.author_id] || '', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id, isPinned: cmt.is_pinned || false, authorId: cmt.author_id });
                     });
                     // 排序：置顶优先，再按时间
                     Object.keys(itemComments).forEach(k => {
@@ -4347,6 +4388,9 @@ function updateNav(items) {
                     likes.delete(sid);
                     likeCounts[sid] = Math.max(0, (likeCounts[sid]||0) - 1);
                     supabase.from('item_likes').delete().eq('item_id', sid).eq('user_id', currentUserId).then();
+                    // ⭐ 取消点赞，扣除积分（防止刷分）
+                    const item = allItems().find(m => String(m.id) === sid);
+                    if (item?.author) addPointsToCreator(item.author, -1);
                 } else {
                     likes.add(sid);
                     likeCounts[sid] = (likeCounts[sid]||0) + 1;
@@ -4375,6 +4419,9 @@ function updateNav(items) {
                     bookmarks.delete(sid);
                     bookmarkCounts[sid] = Math.max(0, (bookmarkCounts[sid]||0) - 1);
                     supabase.from('item_bookmarks').delete().eq('item_id', sid).eq('user_id', currentUserId).then();
+                    // ⭐ 取消收藏，扣除积分（防止刷分）
+                    const item = allItems().find(m => String(m.id) === sid);
+                    if (item?.author) addPointsToCreator(item.author, -2);
                 } else {
                     bookmarks.add(sid);
                     bookmarkCounts[sid] = (bookmarkCounts[sid]||0) + 1;
@@ -4402,7 +4449,9 @@ function updateNav(items) {
                 text = filterText(text);
                 const sid = String(id);
                 if (!itemComments[sid]) itemComments[sid] = [];
-                const cmt = { name, text, time: Date.now() };
+                // 检查此用户是否已评论过（防止刷分：每人每题只算一次积分）
+                const alreadyCommented = currentUserId && itemComments[sid].some(c => c.authorId === currentUserId);
+                const cmt = { name, text, time: Date.now(), authorId: currentUserId || null };
                 itemComments[sid].push(cmt);
                 commentCounts[sid] = (commentCounts[sid]||0) + 1;
                 if (currentUserId) {
@@ -4410,11 +4459,13 @@ function updateNav(items) {
                         if (data) cmt.id = data.id;
                     });
                 }
-                // ⭐ 积分：评论+1
+                // ⭐ 积分：仅首次评论+1（重复评论不积分）
                 const item = allItems().find(m => String(m.id) === sid);
-                if (item?.author) {
+                if (item?.author && !alreadyCommented) {
                     addPointsToCreator(item.author, 1);
-                    // 🔔 通知创作者
+                }
+                // 🔔 通知创作者（每次评论都通知，但不重复积分）
+                if (item?.author) {
                     supabase.from('profiles').select('id').eq('username', item.author).single().then(({ data: pf }) => {
                         if (pf && pf.id !== currentUserId) {
                             supabase.from('notifications').insert({
@@ -5548,13 +5599,20 @@ function updateNav(items) {
 
         // ========== 🏠 Homepage Renderers ==========
         function renderFeatured() {
-            // 精选 4 个代表作：角色01(id=0) / 场景01(id=4) / 建筑01(id=12) / 载具01(id=7)
-            const featuredIds = [0, 4, 8, 6]; // 角色01 / 场景01 / 建筑01 / 载具01
-            const items = featuredIds.map(id => modelData.find(m => m.id === id)).filter(Boolean);
+            // 🎲 从全部作品（画廊 + 用户上传）随机选取 4 个，每小时刷新一次
+            const allPool = [...uploadedItems, ...modelData.filter(m => !uploadedItems.some(u => String(u.id) === String(m.id)))];
+            if (!allPool.length) return;
+            // Fisher-Yates 洗牌取前 4
+            const shuffled = [...allPool];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            const items = shuffled.slice(0, 4);
             const grid = document.getElementById('hpFeaturedGrid');
             grid.innerHTML = items.map(m => `
-                <div class="hp-featured-card" data-wid="${m.id}" onclick="openLightbox(${m.id})">
-                    <img src="${m.thumb || m.file}" alt="${m.title}" loading="lazy">
+                <div class="hp-featured-card" data-wid="${m.id}" onclick="openLightbox('${String(m.id)}')">
+                    <img src="${m.thumb || m.cover || m.file}" alt="${m.title}" loading="lazy" onerror="this.style.opacity='0.3'">
                     <div class="hp-fc-overlay"></div>
                     <span class="hp-fc-badge">🔥 精选</span>
                     <span class="hp-fc-label">${m.title}</span>
