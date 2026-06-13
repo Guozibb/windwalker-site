@@ -1177,6 +1177,7 @@
             gap: 12px;
             align-items: center;
         }
+        .card-author-name:hover { text-decoration: underline; opacity: 0.85; }
 
         /* Card quick actions (like/bookmark on hover) */
         .card-quick-actions {
@@ -3039,7 +3040,7 @@
                         </div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">${m.author||'风之旅人'}${renderBadge(m.authorBadge)} · ${m.cat}</div>
+                            <div class="card-meta"><span class="card-author-name" onclick="event.stopPropagation();showCreatorProfile('${m.author||'风之旅人'}')" style="cursor:pointer;color:var(--accent);font-weight:600;" title="查看作者主页">${m.author||'风之旅人'}</span>${renderBadge(m.authorBadge)} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -3061,7 +3062,7 @@
                         </div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">${m.author||'风之旅人'}${renderBadge(m.authorBadge)} · ${m.cat}</div>
+                            <div class="card-meta"><span class="card-author-name" onclick="event.stopPropagation();showCreatorProfile('${m.author||'风之旅人'}')" style="cursor:pointer;color:var(--accent);font-weight:600;" title="查看作者主页">${m.author||'风之旅人'}</span>${renderBadge(m.authorBadge)} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -3085,7 +3086,7 @@
                     </div>
                     <div class="card-overlay">
                         <div class="card-title">${m.title}</div>
-                        <div class="card-meta">${m.author||'风之旅人'}${renderBadge(m.authorBadge)}${renderCreatorBadge(m.author)} · ${m.cat}</div>
+                        <div class="card-meta"><span class="card-author-name" onclick="event.stopPropagation();showCreatorProfile('${m.author||'风之旅人'}')" style="cursor:pointer;color:var(--accent);font-weight:600;" title="查看作者主页">${m.author||'风之旅人'}</span>${renderBadge(m.authorBadge)}${renderCreatorBadge(m.author)} · ${m.cat}</div>
                     </div>
                 </div>`;
             }).join('');
@@ -3116,19 +3117,45 @@
             // 从全部作品中查找（不受当前筛选影响）
             const all = allItems();
             let foundIdx = all.findIndex(m => String(m.id) === sid);
+            let item = foundIdx !== -1 ? all[foundIdx] : null;
             // 如果在「全部」中没找到，尝试在 filtered 中找（兼容展开 index）
-            if (foundIdx === -1) {
+            if (!item) {
                 const filteredItems = filtered();
                 foundIdx = filteredItems.findIndex(m => String(m.id) === sid);
-                if (foundIdx !== -1) lightboxIdx = foundIdx;
-                else { console.log('openLightbox: item not found, id=' + sid); return; }
+                if (foundIdx !== -1) { lightboxIdx = foundIdx; item = filteredItems[foundIdx]; }
             } else {
-                // 在 allItems 找到了，使用 filtered 的 index（用于前后导航）
                 const filteredItems = filtered();
                 lightboxIdx = filteredItems.findIndex(m => String(m.id) === sid);
                 if (lightboxIdx === -1) lightboxIdx = foundIdx;
             }
-            console.log('openLightbox: found', all[foundIdx].title);
+            // 🔍 本地未找到 → 从 Supabase 按需加载
+            if (!item && sid.startsWith('upload_')) {
+                const uploadId = parseInt(sid.replace('upload_', ''));
+                if (uploadId) {
+                    const { data: row } = await supabase.from('uploads').select('*').eq('id', uploadId).single();
+                    if (row) {
+                        const { data: pf } = await supabase.from('profiles').select('username,badge').eq('id', row.user_id).single();
+                        item = {
+                            id: 'upload_' + row.id,
+                            file: row.file_url,
+                            cover: row.cover_url || null,
+                            type: row.file_type,
+                            cat: row.category || '灵感来源',
+                            title: row.title,
+                            author: pf?.username || '用户',
+                            authorBadge: pf?.badge || '',
+                            fileName: row.file_name,
+                            isUpload: true, persisted: true,
+                            format: row.format || '',
+                            optimized: row.cover_url || row.file_url
+                        };
+                        // 补充到列表以便后续导航
+                        uploadedItems.push(item);
+                    }
+                }
+            }
+            if (!item) { console.log('openLightbox: item not found, id=' + sid); return; }
+            console.log('openLightbox: found', item.title);
             // 👁 浏览量+1
             try {
                 const { data: row } = await supabase.from('item_views').select('views').eq('item_id', sid).maybeSingle();
@@ -3136,7 +3163,7 @@
             } catch(e) { viewCounts[sid] = (viewCounts[sid]||0) + 1; }
             supabase.from('item_views').upsert({item_id:sid, views:viewCounts[sid]}).then();
             renderGallery();
-            showInLightbox(all[foundIdx]);
+            showInLightbox(item);
             lightbox.classList.add('open');
             document.body.style.overflow = 'hidden';
             updateNav(lightboxIdx >= 0 ? filtered() : all);
@@ -3158,7 +3185,7 @@
             } else {
                 lightboxContent.innerHTML = `<img src="${m.optimized || m.file}" alt="${m.title}">`;
             }
-            lightboxDownload.onclick = () => { downloadFile(m); if (m.author) addPointsToCreator(m.author, 5); };
+            lightboxDownload.onclick = () => { downloadFile(m); if (m.author) { addPointsToCreator(m.author, 5); /* 🔔 通知创作者 */ supabase.from('profiles').select('id').eq('username', m.author).single().then(({ data: pf }) => { if (pf && pf.id !== currentUserId) { supabase.from('notifications').insert({ user_id: pf.id, type: 'like', from_user_id: currentUserId, text: `下载了你的作品「${m.title}」`, read: false }).then(); } }); } };
 
             // Social bar
             const socialBar = document.getElementById('lightboxSocial');
@@ -4298,7 +4325,18 @@ function updateNav(items) {
                     supabase.from('item_likes').insert({ item_id: sid, user_id: currentUserId }).then();
                     // ⭐ 积分：点赞+1（仅对创作者作品）
                     const item = allItems().find(m => String(m.id) === sid);
-                    if (item?.author) addPointsToCreator(item.author, 1);
+                    if (item?.author) {
+                        addPointsToCreator(item.author, 1);
+                        // 🔔 通知创作者
+                        supabase.from('profiles').select('id').eq('username', item.author).single().then(({ data: pf }) => {
+                            if (pf && pf.id !== currentUserId) {
+                                supabase.from('notifications').insert({
+                                    user_id: pf.id, type: 'like', from_user_id: currentUserId,
+                                    text: `赞了你的作品「${item.title}」`, read: false
+                                }).then();
+                            }
+                        });
+                    }
                 }
                 renderGallery();
             }
@@ -4315,7 +4353,18 @@ function updateNav(items) {
                     supabase.from('item_bookmarks').insert({ item_id: sid, user_id: currentUserId }).then();
                     // ⭐ 积分：收藏+2
                     const item = allItems().find(m => String(m.id) === sid);
-                    if (item?.author) addPointsToCreator(item.author, 2);
+                    if (item?.author) {
+                        addPointsToCreator(item.author, 2);
+                        // 🔔 通知创作者
+                        supabase.from('profiles').select('id').eq('username', item.author).single().then(({ data: pf }) => {
+                            if (pf && pf.id !== currentUserId) {
+                                supabase.from('notifications').insert({
+                                    user_id: pf.id, type: 'like', from_user_id: currentUserId,
+                                    text: `收藏了你的作品「${item.title}」`, read: false
+                                }).then();
+                            }
+                        });
+                    }
                 }
                 renderGallery();
             }
@@ -4335,7 +4384,18 @@ function updateNav(items) {
                 }
                 // ⭐ 积分：评论+1
                 const item = allItems().find(m => String(m.id) === sid);
-                if (item?.author) addPointsToCreator(item.author, 1);
+                if (item?.author) {
+                    addPointsToCreator(item.author, 1);
+                    // 🔔 通知创作者
+                    supabase.from('profiles').select('id').eq('username', item.author).single().then(({ data: pf }) => {
+                        if (pf && pf.id !== currentUserId) {
+                            supabase.from('notifications').insert({
+                                user_id: pf.id, type: 'comment', from_user_id: currentUserId,
+                                text: `评论了你的作品「${item.title}」`, read: false
+                            }).then();
+                        }
+                    });
+                }
                 renderGallery();
             }
 
@@ -5208,7 +5268,7 @@ function updateNav(items) {
             const workThumbs = (works||[]).slice(0,6).map(w => {
                 const src = w.cover_url || w.file_url;
                 const icon = w.file_type === 'video' ? '▶' : (w.file_type === 'model' ? '🧊' : '🖼');
-                return src ? `<div style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--bg);"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:1.5rem;\\'>${icon}</div>'"></div>` : `<div style="aspect-ratio:1;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">${icon}</div>`;
+                return src ? `<div class="uc-work-thumb" data-wid="${w.id}" style="aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--bg);cursor:pointer;" title="点击查看「${w.title}」"><img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:1.5rem;\\'>${icon}</div>'"></div>` : `<div class="uc-work-thumb" data-wid="${w.id}" style="aspect-ratio:1;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:pointer;" title="点击查看「${w.title}」">${icon}</div>`;
             }).join('');
 
             const overlay = document.createElement('div');
@@ -5235,6 +5295,14 @@ function updateNav(items) {
 
             overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
             document.getElementById('ucCloseBtn').addEventListener('click', () => overlay.remove());
+            // 🖼 作品缩略图点击 → 打开灯箱
+            overlay.querySelectorAll('.uc-work-thumb').forEach(thumb => {
+                thumb.addEventListener('click', () => {
+                    const wid = thumb.dataset.wid;
+                    overlay.remove();
+                    setTimeout(() => openLightbox('upload_' + wid), 100);
+                });
+            });
             document.getElementById('ucFollowBtn').addEventListener('click', async () => {
                 await toggleFollow(user.username);
                 overlay.remove();
@@ -5561,10 +5629,11 @@ function updateNav(items) {
             if (!creatorSet.has(authorUsername)) return; // 非创作者不积分
             try {
                 const { data: pf } = await supabase.from('profiles').select('id,points').eq('username', authorUsername).single();
-                if (!pf) return;
+                if (!pf) { console.warn('[积分] 创作者不存在:', authorUsername); return; }
                 const newPoints = (pf.points || 0) + amount;
-                await supabase.from('profiles').update({ points: newPoints }).eq('id', pf.id);
-            } catch(e) {}
+                const { error } = await supabase.from('profiles').update({ points: newPoints }).eq('id', pf.id);
+                if (error) console.error('[积分] 更新失败:', error.message, '用户:', authorUsername);
+            } catch(e) { console.error('[积分] 异常:', e.message, '用户:', authorUsername); }
         }
 
         // ========== 📊 Creator Center ==========
