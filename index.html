@@ -3965,7 +3965,7 @@ function updateNav(items) {
         const msgOverlay = document.getElementById('msgOverlay');
         const msgContainer = document.getElementById('msgContainer');
         let msgPartner = null, msgPartnerId = null;
-        const MSG_EMOJIS = '😀😂😍🥰😎🤩😢😡👍👎🎉💪🙏🔥💯❤💔✨🌟🎵🎬📸🎮🖼📁💡🌈🍕☕🎁✅❌⏳📌💬'.split('');
+        const MSG_EMOJIS = ['😀','😂','😍','🥰','😎','🤩','😢','😡','👍','❤','🔥','💯','✨','🌟','🎉','🙏','🎵','📸','🎮','💡','✅','❌'];
 
         async function getMsgs() {
             if (!currentUserId) return [];
@@ -3997,7 +3997,7 @@ function updateNav(items) {
                 const preview=(last.img?'[图片] ':'')+(last.retracted?'[已撤回]':(last.text||'').substring(0,20));
                 const t=new Date(last.time),now=new Date(),isToday=t.toDateString()===now.toDateString();
                 const timeStr=isToday?t.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}):t.toLocaleDateString('zh-CN',{month:'short',day:'numeric'});
-                return`<div class="msg-conv-item" onclick="openMsgChat('${n}')" oncontextmenu="event.preventDefault();msgConvCtx('${n}',event)">
+                return`<div class="msg-conv-item" onclick="window.openMsgChat('${n}')" oncontextmenu="event.preventDefault();msgConvCtx('${n}',event)">
                     <div class="msg-conv-avatar">${n[0]}</div>
                     <div class="msg-conv-info"><div class="msg-conv-name">${n}${renderCreatorBadge(n)}</div><div class="msg-conv-preview">${preview}</div></div>
                     <div class="msg-conv-meta"><div class="msg-conv-time">${timeStr}</div>${unread?`<span class="msg-conv-badge">${unread}</span>`:''}</div>
@@ -4034,7 +4034,7 @@ function updateNav(items) {
                 const text=m.retracted?'<em style="opacity:0.5;">对方撤回了一条消息</em>':(m.text||'');
                 const age=(Date.now()-time)/60000,canRetract=isMe&&age<2&&!m.retracted&&m.id;
                 return`${divider}<div class="msg-bubble-row ${isMe?'me':'other'}">
-                    <div><div class="msg-bubble${isMe?' sending':''}">${imgTag}${text}${canRetract?`<button class="msg-retract-btn" onclick="retractMsg(${m.id})">撤回</button>`:''}</div></div></div>`;
+                    <div><div class="msg-bubble${isMe?' sending':''}">${imgTag}${text}${canRetract?`<button class="msg-retract-btn" onclick="window.retractMsg(${m.id})">撤回</button>`:''}</div></div></div>`;
             }).join(''):'<div style="text-align:center;color:var(--text-muted);padding:40px;">开始聊天吧！</div>';
             body.scrollTop=body.scrollHeight;
         }
@@ -4076,6 +4076,11 @@ function updateNav(items) {
         document.getElementById('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}});
 
         function openChatWithUser(user){msgOverlay.classList.add('open');openMsgChat(user);}
+        // 暴露到全局确保 onclick 可用
+        window.openMsgChat = openMsgChat;
+        window.retractMsg = retractMsg;
+        window.sendMsg = sendMsg;
+
         setTimeout(()=>{updateMsgBadge();setInterval(updateMsgBadge,15000);},2000);
 
         // ========== Logout ==========
