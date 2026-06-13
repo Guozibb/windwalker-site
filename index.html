@@ -2970,19 +2970,19 @@
 
         // ========== Lightbox ==========
         async function openLightbox(id) {
-            const items = filtered();
-            lightboxIdx = items.findIndex(m => m.id === id);
-            if (lightboxIdx === -1) return;
-            // 👁 浏览量+1（先查数据库最新值，避免竞态覆盖）
             const sid = String(id);
+            const items = filtered();
+            // 兼容字符串和数字 ID
+            lightboxIdx = items.findIndex(m => String(m.id) === sid);
+            if (lightboxIdx === -1) { console.log('openLightbox: item not found for id=' + sid); return; }
+            console.log('openLightbox: found', items[lightboxIdx].title);
+            // 👁 浏览量+1
             try {
                 const { data: row } = await supabase.from('item_views').select('views').eq('item_id', sid).maybeSingle();
                 viewCounts[sid] = (row?.views || 0) + 1;
-            } catch(e) {
-                viewCounts[sid] = (viewCounts[sid]||0) + 1;
-            }
+            } catch(e) { viewCounts[sid] = (viewCounts[sid]||0) + 1; }
             supabase.from('item_views').upsert({item_id:sid, views:viewCounts[sid]}).then();
-            renderGallery(); // 即时更新卡片浏览量
+            renderGallery();
             showInLightbox(items[lightboxIdx]);
             lightbox.classList.add('open');
             document.body.style.overflow = 'hidden';
