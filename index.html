@@ -3509,35 +3509,18 @@ function updateNav(items) {
             drawerWorksGrid.innerHTML = showItems.slice(0, 30).map(m => {
                 const isMine = m.author === me;
                 const canDelete = (isMine || isAdmin) && m.isUpload;
-                const delBtn = canDelete ? `<button class="drawer-work-delete" data-delete="${m.id}" title="${isAdmin && !isMine ? '管理员删除' : '删除'}">✕</button>` : '';
+                const delBtn = canDelete ? `<button class="drawer-work-delete" data-delete="${m.id}" title="${isAdmin && !isMine ? '管理员删除' : '删除'}" onclick="event.stopPropagation()">✕</button>` : '';
+                const wid = String(m.id);
+                const clickFn = wid.startsWith('upload_') ? `window.openLightbox('${wid}')` : `window.openLightbox(${wid})`;
                 if (m.type === 'video') {
-                    return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}<div class="work-type-icon">▶</div></div>`;
+                    return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${wid}" onclick="${clickFn}">${delBtn}<div class="work-type-icon">▶</div></div>`;
                 }
                 if (m.type === 'model') {
                     const c = m.cover ? `<img src="${m.cover}" alt="${m.title}" loading="lazy">` : '<div class="work-type-icon">🧊</div>';
-                    return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}${c}</div>`;
+                    return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${wid}" onclick="${clickFn}">${delBtn}${c}</div>`;
                 }
-                return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}<img src="${m.file}" alt="${m.title}" loading="lazy"></div>`;
+                return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${wid}" onclick="${clickFn}">${delBtn}<img src="${m.file}" alt="${m.title}" loading="lazy"></div>`;
             }).join('');
-
-            // Click to open lightbox
-            drawerWorksGrid.querySelectorAll('.drawer-work-thumb').forEach(thumb => {
-                thumb.addEventListener('click', e => {
-                    if (e.target.closest('.drawer-work-delete')) return;
-                    const wid = thumb.dataset.wid;
-                    console.log('🖱 drawer click, wid:', wid);
-                    const id = wid && wid.startsWith('upload_') ? wid : parseInt(wid);
-                    console.log('  resolved id:', id, typeof id);
-                    const item = allItems().find(m => String(m.id) === String(id));
-                    console.log('  found item:', !!item, item?.title);
-                    if (item) {
-                        console.log('  calling openLightbox...');
-                        openLightbox(id);
-                    } else {
-                        console.log('  ❌ item not found in allItems!');
-                    }
-                });
-            });
 
             // Delete handlers
             drawerWorksGrid.querySelectorAll('.drawer-work-delete').forEach(btn => {
