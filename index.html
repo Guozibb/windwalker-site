@@ -5201,7 +5201,6 @@ function updateNav(items) {
                 container.innerHTML = sorted.map(([name, info]) => {
                     const av = avMap[name];
                     const initChar = name[0];
-                    return `
                     const isCreatorUser = creatorSet.has(name);
                     return `
                     <div class="hp-creator-card" onclick="showCreatorProfile('${name}')">
