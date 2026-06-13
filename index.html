@@ -32,26 +32,30 @@
             --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 四季主题色 — 春夏秋冬分明 */
+        /* 四季主题色 — 春夏秋冬每个季节色彩鲜明 */
         body.spring {
-            --accent: #f5a0b5; --accent2: #f8c5d0;
-            --bg: #fef5f7; --surface: #fff; --surface2: #fef0f3; --border: #f0d5dd;
-            --text: #5c4050; --text-muted: #b890a0;
+            --accent: #e8697f; --accent2: #f5a0b5;
+            --bg: #fff0f3; --surface: #fff; --surface2: #ffe8ed; --border: #f5c5d0;
+            --text: #5c3040; --text-muted: #c08090;
+            --accent-glow: rgba(232,105,127,0.18);
         }
         body.summer {
-            --accent: #6bc48a; --accent2: #a0d8b0;
-            --bg: #f4faf6; --surface: #fff; --surface2: #eef8f0; --border: #d0e8d5;
-            --text: #3a5c45; --text-muted: #80a88a;
+            --accent: #3da85c; --accent2: #7ccf95;
+            --bg: #edf7f0; --surface: #fff; --surface2: #e6f4ea; --border: #c0e0c8;
+            --text: #2a4a35; --text-muted: #78a885;
+            --accent-glow: rgba(61,168,92,0.16);
         }
         body.autumn {
-            --accent: #e89850; --accent2: #f0c890;
-            --bg: #fdf8f4; --surface: #fff; --surface2: #fdf2e8; --border: #f0dcc5;
-            --text: #5c4535; --text-muted: #b89878;
+            --accent: #e07830; --accent2: #f0b860;
+            --bg: #fdf3e8; --surface: #fff; --surface2: #fbe8d0; --border: #f0d0a8;
+            --text: #5c3a20; --text-muted: #c09068;
+            --accent-glow: rgba(224,120,48,0.18);
         }
         body.winter {
-            --accent: #90bce8; --accent2: #b8d4f5;
-            --bg: #f5f8fc; --surface: #fff; --surface2: #eef3fa; --border: #d5e0f0;
-            --text: #405068; --text-muted: #8098b8;
+            --accent: #5b9dd9; --accent2: #a0c8f0;
+            --bg: #f0f5fc; --surface: #fff; --surface2: #e8eff8; --border: #c8d8f0;
+            --text: #304058; --text-muted: #8098b8;
+            --accent-glow: rgba(91,157,217,0.16);
         }
 
         html { scroll-behavior: smooth; }
@@ -2739,6 +2743,7 @@
                     <span id="previewName"></span>
                     <span id="previewSize"></span>
                 </div>
+                <div id="uploadSizeWarning" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:10px;font-size:0.75rem;color:var(--text);line-height:1.6;"></div>
             </div>
 
             <!-- Form -->
@@ -4086,45 +4091,37 @@ function updateNav(items) {
                 controls.autoRotate = true; controls.autoRotateSpeed = 1.5;
                 controls.target.set(0, 0.3, 0); controls.update();
 
-                // 根据格式加载模型（用 Promise 包装以支持进度回调）
+                // 根据格式加载模型
                 let model;
-                const loadWithTimeout = (loadFn, timeoutMs = 60000) => new Promise((resolve, reject) => {
-                    const timer = setTimeout(() => reject(new Error('加载超时（>60秒），文件可能过大或格式不兼容')), timeoutMs);
-                    loadFn().then(r => { clearTimeout(timer); resolve(r); }).catch(e => { clearTimeout(timer); reject(e); });
-                });
-
                 if (['glb','gltf'].includes(ext)) {
+                    // GLB/GLTF: 使用 loadAsync + 进度回调（大文件可能需要较长时间）
                     const loader = new loaderModule.GLTFLoader();
-                    const result = await loadWithTimeout(() => loader.loadAsync(url));
-                    model = result.scene;
-                } else if (ext === 'fbx') {
-                    const loader = new loaderModule.FBXLoader();
-                    model = await loadWithTimeout(() => new Promise((resolve, reject) => {
-                        loader.load(url, resolve, p => {
-                            if (p && p.total) {
-                                const pct = Math.round(p.loaded / p.total * 100);
-                                container.innerHTML = `<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载 FBX... ${pct}%</div>`;
-                            }
-                        }, reject);
-                    }));
-                } else if (ext === 'obj') {
-                    const loader = new loaderModule.OBJLoader();
-                    model = await loadWithTimeout(() => new Promise((resolve, reject) => {
-                        loader.load(url, resolve, undefined, reject);
-                    }));
-                } else if (ext === 'stl') {
-                    const loader = new loaderModule.STLLoader();
-                    const geometry = await loadWithTimeout(() => new Promise((resolve, reject) => {
-                        loader.load(url, resolve, undefined, reject);
-                    }));
-                    const material = new THREE.MeshStandardMaterial({ color: 0x8899cc, roughness: 0.5, metalness: 0.1 });
-                    model = new THREE.Mesh(geometry, material);
-                } else if (ext === 'dae') {
-                    const loader = new loaderModule.ColladaLoader();
-                    const result = await loadWithTimeout(() => new Promise((resolve, reject) => {
-                        loader.load(url, resolve, undefined, reject);
-                    }));
-                    model = result.scene;
+                    const gltf = await loader.loadAsync(url, p => {
+                        if (p && p.total) {
+                            const pct = Math.round(p.loaded / p.total * 100);
+                            container.innerHTML = `<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 下载中... ${pct}%<br><span style="font-size:0.7rem;opacity:0.6;">${(p.loaded/1048576).toFixed(1)}MB / ${(p.total/1048576).toFixed(1)}MB</span></div>`;
+                        }
+                    });
+                    model = gltf.scene;
+                } else {
+                    // FBX/OBJ/STL/DAE: 用回调式 Promise 包装（兼容性更好）
+                    const loadWithPromise = (LoaderClass, onResult) => new Promise((resolve, reject) => {
+                        const loader = new LoaderClass();
+                        const timeout = setTimeout(() => reject(new Error('加载超时（>120秒），文件可能过大')), 120000);
+                        loader.load(url, result => { clearTimeout(timeout); resolve(onResult ? onResult(result) : result); }, p => {
+                            if (p && p.total) container.innerHTML = `<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载 ${ext.toUpperCase()}... ${Math.round(p.loaded/p.total*100)}%</div>`;
+                        }, err => { clearTimeout(timeout); reject(err); });
+                    });
+                    if (ext === 'fbx') {
+                        model = await loadWithPromise(loaderModule.FBXLoader);
+                    } else if (ext === 'obj') {
+                        model = await loadWithPromise(loaderModule.OBJLoader);
+                    } else if (ext === 'stl') {
+                        const geometry = await loadWithPromise(loaderModule.STLLoader);
+                        model = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x8899cc, roughness: 0.5, metalness: 0.1 }));
+                    } else if (ext === 'dae') {
+                        model = await loadWithPromise(loaderModule.ColladaLoader, r => r.scene);
+                    }
                 }
                 if (!model) throw new Error('无法解析模型结构');
                 console.log('[3D] 模型解析成功, 开始渲染...');
@@ -5001,6 +4998,7 @@ function updateNav(items) {
         const previewContent = document.getElementById('previewContent');
         const previewName = document.getElementById('previewName');
         const previewSize = document.getElementById('previewSize');
+        const uploadSizeWarning = document.getElementById('uploadSizeWarning');
         const previewRemove = document.getElementById('previewRemove');
         const uploadTitle = document.getElementById('uploadTitle');
         const uploadCategory = document.getElementById('uploadCategory');
@@ -5080,6 +5078,7 @@ function updateNav(items) {
             previewContent.innerHTML = '';
             previewName.textContent = '';
             previewSize.textContent = '';
+            uploadSizeWarning.style.display = 'none';
             uploadTitle.value = '';
             uploadCategory.value = '灵感来源';
             btnSubmitUpload.disabled = true;
@@ -5140,6 +5139,22 @@ function updateNav(items) {
             previewName.textContent = file.name;
             previewSize.textContent = formatSize(file.size);
 
+            // ⚠️ 大文件警告（3D 模型超过 10MB）
+            const sizeWarningEl = document.getElementById('uploadSizeWarning');
+            if (is3D && file.size > 10 * 1048576) {
+                sizeWarningEl.style.display = 'block';
+                const ext = file.name.split('.').pop().toLowerCase();
+                let tip = '';
+                if (['glb','gltf'].includes(ext)) {
+                    tip = '建议用 <a href="https://gltf-transform.dev/" target="_blank">gltf-transform</a> 或 Blender 压缩后再上传：<br>1. Draco 压缩几何体（可缩小 5-10 倍）<br>2. 贴图转 WebP / 降分辨率<br>3. 减面降低面数';
+                } else if (ext === 'fbx') {
+                    tip = '建议转为 GLB 格式并用 Draco 压缩后再上传';
+                }
+                sizeWarningEl.innerHTML = `⚠️ 文件较大（${formatSize(file.size)}），加载可能很慢。<br>${tip}`;
+            } else {
+                sizeWarningEl.style.display = 'none';
+            }
+
             // Auto-fill title
             if (!uploadTitle.value) {
                 const t = file.name.replace(/\.[^.]+$/, '').replace(/[_\-]/g, ' ').slice(0, 40);
@@ -5168,7 +5183,7 @@ function updateNav(items) {
             }
 
             const isVideo = /\.(mp4|webm|mov)$/i.test(pendingFile.name);
-            const is3D = /\.(glb|fbx|obj|gltf)$/i.test(pendingFile.name);
+            const is3D = /\.(glb|fbx|obj|gltf|stl|dae)$/i.test(pendingFile.name);
             const isImage = !isVideo && !is3D;
             const newItem = {
                 id: 'upload_' + Date.now(),
@@ -6158,7 +6173,7 @@ function updateNav(items) {
                 if(btn) btn.textContent = icons[season];
                 document.body.className = season;
 
-                const colors = { spring:'245,160,180', summer:'120,185,140', autumn:'220,140,60', winter:'160,200,240' };
+                const colors = { spring:'232,105,127', summer:'61,168,92', autumn:'224,120,48', winter:'91,157,217' };
                 function mkPetal() {
                     const s = season;
                     return { x:Math.random()*W, y:-30, r:Math.random()*4+2, vy:Math.random()*1+0.3, vx:(Math.random()-0.5)*0.8, o:Math.random()*0.45+0.15, rot:Math.random()*360, vrot:(Math.random()-0.5)*2, shape:s };
