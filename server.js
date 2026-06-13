@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -6,8 +7,28 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Middleware
+app.use(compression({ threshold: 500 })); // gzip/brotli for responses >500B
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(__dirname));
+
+// Static files with cache headers
+const ONE_YEAR = 'public, max-age=31536000, immutable';
+const NO_CACHE = 'no-cache';
+
+app.use(express.static(__dirname, {
+    setHeaders(res, filePath) {
+        const ext = path.extname(filePath).toLowerCase();
+        // Immutable hashed assets
+        if (['.webp', '.png', '.jpg', '.jpeg', '.mp4', '.webm', '.woff2', '.woff'].includes(ext)) {
+            res.setHeader('Cache-Control', ONE_YEAR);
+        // Optimized folder — long cache
+        } else if (filePath.includes(path.sep + 'optimized' + path.sep)) {
+            res.setHeader('Cache-Control', ONE_YEAR);
+        // HTML / JSON — revalidate
+        } else if (['.html', '.json'].includes(ext)) {
+            res.setHeader('Cache-Control', NO_CACHE);
+        }
+    }
+}));
 
 // File upload config
 const storage = multer.diskStorage({

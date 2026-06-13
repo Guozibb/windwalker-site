@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>风之旅人 · 3D模型资源库</title>
+    <!-- 预连接外链域名，加速首次请求 -->
+    <link rel="preconnect" href="https://gxbeztgssxniuqwawsrz.supabase.co">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <style>
         /* ========== Reset & Variables ========== */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1908,10 +1911,47 @@
             .search-wrapper input { width: 90px; }
             .search-wrapper input:focus { width: 130px; }
         }
+        /* ========== User Badge ========== */
+        .user-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            line-height: 1.4;
+            vertical-align: middle;
+            margin-left: 4px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #5c3d2e;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+            box-shadow: 0 1px 3px rgba(245,158,100,0.35);
+            pointer-events: none;
+            user-select: none;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
+    <!-- 🔧 管理员诊断栏 — 临时，排查完删除 -->
+    <div id="debugBar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a2e;color:#0f0;font-family:monospace;font-size:12px;padding:6px 12px;text-align:center;display:none;"></div>
+    <script>
+    (function(){
+        var bar = document.getElementById('debugBar');
+        function log(msg){ bar.style.display='block'; bar.textContent += ' | ' + msg; }
+        // 检测 supabase SDK 是否加载
+        setTimeout(function(){
+            if (typeof window.supabase === 'undefined') { log('❌ Supabase SDK 未加载！检查网络或CDN'); }
+            else { log('✅ Supabase SDK 已加载'); }
+        }, 2000);
+        // 暴露全局 debug 函数
+        window._debugAdmin = function(isAdmin, username) {
+            if (isAdmin) { log('👑 管理员: ' + username); bar.style.background='#1a3a1a'; }
+            else { log('👤 普通用户: ' + username + ' (is_admin=' + (arguments[2]===undefined?'undefined':arguments[2]) + ')'); }
+        };
+    })();
+    </script>
 
     <!-- 花瓣飘落 Canvas -->
     <canvas id="petalCanvas" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
@@ -2111,6 +2151,7 @@
                 <input type="file" class="avatar-input" id="avatarInput" accept="image/*">
             </div>
             <input class="drawer-name" id="drawerName" value="风之旅人" maxlength="20" placeholder="你的昵称">
+            <span id="adminBadge" style="display:none;background:linear-gradient(135deg,#f87171,#fb923c);color:#fff;padding:2px 10px;border-radius:10px;font-size:0.65rem;font-weight:700;letter-spacing:1px;">👑 管理员</span>
             <textarea class="drawer-bio" id="drawerBio" placeholder="写一句个人简介..." maxlength="80" rows="1">3D 模型创作者</textarea>
             <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">ID: <strong id="drawerUserCode">------</strong></div>
             <div class="drawer-stats" style="gap:16px;flex-wrap:wrap;justify-content:center;">
@@ -2230,8 +2271,15 @@
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 当前登录用户（页面初始化后填充）
-        let currentUser = null;      // { id, username, bio, avatar_url, user_code }
+        let currentUser = null;      // { id, username, bio, avatar_url, user_code, badge, is_admin }
         let currentUserId = null;    // UUID string
+        let isAdmin = false;         // 管理员特权标记
+
+        // Badge rendering helper — call wherever a username is displayed
+        function renderBadge(badge) {
+            if (!badge) return '';
+            return `<span class="user-badge">${badge}</span>`;
+        }
 
         // ============================================================
         //  📦 资源数据 — 所有文件默认归入「作者作品」
@@ -2403,6 +2451,29 @@
         }
 
         // ========== Render gallery ==========
+        // 管理员从画廊删除作品
+        async function handleAdminDeleteCard(id) {
+            if (!confirm('确定要删除该作品吗？此操作不可撤销。')) return;
+            const sid = String(id);
+            const dbId = sid.replace('upload_', '');
+            // 从 Supabase 删除（RLS 策略允许管理员）
+            if (/^\d+$/.test(dbId)) {
+                try {
+                    await supabase.from('uploads').delete().eq('id', parseInt(dbId));
+                } catch(e) { showToast('删除失败: ' + e.message, true); return; }
+            }
+            // 从本地列表移除
+            const idx = uploadedItems.findIndex(m => String(m.id) === sid);
+            if (idx !== -1) {
+                if (uploadedItems[idx].file && uploadedItems[idx].file.startsWith('blob:')) {
+                    URL.revokeObjectURL(uploadedItems[idx].file);
+                }
+                uploadedItems.splice(idx, 1);
+            }
+            renderGallery();
+            showToast('作品已删除');
+        }
+
         function renderGallery() {
             const items = filtered();
             updateStats();
@@ -2432,7 +2503,7 @@
                         </div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                            <div class="card-meta">${m.author||'风之旅人'}${renderBadge(m.authorBadge)} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -2454,7 +2525,7 @@
                         </div>
                         <div class="card-overlay">
                             <div class="card-title">${m.title}</div>
-                            <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                            <div class="card-meta">${m.author||'风之旅人'}${renderBadge(m.authorBadge)} · ${m.cat}</div>
                         </div>
                     </div>`;
                 }
@@ -2466,6 +2537,7 @@
                     <div class="card-quick-actions">
                         <button class="card-quick-btn${isLiked?' liked':''}" data-action="like" data-id="${m.id}" title="点赞">❤</button>
                         <button class="card-quick-btn${isBooked?' bookmarked':''}" data-action="bookmark" data-id="${m.id}" title="收藏">🔖</button>
+                        ${isAdmin && m.isUpload ? `<button class="card-quick-btn card-admin-del" data-action="adminDel" data-id="${m.id}" title="管理员删除" style="color:var(--red);">🗑</button>` : ''}
                     </div>
                     <div class="card-type-badge badge-image">模型</div>
                     <div class="card-format">${(m.fileName||m.file).split('.').pop().toUpperCase()}</div>
@@ -2477,7 +2549,7 @@
                     </div>
                     <div class="card-overlay">
                         <div class="card-title">${m.title}</div>
-                        <div class="card-meta">${m.author||'风之旅人'} · ${m.cat}</div>
+                        <div class="card-meta">${m.author||'风之旅人'}${renderBadge(m.authorBadge)} · ${m.cat}</div>
                     </div>
                 </div>`;
             }).join('');
@@ -2493,6 +2565,7 @@
                         const id = aid.startsWith('upload_') ? aid : parseInt(aid);
                         if (act === 'like') UserActions.toggleLike(id);
                         if (act === 'bookmark') UserActions.toggleBookmark(id);
+                        if (act === 'adminDel' && isAdmin) { handleAdminDeleteCard(id); return; }
                         return;
                     }
                     const id = card.dataset.id;
@@ -2578,7 +2651,7 @@
             const cmts = UserActions.getComments(id);
             const lbComments = document.getElementById('lbComments');
             lbComments.innerHTML = cmts.length
-                ? cmts.map((c,i) => `<div class="lb-comment-item"><strong>${c.name}:</strong> ${c.text} <button onclick="document.getElementById('lbCommentInput').value='@${c.name} ';document.getElementById('lbCommentInput').focus();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.7rem;">回复</button></div>`).join('')
+                ? cmts.map((c,i) => `<div class="lb-comment-item" style="display:flex;justify-content:space-between;align-items:center;"><span><strong>${c.name}${renderBadge(c.badge)}:</strong> ${c.text} <button onclick="document.getElementById('lbCommentInput').value='@${c.name} ';document.getElementById('lbCommentInput').focus();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.7rem;">回复</button></span>${isAdmin && c.id ? `<button onclick="UserActions.deleteComment('${id}',${c.id},${i});event.stopPropagation();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem;flex-shrink:0;margin-left:8px;" title="管理员删除">🗑</button>` : ''}</div>`).join('')
                 : '<div style="color:#888;font-size:0.78rem;">暂无回复，来发表第一条吧</div>';
         }
 
@@ -2672,9 +2745,12 @@ function updateNav(items) {
                     const code = String(Math.floor(100000 + Math.random() * 900000));
                     const { error: upsertErr } = await supabase.from('profiles').upsert({ id: currentUserId, username: username, user_code: code });
                     if (upsertErr) console.warn('Profile upsert error:', upsertErr.message);
-                    profile = { id: currentUserId, username, bio: '', avatar_url: '', user_code: code };
+                    profile = { id: currentUserId, username, bio: '', avatar_url: '', user_code: code, badge: null, is_admin: false };
                 }
                 currentUser = profile;
+                isAdmin = profile.is_admin || false;
+                console.log('🔍 管理员状态:', { username: profile.username, is_admin: profile.is_admin, isAdmin });
+                if (window._debugAdmin) window._debugAdmin(isAdmin, profile.username, profile.is_admin);
                 return profile;
             } catch(e) {
                 console.error('requireAuth failed:', e.message);
@@ -2684,7 +2760,7 @@ function updateNav(items) {
                     const { data } = await supabase.auth.getSession();
                     if (data?.session) {
                         currentUserId = data.session.user.id;
-                        currentUser = { id: currentUserId, username: 'user', bio: '', avatar_url: '', user_code: '000000' };
+                        currentUser = { id: currentUserId, username: 'user', bio: '', avatar_url: '', user_code: '000000', badge: null, is_admin: false };
                         return currentUser;
                     }
                 } catch(e2) {}
@@ -2698,6 +2774,7 @@ function updateNav(items) {
             if (!currentUser) return;
             drawerName.value = currentUser.username || '';
             drawerBio.value = currentUser.bio || '';
+            document.getElementById('adminBadge').style.display = isAdmin ? 'inline-block' : 'none';
             if (currentUser.avatar_url) {
                 avatarImg.src = currentUser.avatar_url;
                 avatarImg.style.display = 'block';
@@ -2772,13 +2849,13 @@ function updateNav(items) {
                 let users = [];
                 try {
                     if (type === 'following') {
-                        const { data } = await supabase.from('follows').select('following:following_id(username)').eq('follower_id', currentUserId);
+                        const { data } = await supabase.from('follows').select('following:following_id(username,badge)').eq('follower_id', currentUserId);
                         users = (data||[]).map(d => d.following?.username).filter(Boolean);
                     } else if (type === 'followers') {
-                        const { data } = await supabase.from('follows').select('follower:follower_id(username)').eq('following_id', currentUserId);
+                        const { data } = await supabase.from('follows').select('follower:follower_id(username,badge)').eq('following_id', currentUserId);
                         users = (data||[]).map(d => d.follower?.username).filter(Boolean);
                     } else if (type === 'friends') {
-                        const { data } = await supabase.from('friendships').select('user_a:user_a_id(username),user_b:user_b_id(username)').or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
+                        const { data } = await supabase.from('friendships').select('user_a:user_a_id(username,badge),user_b:user_b_id(username,badge)').or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
                         users = (data||[]).map(d => (d.user_a?.username === currentUser?.username ? d.user_b?.username : d.user_a?.username)).filter(Boolean);
                     }
                 } catch(e) { detail.innerHTML='<span style="opacity:0.5;">加载失败</span>'; detail.style.display='block'; return; }
@@ -2937,7 +3014,8 @@ function updateNav(items) {
 
             drawerWorksGrid.innerHTML = showItems.slice(0, 30).map(m => {
                 const isMine = m.author === me;
-                const delBtn = isMine && m.isUpload ? `<button class="drawer-work-delete" data-delete="${m.id}" title="删除">✕</button>` : '';
+                const canDelete = (isMine || isAdmin) && m.isUpload;
+                const delBtn = canDelete ? `<button class="drawer-work-delete" data-delete="${m.id}" title="${isAdmin && !isMine ? '管理员删除' : '删除'}">✕</button>` : '';
                 if (m.type === 'video') {
                     return `<div class="drawer-work-thumb" title="${m.title}" data-wid="${m.id}">${delBtn}<div class="work-type-icon">▶</div></div>`;
                 }
@@ -3022,7 +3100,7 @@ function updateNav(items) {
 
         async function renderNotifs() {
             if (!currentUserId) return;
-            const { data: ns } = await supabase.from('notifications').select('*, from_user:from_user_id(username)').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(50);
+            const { data: ns } = await supabase.from('notifications').select('*, from_user:from_user_id(username,badge)').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(50);
             const dd = document.getElementById('notifyDropdown');
             if (!ns || !ns.length) {
                 dd.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">暂无通知</div>';
@@ -3032,8 +3110,9 @@ function updateNav(items) {
             dd.innerHTML = ns.map(n => {
                 const time = new Date(n.created_at).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
                 const fromName = n.from_user ? n.from_user.username : '未知';
+                const fromBadge = n.from_user?.badge || '';
                 return `<div class="notify-item${n.read?'':' unread'}" data-id="${n.id}">
-                    <strong>${icons[n.type]||'📢'} ${fromName}</strong> ${n.text}
+                    <strong>${icons[n.type]||'📢'} ${fromName}${renderBadge(fromBadge)}</strong> ${n.text}
                     <div class="notify-time">${time}</div>
                 </div>`;
             }).join('');
@@ -3148,11 +3227,22 @@ function updateNav(items) {
             if (!currentUserId) return;
             const me = getCurrentUser();
             // Get friends from Supabase
-            const { data: friendRows } = await supabase.from('friendships').select('user_a:user_a_id(username),user_b:user_b_id(username)').or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
-            const friends = (friendRows||[]).map(r => r.user_a?.username === me ? r.user_b?.username : r.user_a?.username).filter(Boolean);
+            const { data: friendRows } = await supabase.from('friendships').select('user_a:user_a_id(username,badge),user_b:user_b_id(username,badge)').or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`);
+            const friendBadges = {};
+            const friends = (friendRows||[]).map(r => {
+                const name = r.user_a?.username === me ? r.user_b?.username : r.user_a?.username;
+                const badge = r.user_a?.username === me ? r.user_b?.badge : r.user_a?.badge;
+                if (name) friendBadges[name] = badge || '';
+                return name;
+            }).filter(Boolean);
             // Get pending requests
-            const { data: reqRows } = await supabase.from('friend_requests').select('from_user:from_id(username)').eq('to_id', currentUserId).eq('status', 'pending');
-            const requests = (reqRows||[]).map(r => r.from_user?.username).filter(Boolean);
+            const { data: reqRows } = await supabase.from('friend_requests').select('from_user:from_id(username,badge)').eq('to_id', currentUserId).eq('status', 'pending');
+            const requestBadges = {};
+            const requests = (reqRows||[]).map(r => {
+                const name = r.from_user?.username;
+                if (name) requestBadges[name] = r.from_user?.badge || '';
+                return name;
+            }).filter(Boolean);
             const friendList = document.getElementById('friendList');
             let html = '';
             if (requests.length) {
@@ -3162,7 +3252,7 @@ function updateNav(items) {
                     return `<div style="display:flex;align-items:center;gap:8px;background:rgba(56,189,248,0.08);padding:6px 10px;border-radius:10px;margin:4px 0;border:1px solid rgba(56,189,248,0.2);">
                         <span style="font-size:1.2rem;">👤</span>
                         <div style="flex:1;font-size:0.75rem;">
-                            <strong>${r}</strong>
+                            <strong>${r}${renderBadge(requestBadges[r])}</strong>
                             <div style="color:var(--text-muted);">作品 ${info.works} · ${info.created}</div>
                         </div>
                         <button style="background:var(--accent);color:#fff;border:none;border-radius:12px;padding:3px 10px;cursor:pointer;font-size:0.7rem;font-weight:600;" data-accept="${r}">✓ 接受</button>
@@ -3175,7 +3265,7 @@ function updateNav(items) {
                 html += friends.map(f => {
                     const info = getUserInfoCard(f);
                     return `<div style="display:flex;align-items:center;gap:6px;background:rgba(52,211,153,0.06);padding:4px 10px;border-radius:10px;margin:2px 0;font-size:0.78rem;">
-                        <span>👤</span> <strong>${f}</strong>
+                        <span>👤</span> <strong>${f}${renderBadge(friendBadges[f])}</strong>
                         <span style="color:var(--text-muted);font-size:0.7rem;">作品 ${info.works}</span>
                     </div>`;
                 }).join('');
@@ -3213,7 +3303,7 @@ function updateNav(items) {
                 const p = data[0];
                 const { count } = await supabase.from('uploads').select('*', { count: 'exact', head: true }).eq('user_id', p.id);
                 preview.style.display = 'block'; preview.style.color = 'var(--accent)';
-                preview.innerHTML = `👤 <strong>${p.username}</strong> · ID: ${p.user_code} · ${new Date(p.created_at).toLocaleDateString('zh-CN')}加入 · ${count||0}作品`;
+                preview.innerHTML = `👤 <strong>${p.username}${renderBadge(p.badge)}</strong> · ID: ${p.user_code} · ${new Date(p.created_at).toLocaleDateString('zh-CN')}加入 · ${count||0}作品`;
             } else {
                 preview.style.display = 'block'; preview.innerHTML = '❌ 用户不存在（可输入用户名或ID码搜索）'; preview.style.color = 'var(--red)';
             }
@@ -3252,9 +3342,9 @@ function updateNav(items) {
 
         async function getMessages() {
             if (!currentUserId) return [];
-            const { data } = await supabase.from('messages').select('*, from_user:from_id(username), to_user:to_id(username)').or(`from_id.eq.${currentUserId},to_id.eq.${currentUserId}`).order('created_at', { ascending: true });
+            const { data } = await supabase.from('messages').select('*, from_user:from_id(username,badge), to_user:to_id(username,badge)').or(`from_id.eq.${currentUserId},to_id.eq.${currentUserId}`).order('created_at', { ascending: true });
             // Map to legacy format
-            return (data || []).map(m => ({ from: m.from_user ? m.from_user.username : '', to: m.to_user ? m.to_user.username : '', text: m.text, time: new Date(m.created_at).getTime(), read: m.read, img: m.image_url, id: m.id, fromId: m.from_id, toId: m.to_id }));
+            return (data || []).map(m => ({ from: m.from_user ? m.from_user.username : '', fromBadge: m.from_user?.badge || '', to: m.to_user ? m.to_user.username : '', toBadge: m.to_user?.badge || '', text: m.text, time: new Date(m.created_at).getTime(), read: m.read, img: m.image_url, id: m.id, fromId: m.from_id, toId: m.to_id }));
         }
         async function saveMessageToDb(msg) { await supabase.from('messages').insert(msg); }
 
@@ -3276,6 +3366,8 @@ function updateNav(items) {
             chatPartner = ''; chatPanelBack.style.display='none'; chatPanelTitle.textContent='✉ 私信';
             const me = getCurrentUser();
             const msgs = await getMessages();
+            const partnerBadges = {};
+            msgs.forEach(m => { if (m.from !== me) partnerBadges[m.from] = m.fromBadge || ''; if (m.to !== me) partnerBadges[m.to] = m.toBadge || ''; });
             const partners = new Set();
             msgs.forEach(m => { if (m.from===me) partners.add(m.to); if (m.to===me) partners.add(m.from); });
             chatPanelBody.innerHTML = !partners.size
@@ -3286,7 +3378,7 @@ function updateNav(items) {
                     const unread = conv.filter(m => m.to===me&&!m.read).length;
                     return `<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;" class="chat-list-item" data-p="${p}">
                         <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.8rem;">${p.charAt(0)}</div>
-                        <div style="flex:1;"><strong>${p}</strong>${unread?` <span style="color:#ef4444;font-size:0.7rem;">${unread}未读</span>`:''}
+                        <div style="flex:1;"><strong>${p}${renderBadge(partnerBadges[p])}</strong>${unread?` <span style="color:#ef4444;font-size:0.7rem;">${unread}未读</span>`:''}
                         <div style="font-size:0.72rem;color:var(--text-muted);">${(last.img?'[图片] ':'')+(last.text||'').substring(0,25)}</div></div>
                     </div>`;
                 }).join('');
@@ -3297,11 +3389,13 @@ function updateNav(items) {
         }
 
         async function openChatWith(partner) {
-            chatPartner = partner; chatPanelBack.style.display='inline'; chatPanelTitle.textContent = `💬 ${partner}`;
+            chatPartner = partner; chatPanelBack.style.display='inline';
+            chatPanelTitle.innerHTML = `💬 ${partner}`;
             chatPanelTarget.value = partner;
             // Mark messages as read in Supabase
             if (currentUserId) {
-                const { data: tp } = await supabase.from('profiles').select('id').eq('username', partner).single();
+                const { data: tp } = await supabase.from('profiles').select('id,badge').eq('username', partner).single();
+                chatPanelTitle.innerHTML = `💬 ${partner}${renderBadge(tp?.badge||'')}`;
                 if (tp) await supabase.from('messages').update({ read: true }).eq('to_id', currentUserId).eq('from_id', tp.id);
             }
             renderChatBubbles();
@@ -3387,15 +3481,16 @@ function updateNav(items) {
                     // 单独查出所有评论者的用户名映射
                     const authorIds = [...new Set((c||[]).map(cmt => cmt.author_id))];
                     const nameMap = {};
+                    const badgeMap = {};
                     if (authorIds.length) {
-                        const { data: profiles } = await supabase.from('profiles').select('id,username').in('id', authorIds);
-                        (profiles||[]).forEach(p => { nameMap[p.id] = p.username; });
+                        const { data: profiles } = await supabase.from('profiles').select('id,username,badge').in('id', authorIds);
+                        (profiles||[]).forEach(p => { nameMap[p.id] = p.username; badgeMap[p.id] = p.badge || ''; });
                     }
                     itemComments = {};
                     (c || []).forEach(cmt => {
                         const sid = String(cmt.item_id);
                         if (!itemComments[sid]) itemComments[sid] = [];
-                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
+                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', badge: badgeMap[cmt.author_id] || '', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
                     });
                 } catch(e) { likes = new Set(); bookmarks = new Set(); itemComments = {}; }
             }
@@ -3436,16 +3531,35 @@ function updateNav(items) {
             function addComment(id, name, text) {
                 const sid = String(id);
                 if (!itemComments[sid]) itemComments[sid] = [];
-                itemComments[sid].push({ name, text, time: Date.now() });
+                const cmt = { name, text, time: Date.now() };
+                itemComments[sid].push(cmt);
                 commentCounts[sid] = (commentCounts[sid]||0) + 1;
-                if (currentUserId) supabase.from('item_comments').insert({ item_id: sid, author_id: currentUserId, text }).then();
+                if (currentUserId) {
+                    supabase.from('item_comments').insert({ item_id: sid, author_id: currentUserId, text }).select('id').single().then(({ data }) => {
+                        if (data) cmt.id = data.id; // 回填 Supabase 返回的 ID
+                    });
+                }
                 renderGallery();
+            }
+
+            async function deleteComment(itemId, cmtId, cmtIdx) {
+                const sid = String(itemId);
+                if (!currentUserId || !isAdmin) return;
+                try {
+                    await supabase.from('item_comments').delete().eq('id', cmtId);
+                    itemComments[sid].splice(cmtIdx, 1);
+                    commentCounts[sid] = Math.max(0, (commentCounts[sid]||1) - 1);
+                    renderGallery();
+                    showToast('评论已删除');
+                } catch(e) {
+                    showToast('删除失败: ' + e.message, true);
+                }
             }
 
             function getLikedItems(all) { return all.filter(m => likes.has(String(m.id))); }
             function getBookmarkedItems(all) { return all.filter(m => bookmarks.has(String(m.id))); }
 
-            return { isLiked, isBookmarked, toggleLike, toggleBookmark, getComments, addComment, getLikedItems, getBookmarkedItems, loadFromSupabase };
+            return { isLiked, isBookmarked, toggleLike, toggleBookmark, getComments, addComment, getLikedItems, getBookmarkedItems, loadFromSupabase, deleteComment };
         })();
 
         // ============================================================
@@ -3615,24 +3729,25 @@ function updateNav(items) {
         // 加载帖子
         async function loadPlazaPosts() {
             const { data } = await supabase.from('community_posts')
-                .select('*, author:author_id(username,avatar_url)')
+                .select('*, author:author_id(username,avatar_url,badge)')
                 .order('created_at', { ascending: false }).limit(100);
             if (!data) return [];
             const posts = [];
             for (const p of data) {
                 const { data: likes } = await supabase.from('post_likes').select('user_id').eq('post_id', p.id);
-                const { data: cmts } = await supabase.from('post_comments').select('*, author:author_id(username)').eq('post_id', p.id).order('created_at', true);
+                const { data: cmts } = await supabase.from('post_comments').select('*, author:author_id(username,badge)').eq('post_id', p.id).order('created_at', true);
                 posts.push({
                     id: p.id, // use numeric ID directly
                     name: p.author?.username || '未知',
                     avatar: p.author?.avatar_url || '',
+                    badge: p.author?.badge || '',
                     text: p.text || '',
                     media: p.media_url || '',
                     mediaType: p.media_type || null,
                     time: new Date(p.created_at).getTime(),
                     likes: p.likes_count || 0,
                     likedBy: (likes||[]).map(l => l.user_id),
-                    comments: (cmts||[]).map(c => ({ id: c.id, name: c.author?.username||'', text: c.text||'' }))
+                    comments: (cmts||[]).map(c => ({ id: c.id, name: c.author?.username||'', badge: c.author?.badge||'', text: c.text||'' }))
                 });
             }
             return posts;
@@ -3732,9 +3847,9 @@ function updateNav(items) {
                 return `<div class="post-card">
                     <div class="post-header">
                         ${p.avatar?`<div class="post-avatar" style="background-image:url(${p.avatar});background-size:cover;"></div>`:`<div class="post-avatar">${p.name[0]}</div>`}
-                        <div class="post-meta"><div class="post-name">${p.name}</div><div class="post-time">${t}</div></div>
+                        <div class="post-meta"><div class="post-name">${p.name}${renderBadge(p.badge)}</div><div class="post-time">${t}</div></div>
                         ${!isMine?`<button class="post-follow-btn" data-follow="${p.name}">+关注</button>`:''}
-                        ${isMine?`<button class="post-delete" data-pid="${p.id}">✕</button>`:''}
+                        ${(isMine||isAdmin)?`<button class="post-delete" data-pid="${p.id}" title="${isAdmin&&!isMine?'管理员删除':'删除'}">✕</button>`:''}
                     </div>
                     ${p.text?`<div class="post-content">${p.text}</div>`:''}
                     ${p.media?(p.mediaType==='video'?`<div class="post-media"><video src="${p.media}" controls></video></div>`:`<div class="post-media"><img src="${p.media}"></div>`):''}
@@ -3743,7 +3858,7 @@ function updateNav(items) {
                         <button class="post-comment-btn" data-pid="${p.id}">💬 回复 (${(p.comments||[]).length})</button>
                     </div>
                     <div class="comments-section" id="cmts-${p.id}">
-                        ${(p.comments||[]).map(c=>`<div class="comment-item"><span class="comment-name">${c.name}</span> <span class="comment-text">${c.text}</span></div>`).join('')||'<div style="color:var(--text-muted);font-size:0.78rem;">暂无回复</div>'}
+                        ${(p.comments||[]).map(c=>`<div class="comment-item" style="display:flex;justify-content:space-between;align-items:center;"><span><span class="comment-name">${c.name}${renderBadge(c.badge)}</span> <span class="comment-text">${c.text}</span></span>${isAdmin?`<button class="plaza-comment-admin-del" data-cid="${c.id}" data-pid="${p.id}" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.7rem;flex-shrink:0;margin-left:4px;" title="管理员删除">🗑</button>`:''}</div>`).join('')||'<div style="color:var(--text-muted);font-size:0.78rem;">暂无回复</div>'}
                         <div class="comment-input-row"><input class="comment-input" data-pid="${p.id}" placeholder="写回复..." maxlength="200"><button class="comment-submit" data-pid="${p.id}">发送</button></div>
                     </div>
                 </div>`;
@@ -3795,6 +3910,17 @@ function updateNav(items) {
                 plazaPosts=plazaPosts.filter(p=>p.id!==pid);
                 renderPlaza(); showToast('已删除');
             }));
+            // 管理员删除评论
+            communityFeed.querySelectorAll('.plaza-comment-admin-del').forEach(b=>b.addEventListener('click',async e=>{
+                e.stopPropagation();
+                const cid = parseInt(b.dataset.cid);
+                const pid = parseInt(b.dataset.pid);
+                if (!cid || !pid || !isAdmin) return;
+                await supabase.from('post_comments').delete().eq('id', cid);
+                const post = plazaPosts.find(p => p.id === pid);
+                if (post) post.comments = (post.comments||[]).filter(c => c.id !== cid);
+                renderPlaza(); showToast('评论已删除');
+            }));
         }
 
         syncComposerAvatar();
@@ -3814,7 +3940,7 @@ function updateNav(items) {
 
         async function renderFollowingFeed() {
             if (!currentUserId) return;
-            const { data } = await supabase.from('follows').select('following:following_id(username,id,avatar_url)').eq('follower_id', currentUserId);
+            const { data } = await supabase.from('follows').select('following:following_id(username,id,avatar_url,badge)').eq('follower_id', currentUserId);
             const following = (data||[]).map(d => d.following).filter(Boolean);
             if (!following.length) {
                 followingFeedEl.innerHTML = '<div class="community-empty">你还没有关注任何人<br>去广场或搜索关注创作者吧！</div>';
@@ -3823,15 +3949,15 @@ function updateNav(items) {
             const followingNames = following.map(f => f.username);
             // 查关注的用户的广场帖子和上传作品
             const followingIds = following.map(f => f.id);
-            const { data: posts } = await supabase.from('community_posts').select('*, author:author_id(username,avatar_url)').in('author_id', followingIds).order('created_at', { ascending: false }).limit(30);
+            const { data: posts } = await supabase.from('community_posts').select('*, author:author_id(username,avatar_url,badge)').in('author_id', followingIds).order('created_at', { ascending: false }).limit(30);
             const { data: works } = await supabase.from('uploads').select('*').in('user_id', followingIds).order('created_at', { ascending: false }).limit(20);
 
             const items = [];
             (posts||[]).forEach(p => {
-                items.push({ type:'post', title: p.text||'分享了一条动态', author: p.author?.username||'未知', avatar: p.author?.avatar_url||'', time: new Date(p.created_at).getTime(), media: p.media_url, mediaType: p.media_type });
+                items.push({ type:'post', title: p.text||'分享了一条动态', author: p.author?.username||'未知', badge: p.author?.badge||'', avatar: p.author?.avatar_url||'', time: new Date(p.created_at).getTime(), media: p.media_url, mediaType: p.media_type });
             });
             (works||[]).forEach(w => {
-                items.push({ type:'work', title: w.title, author: following.find(f=>f.id===w.user_id)?.username||'未知', avatar: '', time: new Date(w.created_at).getTime(), media: w.cover_url||w.file_url, mediaType: w.file_type });
+                items.push({ type:'work', title: w.title, author: following.find(f=>f.id===w.user_id)?.username||'未知', badge: following.find(f=>f.id===w.user_id)?.badge||'', avatar: '', time: new Date(w.created_at).getTime(), media: w.cover_url||w.file_url, mediaType: w.file_type });
             });
             items.sort((a,b) => b.time - a.time);
 
@@ -3844,7 +3970,7 @@ function updateNav(items) {
                 const thumb = m.media ? (m.mediaType==='video' ? '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px;font-size:2rem;">▶</div>' : `<img src="${m.media}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;">`) : '';
                 return `<div class="post-card">
                     <div class="post-header"><div class="post-avatar">${m.avatar?`<div style="width:100%;height:100%;background-image:url(${m.avatar});background-size:cover;border-radius:50%;"></div>`:(m.author||'?')[0]}</div>
-                    <div class="post-meta"><div class="post-name">${m.author}</div><div class="post-time">${t} · ${m.type==='post'?'广场':'上传'}</div></div></div>
+                    <div class="post-meta"><div class="post-name">${m.author}${renderBadge(m.badge)}</div><div class="post-time">${t} · ${m.type==='post'?'广场':'上传'}</div></div></div>
                     <div style="display:flex;gap:10px;">${thumb?`<div style="width:160px;flex-shrink:0;">${thumb}</div>`:''}
                     <div style="flex:1;"><div style="font-weight:600;margin-bottom:4px;">${m.title||''}</div></div></div>
                 </div>`;
@@ -4233,7 +4359,7 @@ function updateNav(items) {
                 return `<div class="search-user-card" data-username="${r.username}" data-uid="${r.id}">
                     ${avatar}
                     <div class="search-user-info">
-                        <div class="search-user-name">${r.username}</div>
+                        <div class="search-user-name">${r.username}${renderBadge(r.badge)}</div>
                         <div class="search-user-stats">ID: ${r.user_code||'---'} · 作品 ${r.works} · ${r.created}</div>
                     </div>
                     <button class="search-user-follow" data-follow="${r.username}">${r.isF ? '已关注' : '+关注'}</button>
@@ -4290,7 +4416,7 @@ function updateNav(items) {
             overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;';
             overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:28px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto;text-align:center;">
                 ${avatarUrl ? `<img src="${avatarUrl}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 10px;border:3px solid var(--accent);">` : `<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:2rem;margin:0 auto 10px;">${(user.username||'?')[0]}</div>`}
-                <h3 style="margin:4px 0;">${user.username}</h3>
+                <h3 style="margin:4px 0;">${user.username}${renderBadge(pf?.badge)}</h3>
                 <div style="font-size:0.72rem;color:var(--text-muted);">ID: ${pf?.user_code||user.code||'---'} · ${created} 加入</div>
                 <div style="font-size:0.8rem;color:var(--text-muted);margin:4px 0;">${pf?.bio||user.bio||'这个人很懒，什么也没写...'}</div>
                 <div style="display:flex;justify-content:center;gap:20px;margin:10px 0;font-size:0.8rem;">
@@ -4541,9 +4667,10 @@ function updateNav(items) {
                 // 单独查出所有作者的 username
                 const uploaderIds = [...new Set((uploads||[]).map(u => u.user_id))];
                 const nameMap = {};
+                const badgeMap = {};
                 if (uploaderIds.length) {
-                    const { data: profiles } = await supabase.from('profiles').select('id,username').in('id', uploaderIds);
-                    (profiles||[]).forEach(p => { nameMap[p.id] = p.username; });
+                    const { data: profiles } = await supabase.from('profiles').select('id,username,badge').in('id', uploaderIds);
+                    (profiles||[]).forEach(p => { nameMap[p.id] = p.username; badgeMap[p.id] = p.badge || ''; });
                 }
                 (uploads || []).forEach(item => {
                     uploadedItems.push({
@@ -4555,6 +4682,7 @@ function updateNav(items) {
                         subCat: item.sub_category || '',
                         title: item.title,
                         author: nameMap[item.user_id] || '用户',
+                        authorBadge: badgeMap[item.user_id] || '',
                         fileName: item.file_name,
                         isUpload: true,
                         persisted: true,

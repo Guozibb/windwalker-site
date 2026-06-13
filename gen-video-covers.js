@@ -16,7 +16,7 @@ const VIDEOS = [
 async function generateThumb(inputFile, outputFile, seekTime) {
     return new Promise((resolve, reject) => {
         ffmpeg(inputFile)
-            .seekInput(seekTime)  // 取视频中间位置的帧
+            .seekInput(seekTime)
             .frames(1)
             .output(outputFile)
             .on('end', resolve)
@@ -45,16 +45,18 @@ async function processAll() {
         console.log(`  🎬 ${v.title} — 提取封面帧...`);
         await generateThumb(srcPath, tmpPng, 2);
 
-        // 转 WebP 大图
+        // 转 WebP 大图（quality 70）
         const optOut = path.join(outDir, name + '.webp');
-        await sharp(tmpPng).webp({ quality: 80 }).toFile(optOut);
+        await sharp(tmpPng)
+            .webp({ quality: 70, effort: 6 })
+            .toFile(optOut);
         const optSize = fs.statSync(optOut).size;
 
-        // 转 WebP 缩略图
+        // 转 WebP 缩略图（800px 宽）
         const thumbOut = path.join(thumbDir, name + '.webp');
         await sharp(tmpPng)
-            .resize(1200, undefined, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality: 80 })
+            .resize(800, undefined, { withoutEnlargement: true, fit: 'inside' })
+            .webp({ quality: 70, effort: 6 })
             .toFile(thumbOut);
         const thumbSize = fs.statSync(thumbOut).size;
 
