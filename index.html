@@ -1462,7 +1462,7 @@
             --mx: 0.5; --my: 0.5;
             position: relative;
             margin: 12px auto 24px;
-            max-width: 960px;
+            max-width: 1300px;
             width: calc(100% - 48px);
             padding: 56px 36px;
             border-radius: 24px;
@@ -6119,16 +6119,25 @@ function updateNav(items) {
                 const cvs = document.getElementById('bannerPetalCanvas');
                 if (!cvs) return;
                 const bnr = document.getElementById('hpBanner');
-                cvs.width = bnr.offsetWidth; cvs.height = bnr.offsetHeight;
+                const resize = () => { cvs.width = bnr.offsetWidth; cvs.height = bnr.offsetHeight; };
+                resize(); window.addEventListener('resize', resize);
                 const bctx = cvs.getContext('2d');
+                const season = localStorage.getItem('ww_season')||'spring';
+                // 季节色板 — 低饱和度
+                const palettes = {
+                    spring: ['255,190,205','250,175,195','255,200,215','245,170,190'],
+                    summer: ['155,210,170','140,200,160','165,220,180','150,195,165'],
+                    autumn: ['235,175,115','225,160,100','240,185,125','220,155,105'],
+                    winter: ['175,210,240','165,200,235','185,220,245','170,195,230']
+                };
+                const bcolors = palettes[season] || palettes.spring;
                 const bpts = [];
-                const bcolors = ['255,180,200','245,170,190','255,200,215','240,160,185'];
-                for (let i = 0; i < 16; i++) {
+                for (let i = 0; i < 35; i++) {
                     bpts.push({
                         x: Math.random() * cvs.width, y: Math.random() * cvs.height,
-                        r: 3 + Math.random() * 4, vy: 0.15 + Math.random() * 0.35,
-                        vx: (Math.random() - 0.5) * 0.3, rot: Math.random() * 360,
-                        vrot: (Math.random() - 0.5) * 1.5, o: 0.2 + Math.random() * 0.35,
+                        r: 4 + Math.random() * 5, vy: 0.2 + Math.random() * 0.4,
+                        vx: (Math.random() - 0.5) * 0.5, rot: Math.random() * 360,
+                        vrot: (Math.random() - 0.5) * 2, o: 0.3 + Math.random() * 0.45,
                         c: bcolors[Math.floor(Math.random() * bcolors.length)]
                     });
                 }
@@ -6143,9 +6152,8 @@ function updateNav(items) {
                     const w = cvs.width, h = cvs.height;
                     bctx.clearRect(0, 0, w, h);
                     for (const p of bpts) {
-                        // 风力：鼠标位置影响花瓣偏移
-                        const windX = (bmx - 0.5) * 0.4;
-                        const windY = (bmy - 0.5) * 0.25;
+                        const windX = (bmx - 0.5) * 0.5;
+                        const windY = (bmy - 0.5) * 0.3;
                         p.y += p.vy + windY; p.x += p.vx + windX;
                         p.rot += p.vrot;
                         if (p.y > h + 20) { p.y = -20; p.x = Math.random() * w; }
@@ -6154,10 +6162,12 @@ function updateNav(items) {
                         bctx.save(); bctx.translate(p.x, p.y); bctx.rotate(p.rot * Math.PI / 180);
                         bctx.globalAlpha = p.o;
                         bctx.fillStyle = `rgba(${p.c},1)`;
-                        // 花瓣形状
+                        bctx.shadowColor = `rgba(${p.c},0.5)`;
+                        bctx.shadowBlur = 3;
                         bctx.beginPath();
-                        bctx.ellipse(0, 0, p.r, p.r * 0.35, 0, 0, Math.PI * 2);
+                        bctx.ellipse(0, 0, p.r, p.r * 0.38, 0, 0, Math.PI * 2);
                         bctx.fill();
+                        bctx.shadowBlur = 0;
                         bctx.restore();
                     }
                     requestAnimationFrame(bLoop);
