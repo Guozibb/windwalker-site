@@ -73,12 +73,38 @@ body{
 <body>
 
 <canvas id="bgCanvas"></canvas>
+<!-- 中景SVG元素 -->
+<svg id="skyBirds" style="position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.35;" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#7eb8da" stroke-width="1.5" opacity="0.5">
+        <path d="M0,0 Q8,-6 16,0 Q24,-5 32,0" transform="translate(15%,20%) scale(1.2)"><animateTransform attributeName="transform" type="translate" values="15%,20%;18%,18%;15%,20%" dur="6s" repeatCount="indefinite"/></path>
+        <path d="M0,0 Q6,-5 12,0 Q18,-4 24,0" transform="translate(35%,15%) scale(1)"><animateTransform attributeName="transform" type="translate" values="35%,15%;38%,13%;35%,15%" dur="7s" repeatCount="indefinite"/></path>
+        <path d="M0,0 Q7,-5 14,0 Q21,-4 28,0" transform="translate(55%,18%) scale(1.1)"><animateTransform attributeName="transform" type="translate" values="55%,18%;52%,16%;55%,18%" dur="5.5s" repeatCount="indefinite"/></path>
+        <path d="M0,0 Q5,-4 10,0 Q15,-3 20,0" transform="translate(72%,12%) scale(0.9)"><animateTransform attributeName="transform" type="translate" values="72%,12%;75%,10%;72%,12%" dur="8s" repeatCount="indefinite"/></path>
+    </g>
+</svg>
+<svg id="oceanFish" style="position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.3;display:none;" xmlns="http://www.w3.org/2000/svg">
+    <g fill="#80b8c8" opacity="0.4">
+        <ellipse rx="18" ry="8" transform="translate(20%,55%)"><animateTransform attributeName="transform" type="translate" values="20%,55%;22%,54%;20%,55%" dur="4s" repeatCount="indefinite"/></ellipse>
+        <polygon points="0,0 -10,-6 -10,6" transform="translate(38,0)"/><animateTransform attributeName="transform" type="translate" values="40%,50%;42%,48%;40%,50%" dur="5s" repeatCount="indefinite"/>
+        <ellipse rx="15" ry="6" transform="translate(60%,52%)"><animateTransform attributeName="transform" type="translate" values="60%,52%;62%,51%;60%,52%" dur="3.5s" repeatCount="indefinite"/></ellipse>
+        <ellipse rx="12" ry="5" transform="translate(78%,48%)"><animateTransform attributeName="transform" type="translate" values="78%,48%;80%,47%;78%,48%" dur="4.5s" repeatCount="indefinite"/></ellipse>
+    </g>
+</svg>
+<svg id="desertTraveler" style="position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.4;display:none;" xmlns="http://www.w3.org/2000/svg">
+    <g fill="#c49860" opacity="0.5">
+        <circle r="4" transform="translate(30%,62%)"><animateTransform attributeName="transform" type="translate" values="30%,62%;32%,62%;30%,62%" dur="12s" repeatCount="indefinite"/></circle>
+        <line x1="0" y1="4" x2="0" y2="14" stroke="#c49860" stroke-width="2" transform="translate(0,0)"/><animateTransform attributeName="transform" type="translate" values="0,0;2,0;0,0" dur="12s" repeatCount="indefinite"/>
+        <circle r="3" transform="translate(65%,58%)"><animateTransform attributeName="transform" type="translate" values="65%,58%;68%,58%;65%,58%" dur="15s" repeatCount="indefinite"/></circle>
+    </g>
+</svg>
 <div class="theme-switcher" id="themeSwitcher">
     <button class="theme-btn active" data-theme="sky" title="晴空絮语">☁</button>
     <button class="theme-btn" data-theme="ocean" title="浅海涟漪">🌊</button>
     <button class="theme-btn" data-theme="desert" title="金沙流影">🏜</button>
 </div>
+<button class="dark-toggle" id="motionToggle" title="动态效果" style="top:16px;right:64px;">✨</button>
 <button class="dark-toggle" id="darkToggle" title="暗黑模式">🌙</button>
+<button class="dark-toggle" id="musicToggle" title="音乐开关" style="top:16px;right:112px;">🎵</button>
 
 <div class="login-card" id="loginCard">
     <div class="login-logo">
@@ -118,6 +144,11 @@ const cvs=document.getElementById('bgCanvas'),ctx=cvs.getContext('2d');
 let W,H,mx=-999,my=-999,time=0;
 let theme=localStorage.getItem('ww_bg_theme')||'sky';
 let particles=[],ripples=[];
+const isMobile=/Mobi|Android/i.test(navigator.userAgent);
+const PARTICLE_MAX=isMobile?{sky:30,ocean:28,desert:35}:{sky:60,ocean:55,desert:70};
+let motionEnabled=true,musicEnabled=true,pageFocused=true;
+let audioCtx=null,musicGain=null,musicTimer=null,sfxEnabled=true;
+document.addEventListener('visibilitychange',()=>{pageFocused=!document.hidden;});
 
 const themeColors={
     sky:{grad:['#e0f0ff','#f8fafc','#ffffff'],btnBg:'#74b9ff',btnHover:'#0984e3',text:'#2c3e50',cardShadow:'rgba(70,130,180,0.15)'},
@@ -130,8 +161,70 @@ function applyTheme(t){
     document.documentElement.style.setProperty('--btn-hover',c.btnHover);
     document.documentElement.style.setProperty('--text',c.text);
     document.documentElement.style.setProperty('--card-shadow','0 8px 40px '+c.cardShadow);
+    // SVG 中景
+    document.getElementById('skyBirds').style.display=t==='sky'?'block':'none';
+    document.getElementById('oceanFish').style.display=t==='ocean'?'block':'none';
+    document.getElementById('desertTraveler').style.display=t==='desert'?'block':'none';
     particles=[];ripples=[];
+    if(musicEnabled)startMusic();
 }
+
+// 🎵 主题音乐（Web Audio API 生成轻钢琴旋律）
+function getMusicNotes(t){
+    if(t==='sky')return[
+        {n:523,d:1.5},{n:659,d:0.8},{n:784,d:1.2},{n:659,d:0.6},{n:587,d:0.8},{n:523,d:1.0},{n:440,d:0.7},{n:523,d:1.4},
+        {n:659,d:0.9},{n:587,d:0.7},{n:523,d:1.0},{n:392,d:1.2},{n:440,d:0.8},{n:523,d:1.0},{n:587,d:0.7},{n:659,d:1.5},
+    ];
+    if(t==='ocean')return[
+        {n:392,d:1.0},{n:440,d:0.8},{n:494,d:1.2},{n:440,d:0.6},{n:523,d:1.0},{n:494,d:0.8},{n:440,d:1.4},{n:392,d:1.0},
+        {n:330,d:1.0},{n:392,d:0.8},{n:440,d:1.2},{n:392,d:0.6},{n:494,d:1.0},{n:440,d:0.8},{n:392,d:1.5},
+    ];
+    return[
+        {n:392,d:1.2},{n:440,d:0.8},{n:494,d:1.0},{n:523,d:0.7},{n:587,d:0.9},{n:523,d:0.8},{n:494,d:1.2},{n:440,d:1.5},
+        {n:392,d:1.0},{n:330,d:0.8},{n:392,d:1.0},{n:440,d:0.7},{n:494,d:1.2},{n:440,d:0.8},{n:392,d:1.0},{n:330,d:1.8},
+    ];
+}
+let musicIdx=0;
+function startMusic(){
+    stopMusic();
+    if(!musicEnabled)return;
+    try{
+        if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+        if(audioCtx.state==='suspended')audioCtx.resume();
+        musicGain=audioCtx.createGain();musicGain.gain.value=0.025;musicGain.connect(audioCtx.destination);
+        const notes=getMusicNotes(theme);
+        function playNote(){
+            if(!musicEnabled||!audioCtx||!musicGain)return;
+            const{n,d}=notes[musicIdx%notes.length];musicIdx++;
+            const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+            o.type='triangle';o.frequency.value=n;
+            const dur=d*0.7,t=audioCtx.currentTime;
+            g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.025,t+0.05);
+            g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+            const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;f.Q.value=2;
+            o.connect(g).connect(f);f.connect(musicGain);
+            o.start(t);o.stop(t+dur+0.3);
+            musicTimer=setTimeout(playNote,d*950);
+        }
+        playNote();
+    }catch(_){}
+}
+function stopMusic(){if(musicTimer){clearTimeout(musicTimer);musicTimer=null;}if(musicGain){try{musicGain.disconnect();}catch(_){}}musicGain=null;if(musicIdx)musicIdx=0;}
+
+// 🎵 音乐开关
+document.getElementById('musicToggle').addEventListener('click',()=>{
+    musicEnabled=!musicEnabled;
+    document.getElementById('musicToggle').textContent=musicEnabled?'🎵':'🔇';
+    if(musicEnabled)startMusic();else stopMusic();
+});
+// ✨ 动态效果开关
+document.getElementById('motionToggle').addEventListener('click',()=>{
+    motionEnabled=!motionEnabled;
+    document.getElementById('motionToggle').textContent=motionEnabled?'✨':'🚫';
+    if(!motionEnabled){particles=[];ripples=[];}
+});
+// 初始化音乐
+setTimeout(()=>{if(musicEnabled)startMusic();},1500);
 applyTheme(theme);
 
 function resize(){W=cvs.width=innerWidth;H=cvs.height=innerHeight;}
@@ -139,7 +232,7 @@ resize();window.addEventListener('resize',resize);
 document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
 document.addEventListener('mouseleave',()=>{mx=-999;my=-999;});
 document.addEventListener('touchmove',e=>{mx=e.touches[0].clientX;my=e.touches[0].clientY;},{passive:true});
-document.addEventListener('click',e=>{if(theme==='ocean')ripples.push({x:e.clientX,y:e.clientY,r:0,maxR:80,life:1});});
+if(!isMobile)document.addEventListener('click',e=>{if(motionEnabled&&theme==='ocean')ripples.push({x:e.clientX,y:e.clientY,r:0,maxR:80,life:1});});
 
 // 主题按钮
 document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()=>{
@@ -163,7 +256,7 @@ function drawSky(){
         const parts=[{dx:0,dy:0,r:c.h*0.55},{dx:-c.w*0.25,dy:c.h*0.05,r:c.h*0.35},{dx:c.w*0.25,dy:c.h*0.05,r:c.h*0.35},{dx:-c.w*0.12,dy:-c.h*0.3,r:c.h*0.3},{dx:c.w*0.12,dy:-c.h*0.3,r:c.h*0.3},{dx:0,dy:-c.h*0.38,r:c.h*0.26}];
         parts.forEach(p=>{ctx.beginPath();ctx.arc(cx+p.dx,cy+p.dy,p.r,0,Math.PI*2);ctx.fill();});
     });
-    if(particles.length<60&&Math.random()<0.3){particles.push({x:Math.random()*W,y:Math.random()*H,r:2+Math.random()*4,a:0.3+Math.random()*0.5,va:0.005+Math.random()*0.01,vy:-(0.3+Math.random()*0.5),vx:(Math.random()-0.5)*0.3,phase:Math.random()*6});}
+    if(motionEnabled&&particles.length<PARTICLE_MAX.sky&&Math.random()<0.3){particles.push({x:Math.random()*W,y:Math.random()*H,r:2+Math.random()*4,a:0.3+Math.random()*0.5,va:0.005+Math.random()*0.01,vy:-(0.3+Math.random()*0.5),vx:(Math.random()-0.5)*0.3,phase:Math.random()*6});}
 }
 // === 浅海涟漪 ===
 function drawOcean(){
@@ -181,7 +274,7 @@ function drawOcean(){
     }
     ripples=ripples.filter(r=>{r.r+=1.5;r.life-=0.015;return r.life>0;});
     ripples.forEach(r=>{ctx.strokeStyle=`rgba(255,255,255,${r.life*0.4})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke();});
-    if(particles.length<55&&Math.random()<0.25){particles.push({x:Math.random()*W,y:H+5,r:3+Math.random()*4,a:0.4+Math.random()*0.3,vy:-(0.4+Math.random()*0.6),vx:(Math.random()-0.5)*0.25,phase:Math.random()*6});}
+    if(motionEnabled&&particles.length<PARTICLE_MAX.ocean&&Math.random()<0.25){particles.push({x:Math.random()*W,y:H+5,r:3+Math.random()*4,a:0.4+Math.random()*0.3,vy:-(0.4+Math.random()*0.6),vx:(Math.random()-0.5)*0.25,phase:Math.random()*6});}
 }
 // === 金沙流影 ===
 let duneOff1=0,duneOff2=0;
@@ -198,7 +291,7 @@ function drawDesert(){
     ctx.beginPath();ctx.moveTo(0,H);
     for(let x=0;x<=W;x+=12){const y=H*0.72+Math.sin((x+duneOff2)*0.004)*30+Math.sin((x+duneOff2)*0.012)*18;ctx.lineTo(x,y);}
     ctx.lineTo(W,H);ctx.closePath();ctx.fill();
-    if(particles.length<70&&Math.random()<0.35){particles.push({x:-10,y:Math.random()*H*0.7,r:1+Math.random()*3,a:0.3+Math.random()*0.4,vy:-(0.2+Math.random()*0.3),vx:0.5+Math.random()*0.7,phase:Math.random()*6});}
+    if(motionEnabled&&particles.length<PARTICLE_MAX.desert&&Math.random()<0.35){particles.push({x:-10,y:Math.random()*H*0.7,r:1+Math.random()*3,a:0.3+Math.random()*0.4,vy:-(0.2+Math.random()*0.3),vx:0.5+Math.random()*0.7,phase:Math.random()*6});}
 }
 
 // 粒子渲染
