@@ -5376,15 +5376,17 @@ function updateNav(items) {
         async function renderTopCreators() {
             const container = document.getElementById('hpCreatorsRow');
             try {
-                // 聚合每个用户的上传数量
+                // 只统计创作者，按作品获赞总数排序
                 const creatorMap = {};
                 for (const m of uploadedItems) {
                     const key = m.author || '未知';
-                    if (!creatorMap[key]) creatorMap[key] = { count: 0, badge: m.authorBadge };
+                    if (!creatorSet.has(key)) continue; // 非创作者跳过
+                    if (!creatorMap[key]) creatorMap[key] = { count: 0, likes: 0, badge: m.authorBadge };
                     creatorMap[key].count++;
+                    creatorMap[key].likes += (likeCounts[String(m.id)] || 0);
                 }
                 const sorted = Object.entries(creatorMap)
-                    .sort((a,b) => b[1].count - a[1].count)
+                    .sort((a,b) => (b[1].likes + b[1].count * 2) - (a[1].likes + a[1].count * 2))
                     .slice(0, 6);
                 if (!sorted.length) {
                     container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">还没有创作者入驻</div>';
@@ -5663,13 +5665,15 @@ function updateNav(items) {
             if (!reason) return;
             try {
                 await supabase.from('reports').insert({ reporter_id: currentUserId, target_type: targetType, target_id: String(targetId), reason });
-                // 通知所有管理员
-                const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+                // 通知管理员（通过 is_admin 和 username='admin' 双重查找）
+                const { data: admins } = await supabase.from('profiles').select('id').or('is_admin.eq.true,username.eq.admin');
+                const sent = new Set();
                 if (admins) {
                     for (const admin of admins) {
+                        if (sent.has(admin.id)) continue; sent.add(admin.id);
                         await supabase.from('notifications').insert({
-                            user_id: admin.id, type: 'system', from_user_id: currentUserId,
-                            text: `举报了${targetType==='post'?'帖子':targetType==='comment'?'评论':'作品'}：${reason}`,
+                            user_id: admin.id, type: 'system',
+                            text: `🚩 用户举报：${targetType==='post'?'帖子':targetType==='comment'?'评论':'作品'} #${String(targetId).slice(-6)}，原因：${reason}`,
                             read: false
                         });
                     }
@@ -5770,6 +5774,8 @@ function updateNav(items) {
             renderFeatured();
             renderLatestUploads();
             renderTopCreators();
+            // 每小时刷新精选推荐 + 热门创作者
+            setInterval(() => { renderFeatured(); renderLatestUploads(); renderTopCreators(); }, 3600000);
             // notifications load on bell click (lazy)
 
             // 隐藏入场 Canvas（轻量化：跳过动画）
