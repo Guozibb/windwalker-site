@@ -4005,8 +4005,8 @@ function updateNav(items) {
         // Open messaging
         document.getElementById('btnOpenMessages').addEventListener('click',()=>{msgOverlay.classList.add('open');renderConvList();});
         document.getElementById('msgClose').addEventListener('click',()=>msgOverlay.classList.remove('open'));
-        document.getElementById('msgChatClose').addEventListener('click',()=>{msgPartner=null;msgPartnerId=null;msgContainer.classList.remove('chat-open');renderConvList();});
-        document.getElementById('msgChatBack').addEventListener('click',()=>{msgPartner=null;msgPartnerId=null;msgContainer.classList.remove('chat-open');renderConvList();});
+        document.getElementById('msgChatClose').addEventListener('click',()=>{msgPartner=null;msgPartnerId=null;msgContainer.classList.remove('chat-open');document.getElementById('msgChatBody').innerHTML='<div style="text-align:center;color:var(--text-muted);padding:60px;">选择一位用户开始聊天</div>';document.getElementById('msgChatName').textContent='';renderConvList();});
+        document.getElementById('msgChatBack').addEventListener('click',()=>{msgPartner=null;msgPartnerId=null;msgContainer.classList.remove('chat-open');document.getElementById('msgChatBody').innerHTML='<div style="text-align:center;color:var(--text-muted);padding:60px;">选择一位用户开始聊天</div>';document.getElementById('msgChatName').textContent='';renderConvList();});
         // Tab switch
         document.querySelectorAll('.msg-sidebar-tab').forEach(t=>t.addEventListener('click',function(){document.querySelectorAll('.msg-sidebar-tab').forEach(x=>x.classList.remove('active'));this.classList.add('active');renderConvList();}));
 
