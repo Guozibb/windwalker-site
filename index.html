@@ -5289,6 +5289,7 @@ function updateNav(items) {
 
         // ========== 🎨 Creator Profile Modal ==========
         async function showCreatorProfile(username) {
+            console.log('🎯 showCreatorProfile called:', username);
             if (!username) return;
             try {
                 const { data: pf } = await supabase.from('profiles').select('*').eq('username', username).single();
@@ -5519,6 +5520,9 @@ function updateNav(items) {
             renderTopCreators();
             // notifications load on bell click (lazy)
 
+            // 暴露全局函数确保 onclick 可用
+            window.showCreatorProfile = showCreatorProfile;
+            window.submitReport = submitReport;
             // 隐藏入场 Canvas（轻量化：跳过动画）
             entranceCanvas.style.display = 'none';
 
