@@ -5333,7 +5333,7 @@ function updateNav(items) {
                     pinnedHTML = `<div style="margin-bottom:14px;"><div style="font-weight:700;margin-bottom:8px;color:var(--text);">📌 置顶代表作</div>
                         <div style="display:grid;grid-template-columns:repeat(${Math.min(pinnedWorks.length,3)},1fr);gap:10px;">${pinnedWorks.map(w => {
                             const sid = 'upload_' + w.id;
-                            return `<div class="creator-modal-work-card" onclick="creatorModalOverlay.classList.remove('open');openLightbox('${sid}')" style="aspect-ratio:16/10;border:2px solid var(--accent);">
+                            return `<div class="creator-modal-work-card" onclick="window.openLightboxFromModal('${sid}')" style="aspect-ratio:16/10;border:2px solid var(--accent);">
                                 <img src="${w.cover_url || w.file_url}" alt="${w.title}" loading="lazy" onerror="this.style.display='none'">
                                 <div class="cmw-label">📌 ${w.title}</div></div>`;
                         }).join('')}</div></div>`;
@@ -5348,7 +5348,7 @@ function updateNav(items) {
                         const sid = 'upload_' + w.id;
                         const isPinned = pinnedIds.includes(w.id);
                         const pinBtn = isSelfProfile ? `<button class="creator-pin-btn" data-wid="${w.id}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.7rem;z-index:2;" title="${isPinned?'取消置顶':'置顶'}">${isPinned?'📌':'📍'}</button>` : '';
-                        return `<div class="creator-modal-work-card" style="position:relative;" onclick="if(!event.target.closest('.creator-pin-btn')){creatorModalOverlay.classList.remove('open');openLightbox('${sid}')}">
+                        return `<div class="creator-modal-work-card" style="position:relative;" onclick="if(!event.target.closest('.creator-pin-btn')){window.openLightboxFromModal('${sid}')}">
                             ${pinBtn}
                             <img src="${w.cover_url || w.file_url}" alt="${w.title}" loading="lazy" onerror="this.style.display='none';this.parentElement.style.background='var(--surface2)';">
                             <div class="cmw-label">${w.title}</div>
@@ -5398,6 +5398,10 @@ function updateNav(items) {
         // 立即挂载到 window，确保 onclick 能访问
         window.showCreatorProfile = showCreatorProfile;
         window.openLightbox = openLightbox;
+        window.openLightboxFromModal = function(id) {
+            document.getElementById('creatorModalOverlay').classList.remove('open');
+            setTimeout(() => openLightbox(id), 150);
+        };
 
         // Close handler
         document.getElementById('creatorModalClose').addEventListener('click', () => {
