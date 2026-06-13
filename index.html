@@ -1934,24 +1934,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-    <!-- 🔧 管理员诊断栏 — 临时，排查完删除 -->
-    <div id="debugBar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a2e;color:#0f0;font-family:monospace;font-size:12px;padding:6px 12px;text-align:center;display:none;"></div>
-    <script>
-    (function(){
-        var bar = document.getElementById('debugBar');
-        function log(msg){ bar.style.display='block'; bar.textContent += ' | ' + msg; }
-        // 检测 supabase SDK 是否加载
-        setTimeout(function(){
-            if (typeof window.supabase === 'undefined') { log('❌ Supabase SDK 未加载！检查网络或CDN'); }
-            else { log('✅ Supabase SDK 已加载'); }
-        }, 2000);
-        // 暴露全局 debug 函数
-        window._debugAdmin = function(isAdmin, username) {
-            if (isAdmin) { log('👑 管理员: ' + username); bar.style.background='#1a3a1a'; }
-            else { log('👤 普通用户: ' + username + ' (is_admin=' + (arguments[2]===undefined?'undefined':arguments[2]) + ')'); }
-        };
-    })();
-    </script>
 
     <!-- 花瓣飘落 Canvas -->
     <canvas id="petalCanvas" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
@@ -2749,8 +2731,6 @@ function updateNav(items) {
                 }
                 currentUser = profile;
                 isAdmin = profile.is_admin || false;
-                console.log('🔍 管理员状态:', { username: profile.username, is_admin: profile.is_admin, isAdmin });
-                if (window._debugAdmin) window._debugAdmin(isAdmin, profile.username, profile.is_admin);
                 return profile;
             } catch(e) {
                 console.error('requireAuth failed:', e.message);
