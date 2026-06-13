@@ -2728,7 +2728,7 @@
                 <div class="drop-zone-icon">📁</div>
                 <p>拖拽文件到此处，或 <span class="browse-link">点击浏览</span></p>
                 <p style="font-size:0.72rem;margin-top:4px;">支持 JPG / PNG / MP4 / GLB / FBX</p>
-                <input type="file" id="fileInput" accept="image/*,video/*,.glb,.fbx,.obj,.gltf">
+                <input type="file" id="fileInput" accept="image/*,video/*,.glb,.fbx,.obj,.gltf,.stl,.dae">
             </div>
 
             <!-- Preview -->
@@ -3176,11 +3176,12 @@
                 lightboxContent.innerHTML = `<video src="${m.file}" controls autoplay poster="${m.optimized || ''}" style="max-width:90vw;max-height:75vh;border-radius:6px;" id="lbVideo"></video>`;
             } else if (m.type === 'model') {
                 const ext = (m.fileName||m.file||'').toLowerCase().split('.').pop();
-                if (['glb','gltf'].includes(ext)) {
+                // 支持在线预览的 3D 格式（Three.js 加载器）
+                if (['glb','gltf','fbx','obj','stl','dae'].includes(ext)) {
                     lightboxContent.innerHTML = `<div id="model3DViewer" style="width:80vw;max-width:700px;height:60vh;max-height:500px;position:relative;border-radius:12px;overflow:hidden;background:radial-gradient(circle,#1e293b,#0f172a);"></div>`;
-                    setTimeout(() => initModel3DViewer(m.file), 200);
+                    setTimeout(() => initModel3DViewer(m.file, ext), 200);
                 } else {
-                    lightboxContent.innerHTML = `<div style="text-align:center;font-size:5rem;padding:60px;">🧊<p style="font-size:1rem;color:var(--text-muted);margin-top:16px;">3D 模型文件<br>${m.fileName||''}</p><p style="font-size:0.8rem;color:var(--text-muted);">${ext.toUpperCase()} 格式，可在本地 3D 软件中打开<br>或转为 GLB 格式上传以在线预览</p></div>`;
+                    lightboxContent.innerHTML = `<div style="text-align:center;font-size:5rem;padding:60px;">🧊<p style="font-size:1rem;color:var(--text-muted);margin-top:16px;">3D 模型文件<br>${m.fileName||''}</p><p style="font-size:0.8rem;color:var(--text-muted);">${ext.toUpperCase()} 格式暂不支持在线预览<br>可转为 GLB/FBX 格式上传</p></div>`;
                 }
             } else {
                 lightboxContent.innerHTML = `<img src="${m.optimized || m.file}" alt="${m.title}">`;
@@ -4017,9 +4018,10 @@ function updateNav(items) {
         let chatPartner = '';
         // ========== 🧊 3D Model Viewer ==========
         let model3DViewerActive = null;
-        async function initModel3DViewer(url) {
+        async function initModel3DViewer(url, ext) {
             const container = document.getElementById('model3DViewer');
             if (!container || !url) return;
+            ext = (ext || '').toLowerCase();
             // 清理旧 viewer
             if (model3DViewerActive) {
                 model3DViewerActive.controls.dispose();
@@ -4029,11 +4031,16 @@ function updateNav(items) {
             }
             container.innerHTML = '<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载模型中...</div>';
             try {
-                const [THREE, { GLTFLoader }, { OrbitControls }] = await Promise.all([
-                    import('three'),
-                    import('three/addons/loaders/GLTFLoader.js'),
-                    import('three/addons/controls/OrbitControls.js')
-                ]);
+                // 根据格式动态导入对应加载器
+                const imports = [import('three'), import('three/addons/controls/OrbitControls.js')];
+                if (['glb','gltf'].includes(ext)) imports.push(import('three/addons/loaders/GLTFLoader.js'));
+                else if (ext === 'fbx') imports.push(import('three/addons/loaders/FBXLoader.js'));
+                else if (ext === 'obj') imports.push(import('three/addons/loaders/OBJLoader.js'));
+                else if (ext === 'stl') imports.push(import('three/addons/loaders/STLLoader.js'));
+                else if (ext === 'dae') imports.push(import('three/addons/loaders/ColladaLoader.js'));
+                else imports.push(import('three/addons/loaders/GLTFLoader.js')); // 回退
+
+                const [THREE, { OrbitControls }, loaderModule] = await Promise.all(imports);
                 container.innerHTML = '';
                 const w = container.clientWidth, h = container.clientHeight;
                 const scene = new THREE.Scene();
@@ -4057,10 +4064,31 @@ function updateNav(items) {
                 controls.enableDamping = true; controls.dampingFactor = 0.08;
                 controls.autoRotate = true; controls.autoRotateSpeed = 1.5;
                 controls.target.set(0, 0.3, 0); controls.update();
-                // 加载模型
-                const loader = new GLTFLoader();
-                const gltf = await loader.loadAsync(url);
-                const model = gltf.scene;
+
+                // 根据格式加载模型
+                let model;
+                if (['glb','gltf'].includes(ext)) {
+                    const loader = new loaderModule.GLTFLoader();
+                    const result = await loader.loadAsync(url);
+                    model = result.scene;
+                } else if (ext === 'fbx') {
+                    const loader = new loaderModule.FBXLoader();
+                    model = await loader.loadAsync(url);
+                } else if (ext === 'obj') {
+                    const loader = new loaderModule.OBJLoader();
+                    model = await loader.loadAsync(url);
+                } else if (ext === 'stl') {
+                    const loader = new loaderModule.STLLoader();
+                    const geometry = await loader.loadAsync(url);
+                    const material = new THREE.MeshStandardMaterial({ color: 0x8899cc, roughness: 0.5, metalness: 0.1 });
+                    model = new THREE.Mesh(geometry, material);
+                } else if (ext === 'dae') {
+                    const loader = new loaderModule.ColladaLoader();
+                    const result = await loader.loadAsync(url);
+                    model = result.scene;
+                }
+                if (!model) throw new Error('无法解析模型');
+
                 // 居中模型
                 const box = new THREE.Box3().setFromObject(model);
                 const center = box.getCenter(new THREE.Vector3());
@@ -4089,7 +4117,7 @@ function updateNav(items) {
                     if (w2 > 0 && h2 > 0) { camera.aspect = w2/h2; camera.updateProjectionMatrix(); renderer.setSize(w2, h2); }
                 }).observe(container);
             } catch(e) {
-                container.innerHTML = '<div style="color:var(--red);text-align:center;padding-top:40%;">模型加载失败<br><span style="font-size:0.8rem;">请确认文件为有效 GLB/GLTF 格式</span></div>';
+                container.innerHTML = `<div style="color:var(--red);text-align:center;padding-top:40%;">模型加载失败<br><span style="font-size:0.8rem;">${e.message||'请确认文件格式正确'} — 支持的格式: GLB/GLTF/FBX/OBJ/STL/DAE</span></div>`;
             }
         }
         window.initModel3DViewer = initModel3DViewer;
@@ -5033,7 +5061,7 @@ function updateNav(items) {
 
         function handleFile(file) {
             // Validate
-            const allowed = /\.(png|jpg|jpeg|gif|webp|bmp|svg|mp4|webm|mov|glb|fbx|obj|gltf)$/i;
+            const allowed = /\.(png|jpg|jpeg|gif|webp|bmp|svg|mp4|webm|mov|glb|fbx|obj|gltf|stl|dae)$/i;
             if (!allowed.test(file.name)) {
                 showToast('不支持的文件格式', true);
                 return;
@@ -5044,7 +5072,7 @@ function updateNav(items) {
             pendingObjectURL = URL.createObjectURL(file);
 
             const isVideo = /\.(mp4|webm|mov)$/i.test(file.name);
-            const is3D = /\.(glb|fbx|obj|gltf)$/i.test(file.name);
+            const is3D = /\.(glb|fbx|obj|gltf|stl|dae)$/i.test(file.name);
 
             uploadPreview.classList.add('show');
             if (isVideo) {
@@ -5626,13 +5654,10 @@ function updateNav(items) {
         // ========== ⭐ 积分系统 ==========
         async function addPointsToCreator(authorUsername, amount) {
             if (!authorUsername || amount <= 0) return;
-            if (!creatorSet.has(authorUsername)) return; // 非创作者不积分
+            // 使用 SECURITY DEFINER RPC 绕过 RLS（RLS 仅允许更新自己的资料）
             try {
-                const { data: pf } = await supabase.from('profiles').select('id,points').eq('username', authorUsername).single();
-                if (!pf) { console.warn('[积分] 创作者不存在:', authorUsername); return; }
-                const newPoints = (pf.points || 0) + amount;
-                const { error } = await supabase.from('profiles').update({ points: newPoints }).eq('id', pf.id);
-                if (error) console.error('[积分] 更新失败:', error.message, '用户:', authorUsername);
+                const { error } = await supabase.rpc('add_points', { p_username: authorUsername, p_amount: amount });
+                if (error) console.error('[积分] RPC 失败:', error.message, '用户:', authorUsername);
             } catch(e) { console.error('[积分] 异常:', e.message, '用户:', authorUsername); }
         }
 
