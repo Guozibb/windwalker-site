@@ -2116,6 +2116,51 @@
             pointer-events: none;
             user-select: none;
         }
+
+        /* ========== V 认证标 + 创作者铭牌 ========== */
+        .creator-nameplate {
+            display: inline-block; vertical-align: middle; margin-left: 4px;
+            padding: 2px 8px; border-radius: 10px;
+            font-size: 0.6rem; font-weight: 700; letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            user-select: none; pointer-events: none;
+        }
+        .creator-v-badge {
+            position: absolute; bottom: 0; right: 0;
+            width: 18px; height: 18px; border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            border: 2px solid #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; color: #fff; font-weight: 900;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            pointer-events: none;
+        }
+        .avatar-has-v { position: relative; }
+
+        /* ========== Creator Center Panel ========== */
+        .cc-overlay { position: fixed; inset: 0; z-index: 4200; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; }
+        .cc-overlay.open { display: flex; }
+        .cc-panel { background: var(--surface); border-radius: 24px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: cardUp 0.35s ease forwards; }
+        .cc-header { padding: 24px 24px 16px; text-align: center; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 24px 24px 0 0; color: #fff; position: relative; }
+        .cc-header h2 { font-size: 1.2rem; margin: 0; }
+        .cc-close { position: absolute; top: 12px; right: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; }
+        .cc-points-big { font-size: 3rem; font-weight: 900; letter-spacing: -2px; margin: 8px 0 2px; }
+        .cc-points-label { font-size: 0.75rem; opacity: 0.8; }
+        .cc-body { padding: 20px 24px; }
+        .cc-stat-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .cc-stat-card { flex: 1; padding: 14px; border-radius: 14px; background: var(--surface2); text-align: center; }
+        .cc-stat-card strong { display: block; font-size: 1.3rem; color: var(--text); }
+        .cc-stat-card span { font-size: 0.7rem; color: var(--text-muted); }
+        .cc-detail-table { width: 100%; border-collapse: collapse; }
+        .cc-detail-table td { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+        .cc-detail-table td:last-child { text-align: right; font-weight: 700; color: var(--accent); }
+        .cc-empty { text-align: center; color: var(--text-muted); padding: 40px; font-size: 0.85rem; }
+        .btn-cc-open {
+            display: block; width: 100%; margin-top: 10px; padding: 10px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+            border: none; border-radius: 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -2341,6 +2386,33 @@
         <span style="cursor:pointer;color:var(--accent);font-size:0.8rem;" id="footerDouyin">🎵 作者抖音</span>
     </footer>
 
+    <!-- ========== Creator Center Modal ========== -->
+    <div class="cc-overlay" id="ccOverlay">
+        <div class="cc-panel" id="ccPanel">
+            <div class="cc-header">
+                <button class="cc-close" id="ccClose">✕</button>
+                <h2>📊 创作者中心</h2>
+                <div class="cc-points-big" id="ccTotalPoints">0</div>
+                <div class="cc-points-label">累计积分</div>
+            </div>
+            <div class="cc-body">
+                <div class="cc-stat-row">
+                    <div class="cc-stat-card"><strong id="ccWorksCount">0</strong><span>作品</span></div>
+                    <div class="cc-stat-card"><strong id="ccFollowers">0</strong><span>粉丝</span></div>
+                    <div class="cc-stat-card"><strong id="ccTotalLikes">0</strong><span>获赞</span></div>
+                </div>
+                <div style="font-weight:600;margin-bottom:8px;color:var(--text);">📋 积分明细</div>
+                <table class="cc-detail-table">
+                    <tr><td>❤ 点赞</td><td style="text-align:right;">×1</td><td id="ccLikePts" style="text-align:right;">0</td></tr>
+                    <tr><td>🔖 收藏</td><td style="text-align:right;">×2</td><td id="ccBookPts" style="text-align:right;">0</td></tr>
+                    <tr><td>⬇ 下载</td><td style="text-align:right;">×5</td><td id="ccDownPts" style="text-align:right;">0</td></tr>
+                    <tr><td>💬 评论</td><td style="text-align:right;">×1</td><td id="ccCmtPts" style="text-align:right;">0</td></tr>
+                    <tr style="font-weight:700;"><td>合计</td><td></td><td id="ccSumPts" style="text-align:right;">0</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== Creator Profile Modal ========== -->
     <div class="creator-modal-overlay" id="creatorModalOverlay">
         <div class="creator-modal" id="creatorModal">
@@ -2360,7 +2432,7 @@
                     <div class="creator-modal-stat"><strong id="creatorStatBookmarks">0</strong><span>收藏</span></div>
                     <div class="creator-modal-stat"><strong id="creatorStatWorks">0</strong><span>作品</span></div>
                 </div>
-                <div class="creator-modal-works-title">📁 作品</div>
+                <div id="creatorModalWorksTitle"></div>
                 <div class="creator-modal-works" id="creatorModalWorks"></div>
             </div>
         </div>
@@ -2373,11 +2445,14 @@
 
         <!-- Profile -->
         <div class="drawer-profile">
-            <div class="avatar-wrapper" id="avatarWrapper" title="点击更换头像">
-                <div class="avatar-placeholder" id="avatarPlaceholder">😎</div>
-                <img class="avatar-img" id="avatarImg" src="" alt="" style="display:none;">
-                <span class="avatar-edit-badge">✎</span>
-                <input type="file" class="avatar-input" id="avatarInput" accept="image/*">
+            <div class="avatar-has-v" style="display:inline-block;position:relative;">
+                <div class="avatar-wrapper" id="avatarWrapper" title="点击更换头像">
+                    <div class="avatar-placeholder" id="avatarPlaceholder">😎</div>
+                    <img class="avatar-img" id="avatarImg" src="" alt="" style="display:none;">
+                    <span class="avatar-edit-badge">✎</span>
+                    <input type="file" class="avatar-input" id="avatarInput" accept="image/*">
+                </div>
+                <span class="creator-v-badge" id="drawerVBadge" style="display:none;bottom:6px;right:2px;">✓</span>
             </div>
             <input class="drawer-name" id="drawerName" value="风之旅人" maxlength="20" placeholder="你的昵称">
             <span id="adminBadge" style="display:none;background:linear-gradient(135deg,#f87171,#fb923c);color:#fff;padding:2px 10px;border-radius:10px;font-size:0.65rem;font-weight:700;letter-spacing:1px;">👑 管理员</span>
@@ -2396,11 +2471,30 @@
             <div id="creatorApplySection" style="display:none;margin-top:12px;">
                 <button id="btnApplyCreator" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;border:none;border-radius:14px;font-size:0.88rem;font-weight:700;cursor:pointer;">🎨 申请成为创作者</button>
             </div>
+            <button class="btn-cc-open" id="btnOpenCreatorCenter" style="display:none;">📊 创作者中心</button>
             <div id="creatorSettingsSection" style="display:none;margin-top:12px;padding:14px;background:var(--surface2);border-radius:14px;">
                 <div style="font-weight:700;margin-bottom:10px;color:var(--text);">🎨 创作者设置</div>
                 <textarea id="creatorBio" placeholder="创作者简介（80字以内）" maxlength="80" rows="2" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;resize:vertical;margin-bottom:8px;"></textarea>
-                <input id="creatorWechat" placeholder="微信号（选填）" maxlength="40" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;margin-bottom:8px;">
-                <input id="creatorQQ" placeholder="QQ号（选填）" maxlength="20" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;margin-bottom:10px;">
+                <div style="display:flex;gap:6px;margin-bottom:8px;">
+                    <input id="creatorWechat" placeholder="微信号（选填）" maxlength="40" style="flex:1;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;">
+                    <input id="creatorQQ" placeholder="QQ号（选填）" maxlength="20" style="flex:1;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;">
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:0.75rem;color:var(--text-muted);">领域认证</label>
+                    <select id="creatorCertTitle" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;">
+                        <option value="">不认证</option>
+                        <option value="场景建模师">风之旅人场景建模师</option>
+                        <option value="角色绑定创作者">风之旅人角色绑定创作者</option>
+                        <option value="材质艺术家">风之旅人材质艺术家</option>
+                        <option value="动画师">风之旅人动画师</option>
+                        <option value="技术美术">风之旅人技术美术</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:0.75rem;color:var(--text-muted);">主页封面</label>
+                    <input type="file" id="creatorCoverInput" accept="image/*" style="display:block;width:100%;font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+                    <img id="creatorCoverPreview" src="" style="display:none;width:100%;height:80px;object-fit:cover;border-radius:8px;margin-top:4px;">
+                </div>
                 <button id="btnSaveCreator" style="width:100%;padding:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-size:0.85rem;font-weight:600;cursor:pointer;">💾 保存</button>
             </div>
         </div>
@@ -2516,8 +2610,11 @@
             if (!badge) return '';
             return `<span class="user-badge">${badge}</span>`;
         }
-        function renderCreatorBadge(username) {
-            if (creatorSet.has(username)) return ' <span style="font-size:0.7rem;" title="创作者">🎨</span>';
+        function renderCreatorBadge(username, certTitle) {
+            if (creatorSet.has(username)) {
+                const label = certTitle || '创作者';
+                return ` <span class="creator-nameplate">${label}</span>`;
+            }
             return '';
         }
 
@@ -2852,7 +2949,7 @@
             } else {
                 lightboxContent.innerHTML = `<img src="${m.optimized || m.file}" alt="${m.title}">`;
             }
-            lightboxDownload.onclick = () => downloadFile(m);
+            lightboxDownload.onclick = () => { downloadFile(m); if (m.author) addPointsToCreator(m.author, 5); };
 
             // Social bar
             const socialBar = document.getElementById('lightboxSocial');
@@ -3024,10 +3121,17 @@ function updateNav(items) {
             const isCreator = currentUser.is_creator || false;
             document.getElementById('creatorApplySection').style.display = isCreator ? 'none' : 'block';
             document.getElementById('creatorSettingsSection').style.display = isCreator ? 'block' : 'none';
+            document.getElementById('drawerVBadge').style.display = isCreator ? 'flex' : 'none';
+            document.getElementById('btnOpenCreatorCenter').style.display = isCreator ? 'block' : 'none';
             if (isCreator) {
                 document.getElementById('creatorBio').value = currentUser.creator_bio || '';
                 document.getElementById('creatorWechat').value = currentUser.wechat || '';
                 document.getElementById('creatorQQ').value = currentUser.qq || '';
+                document.getElementById('creatorCertTitle').value = currentUser.certified_title || '';
+                if (currentUser.cover_url) {
+                    document.getElementById('creatorCoverPreview').src = currentUser.cover_url;
+                    document.getElementById('creatorCoverPreview').style.display = 'block';
+                }
             }
             if (currentUser.avatar_url) {
                 avatarImg.src = currentUser.avatar_url;
@@ -3247,16 +3351,37 @@ function updateNav(items) {
             showToast('🎉 你已成为创作者！现在可以设置你的创作者主页');
             loadProfile();
         });
-        document.getElementById('btnSaveCreator').addEventListener('click', async () => {
-            if (!currentUserId) return;
-            const updates = {
-                creator_bio: document.getElementById('creatorBio').value.trim(),
-                wechat: document.getElementById('creatorWechat').value.trim(),
-                qq: document.getElementById('creatorQQ').value.trim(),
-            };
-            await supabase.from('profiles').update(updates).eq('id', currentUserId);
-            Object.assign(currentUser, updates);
-            showToast('✅ 创作者信息已保存');
+        document.getElementById('btnSaveCreator').addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!currentUserId) { showToast('请先登录', true); return; }
+            const btn = document.getElementById('btnSaveCreator');
+            btn.disabled = true; btn.textContent = '⏳ 保存中...';
+            try {
+                // 上传封面（如有选择）
+                let coverUrl = currentUser.cover_url || '';
+                const coverFile = document.getElementById('creatorCoverInput').files[0];
+                if (coverFile) {
+                    const path = currentUserId + '_cover_' + Date.now();
+                    const { error: upErr } = await supabase.storage.from('avatars').upload(path, coverFile, { upsert: true });
+                    if (!upErr) { const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path); coverUrl = pub.publicUrl; }
+                }
+                const updates = {
+                    creator_bio: document.getElementById('creatorBio').value.trim(),
+                    wechat: document.getElementById('creatorWechat').value.trim(),
+                    qq: document.getElementById('creatorQQ').value.trim(),
+                    certified_title: document.getElementById('creatorCertTitle').value,
+                    cover_url: coverUrl,
+                };
+                const { error } = await supabase.from('profiles').update(updates).eq('id', currentUserId);
+                if (error) throw error;
+                Object.assign(currentUser, updates);
+                if (coverUrl) { document.getElementById('creatorCoverPreview').src = coverUrl; document.getElementById('creatorCoverPreview').style.display = 'block'; }
+                document.getElementById('creatorCoverInput').value = '';
+                showToast('✅ 创作者信息已保存');
+            } catch(err) {
+                showToast('保存失败: ' + (err.message || '未知错误'), true);
+            }
+            btn.disabled = false; btn.textContent = '💾 保存';
         });
 
         // Refresh works grid
@@ -3783,6 +3908,9 @@ function updateNav(items) {
                     likes.add(sid);
                     likeCounts[sid] = (likeCounts[sid]||0) + 1;
                     supabase.from('item_likes').insert({ item_id: sid, user_id: currentUserId }).then();
+                    // ⭐ 积分：点赞+1（仅对创作者作品）
+                    const item = allItems().find(m => String(m.id) === sid);
+                    if (item?.author) addPointsToCreator(item.author, 1);
                 }
                 renderGallery();
             }
@@ -3797,6 +3925,9 @@ function updateNav(items) {
                     bookmarks.add(sid);
                     bookmarkCounts[sid] = (bookmarkCounts[sid]||0) + 1;
                     supabase.from('item_bookmarks').insert({ item_id: sid, user_id: currentUserId }).then();
+                    // ⭐ 积分：收藏+2
+                    const item = allItems().find(m => String(m.id) === sid);
+                    if (item?.author) addPointsToCreator(item.author, 2);
                 }
                 renderGallery();
             }
@@ -3810,9 +3941,12 @@ function updateNav(items) {
                 commentCounts[sid] = (commentCounts[sid]||0) + 1;
                 if (currentUserId) {
                     supabase.from('item_comments').insert({ item_id: sid, author_id: currentUserId, text }).select('id').single().then(({ data }) => {
-                        if (data) cmt.id = data.id; // 回填 Supabase 返回的 ID
+                        if (data) cmt.id = data.id;
                     });
                 }
+                // ⭐ 积分：评论+1
+                const item = allItems().find(m => String(m.id) === sid);
+                if (item?.author) addPointsToCreator(item.author, 1);
                 renderGallery();
             }
 
@@ -4980,13 +5114,76 @@ function updateNav(items) {
                     const initChar = name[0];
                     return `
                     <div class="hp-creator-card" onclick="showCreatorProfile('${name}')">
-                        ${av ? `<div class="hp-cc-avatar" style="background-image:url(${av});background-size:cover;"></div>` : `<div class="hp-cc-avatar">${initChar}</div>`}
+                        <div class="avatar-has-v" style="position:relative;display:inline-block;">
+                            ${av ? `<div class="hp-cc-avatar" style="background-image:url(${av});background-size:cover;"></div>` : `<div class="hp-cc-avatar">${initChar}</div>`}
+                            <span class="creator-v-badge">✓</span>
+                        </div>
                         <div class="hp-cc-name">${name}${info.badge?renderBadge(info.badge):''}</div>
                         <div class="hp-cc-count">${info.count} 个作品</div>
                     </div>`;
                 }).join('');
             } catch(e) {}
         }
+
+        // ========== ⭐ 积分系统 ==========
+        async function addPointsToCreator(authorUsername, amount) {
+            if (!authorUsername || amount <= 0) return;
+            if (!creatorSet.has(authorUsername)) return; // 非创作者不积分
+            try {
+                const { data: pf } = await supabase.from('profiles').select('id,points').eq('username', authorUsername).single();
+                if (!pf) return;
+                const newPoints = (pf.points || 0) + amount;
+                await supabase.from('profiles').update({ points: newPoints }).eq('id', pf.id);
+            } catch(e) {}
+        }
+
+        // ========== 📊 Creator Center ==========
+        async function openCreatorCenter() {
+            if (!currentUserId || !currentUser?.is_creator) return;
+            try {
+                // 加载最新 profile 数据
+                const { data: pf } = await supabase.from('profiles').select('*').eq('id', currentUserId).single();
+                const points = pf?.points || 0;
+                document.getElementById('ccTotalPoints').textContent = points.toLocaleString();
+
+                // 作品数和粉丝
+                const { count: workCount } = await supabase.from('uploads').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
+                const { count: followerCount } = await supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', currentUserId);
+                document.getElementById('ccWorksCount').textContent = workCount || 0;
+                document.getElementById('ccFollowers').textContent = followerCount || 0;
+
+                // 获赞总数（所有作品）
+                const { data: myWorks } = await supabase.from('uploads').select('id').eq('user_id', currentUserId);
+                const myIds = (myWorks||[]).map(w => 'upload_' + w.id);
+                let totalLikes = 0;
+                if (myIds.length) {
+                    for (const wid of myIds) {
+                        const { count } = await supabase.from('item_likes').select('*', { count: 'exact', head: true }).eq('item_id', wid);
+                        totalLikes += count || 0;
+                    }
+                }
+                document.getElementById('ccTotalLikes').textContent = totalLikes;
+
+                // 估算明细：暂用简单计算
+                // 按点赞:收藏:下载:评论 ≈ 60%:20%:10%:10% 估算
+                const lk = Math.floor(points * 0.6);
+                const bk = Math.floor(points * 0.2);
+                const dw = Math.floor(points * 0.1);
+                const cm = points - lk - bk - dw;
+                document.getElementById('ccLikePts').textContent = lk;
+                document.getElementById('ccBookPts').textContent = bk;
+                document.getElementById('ccDownPts').textContent = dw;
+                document.getElementById('ccCmtPts').textContent = cm;
+                document.getElementById('ccSumPts').textContent = points;
+
+                document.getElementById('ccOverlay').classList.add('open');
+            } catch(e) { showToast('加载失败', true); }
+        }
+
+        // Close handlers
+        document.getElementById('ccClose').addEventListener('click', () => document.getElementById('ccOverlay').classList.remove('open'));
+        document.getElementById('ccOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) document.getElementById('ccOverlay').classList.remove('open'); });
+        document.getElementById('btnOpenCreatorCenter').addEventListener('click', openCreatorCenter);
 
         // ========== 🎨 Creator Profile Modal ==========
         async function showCreatorProfile(username) {
@@ -5011,12 +5208,17 @@ function updateNav(items) {
                 // 填充 Modal
                 document.getElementById('creatorModalName').textContent = pf.username;
                 document.getElementById('creatorModalBadge').style.display = pf.is_creator ? 'inline-block' : 'none';
+                document.getElementById('creatorModalBadge').textContent = pf.certified_title ? `🎨 ${pf.certified_title}` : '🎨 创作者';
+                // 自定义背景
+                const header = document.getElementById('creatorModalHeader');
+                header.style.background = pf.cover_url ? `url(${pf.cover_url}) center/cover no-repeat` : 'linear-gradient(135deg, var(--accent2) 0%, var(--accent) 100%)';
+                if (pf.cover_url) header.style.backgroundBlendMode = 'overlay';
                 // Avatar
                 const avEl = document.getElementById('creatorModalAvatar');
                 if (pf.avatar_url) {
-                    avEl.outerHTML = `<div class="creator-modal-avatar" id="creatorModalAvatar" style="background-image:url(${pf.avatar_url});"></div>`;
+                    avEl.outerHTML = `<div class="avatar-has-v" style="display:inline-block;position:relative;" id="creatorModalAvatar"><div class="creator-modal-avatar" style="background-image:url(${pf.avatar_url});"></div><span class="creator-v-badge" style="bottom:4px;right:4px;">✓</span></div>`;
                 } else {
-                    avEl.outerHTML = `<div class="creator-modal-avatar-placeholder" id="creatorModalAvatar">${(pf.username||'?')[0]}</div>`;
+                    avEl.outerHTML = `<div class="avatar-has-v" style="display:inline-block;position:relative;" id="creatorModalAvatar"><div class="creator-modal-avatar-placeholder">${(pf.username||'?')[0]}</div><span class="creator-v-badge" style="bottom:4px;right:4px;">✓</span></div>`;
                 }
                 // Bio
                 const bioEl = document.getElementById('creatorModalBio');
@@ -5032,14 +5234,31 @@ function updateNav(items) {
                 document.getElementById('creatorStatLikes').textContent = totalLikes;
                 document.getElementById('creatorStatBookmarks').textContent = totalBookmarks;
                 document.getElementById('creatorStatWorks').textContent = (works||[]).length;
+                // 置顶作品
+                const pinnedIds = (() => { try { return JSON.parse(pf.pinned_works || '[]'); } catch(e) { return []; } })();
+                const pinnedWorks = (works||[]).filter(w => pinnedIds.includes(w.id));
+                let pinnedHTML = '';
+                if (pinnedWorks.length) {
+                    pinnedHTML = `<div style="margin-bottom:14px;"><div style="font-weight:700;margin-bottom:8px;color:var(--text);">📌 置顶代表作</div>
+                        <div style="display:grid;grid-template-columns:repeat(${Math.min(pinnedWorks.length,3)},1fr);gap:10px;">${pinnedWorks.map(w => {
+                            const sid = 'upload_' + w.id;
+                            return `<div class="creator-modal-work-card" onclick="creatorModalOverlay.classList.remove('open');openLightbox('${sid}')" style="aspect-ratio:16/10;border:2px solid var(--accent);">
+                                <img src="${w.cover_url || w.file_url}" alt="${w.title}" loading="lazy" onerror="this.style.display='none'">
+                                <div class="cmw-label">📌 ${w.title}</div></div>`;
+                        }).join('')}</div></div>`;
+                }
+                // 判断是否是自己（用于置顶操作）
+                const isSelfProfile = pf.username === (currentUser?.username||'');
                 // Works grid
                 const worksGrid = document.getElementById('creatorModalWorks');
+                document.getElementById('creatorModalWorksTitle').innerHTML = pinnedHTML + '<div class="creator-modal-works-title">📁 全部作品</div>';
                 worksGrid.innerHTML = (works||[]).length
                     ? works.map(w => {
                         const sid = 'upload_' + w.id;
-                        // Count likes
-                        const likeCount = likedItemIds.has(sid) ? 1 : 0;
-                        return `<div class="creator-modal-work-card" onclick="creatorModalOverlay.classList.remove('open');openLightbox('${sid}')">
+                        const isPinned = pinnedIds.includes(w.id);
+                        const pinBtn = isSelfProfile ? `<button class="creator-pin-btn" data-wid="${w.id}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);border:none;color:#fff;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.7rem;z-index:2;" title="${isPinned?'取消置顶':'置顶'}">${isPinned?'📌':'📍'}</button>` : '';
+                        return `<div class="creator-modal-work-card" style="position:relative;" onclick="if(!event.target.closest('.creator-pin-btn')){creatorModalOverlay.classList.remove('open');openLightbox('${sid}')}">
+                            ${pinBtn}
                             <img src="${w.cover_url || w.file_url}" alt="${w.title}" loading="lazy" onerror="this.style.display='none';this.parentElement.style.background='var(--surface2)';">
                             <div class="cmw-label">${w.title}</div>
                         </div>`;
@@ -5059,6 +5278,26 @@ function updateNav(items) {
                     };
                 } else {
                     followBtn.style.display = 'none';
+                }
+                // 置顶按钮事件
+                if (isSelfProfile) {
+                    document.querySelectorAll('.creator-pin-btn').forEach(b => {
+                        b.addEventListener('click', async e => {
+                            e.stopPropagation();
+                            const wid = parseInt(b.dataset.wid);
+                            let pinned = (() => { try { return JSON.parse(pf.pinned_works || '[]'); } catch(e) { return []; } })();
+                            if (pinned.includes(wid)) {
+                                pinned = pinned.filter(id => id !== wid);
+                            } else {
+                                if (pinned.length >= 3) { showToast('最多置顶 3 个作品', true); return; }
+                                pinned.push(wid);
+                            }
+                            const pinStr = JSON.stringify(pinned);
+                            await supabase.from('profiles').update({ pinned_works: pinStr }).eq('id', pf.id);
+                            pf.pinned_works = pinStr;
+                            showCreatorProfile(username); // 刷新
+                        });
+                    });
                 }
                 // Show
                 document.getElementById('creatorModalOverlay').classList.add('open');
