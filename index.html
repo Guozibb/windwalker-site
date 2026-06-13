@@ -3961,6 +3961,31 @@ function updateNav(items) {
 
         // ========== Horizontal Chat Panel ==========
         let chatPartner = '';
+        // ========== 🚫 违禁词过滤 ==========
+        const FORBIDDEN_WORDS = [
+            // 英文
+            'fuck','shit','damn','ass','bitch','dick','porn','sex','nude','kill','murder','suicide','heroin','cocaine','gambling','casino','fraud','hack','virus','malware','terrorist','nazi','racist','slave','violence',
+            // 中文脏话
+            '操你','我操','傻逼','傻B','sb','SB','你妈','他妈','鸡巴','卧槽','我艹','尼玛','脑残','弱智','白痴','废物','垃圾人','贱人','骚货','婊子',
+            // 中文色情
+            '色情','黄色','裸体','裸聊','约炮','一夜情','嫖娼','卖淫','做爱','上床',
+            // 中文赌博诈骗
+            '赌博','赌场','博彩','彩票','下注','庄家','网赌','刷单','返利','兼职赚钱','日赚','加微信','加V信','加QQ',
+            // 中文暴力违法
+            '杀人','砍人','绑架','毒品','吸毒','贩毒','冰毒','海洛因','枪支','炸弹','暴乱','推翻','颠覆',
+            // 中文广告骚扰
+            '广告推广','点击领取','免费领取','点击下载','加群',
+        ];
+        function filterText(text) {
+            if (!text) return text;
+            let result = text;
+            FORBIDDEN_WORDS.forEach(w => {
+                const regex = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                result = result.replace(regex, '***');
+            });
+            return result;
+        }
+
         // ========== ✉ Messaging System ==========
         const msgOverlay = document.getElementById('msgOverlay');
         const msgContainer = document.getElementById('msgContainer');
@@ -4058,17 +4083,21 @@ function updateNav(items) {
 
         // Send
         async function sendMsg(){
-            const input=document.getElementById('msgInput'),text=input.value.trim();
+            const input=document.getElementById('msgInput'),rawText=input.value.trim();
+            const text=filterText(rawText);
             if(!text&&!msgPendingImages.length)return;
             if(!msgPartnerId){const{data:tp}=await supabase.from('profiles').select('id').eq('username',msgPartner).single();msgPartnerId=tp?.id;}
             if(!msgPartnerId){showToast('用户不存在',true);return;}
             for(const img of msgPendingImages){
+                // 🖼 压缩后再上传
+                let fileToUpload=img;
+                try{fileToUpload=await compressImage(img,1200,0.7);}catch(e){}
                 const path=`chat/${Date.now()}_${Math.random().toString(36).slice(2,6)}.jpg`;
-                const{error}=await supabase.storage.from('community-media').upload(path,img);
+                const{error}=await supabase.storage.from('community-media').upload(path,fileToUpload);
                 if(!error){const{data}=supabase.storage.from('community-media').getPublicUrl(path);
                     await supabase.from('messages').insert({from_id:currentUserId,to_id:msgPartnerId,text:'',image_url:data.publicUrl,read:false});}
             }
-            if(text)await supabase.from('messages').insert({from_id:currentUserId,to_id:msgPartnerId,text,read:false});
+            if(text)await supabase.from('messages').insert({from_id:currentUserId,to_id:msgPartnerId,text:filterText(text),read:false});
             input.value='';msgPendingImages=[];document.getElementById('msgImgInput').value='';
             renderChatBubbles();updateMsgBadge();
         }
@@ -4169,6 +4198,7 @@ function updateNav(items) {
 
             function getComments(id) { return itemComments[String(id)] || []; }
             function addComment(id, name, text) {
+                text = filterText(text);
                 const sid = String(id);
                 if (!itemComments[sid]) itemComments[sid] = [];
                 const cmt = { name, text, time: Date.now() };
@@ -4444,7 +4474,7 @@ function updateNav(items) {
         // 发布
         composerSubmit.addEventListener('click', async () => {
             if (!currentUserId) return;
-            const text = composerInput.value.trim();
+            const text = filterText(composerInput.value.trim());
             if (!text && !composerPendingFile) return;
             composerSubmit.disabled = true; composerSubmit.textContent = '⏳';
 
@@ -4544,7 +4574,7 @@ function updateNav(items) {
                 const input=communityFeed.querySelector(`.comment-input[data-pid="${b.dataset.pid}"]`);
                 if(!input?.value.trim()||!currentUserId) return;
                 const pid=parseInt(b.dataset.pid); if(!pid) return;
-                const {error}=await supabase.from('post_comments').insert({post_id:pid,author_id:currentUserId,text:input.value.trim()});
+                const {error}=await supabase.from('post_comments').insert({post_id:pid,author_id:currentUserId,text:filterText(input.value.trim())});
                 if(error){showToast('回复失败: '+error.message,true);return;}
                 // 通知帖主
                 const { data: cp } = await supabase.from('community_posts').select('author_id').eq('id',pid).single();
