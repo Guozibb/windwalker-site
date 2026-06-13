@@ -3528,8 +3528,7 @@ function updateNav(items) {
                     const id = wid && wid.startsWith('upload_') ? wid : parseInt(wid);
                     const item = allItems().find(m => String(m.id) === String(id));
                     if (item) {
-                        closeDrawer();
-                        setTimeout(() => openLightbox(id), 300);
+                        openLightbox(id);
                     }
                 });
             });
