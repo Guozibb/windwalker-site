@@ -1004,6 +1004,23 @@
             font-weight: 600;
         }
 
+        /* Filter tag groups */
+        .filter-groups {
+            max-width: 1440px; margin: 0 auto; padding: 0 24px 10px;
+            display: flex; flex-wrap: wrap; gap: 12px;
+        }
+        @media (min-width: 1024px) { .filter-groups { padding: 0 0 10px; } }
+        .filt-group { display: flex; align-items: center; gap: 5px; }
+        .filt-label { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
+        .filt-tag {
+            padding: 4px 10px; border-radius: 12px;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text-muted); cursor: pointer; font-size: 0.7rem;
+            font-weight: 500; transition: var(--transition); white-space: nowrap;
+        }
+        .filt-tag:hover { border-color: var(--accent); color: var(--text); }
+        .filt-tag.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
         /* Sub-categories */
         .sub-categories {
             max-width: 1440px;
@@ -2149,6 +2166,7 @@
 
     <!-- ========== 🏠 Homepage Hero Banner ========== -->
     <div class="hp-banner" id="hpBanner">
+        <canvas id="bannerPetalCanvas" style="position:absolute;inset:0;z-index:0;pointer-events:none;"></canvas>
         <h1>🎨 风之旅人 · 3D模型资源库</h1>
         <p>探索高质量 3D 模型、材质贴图、角色动画<br>创作者社区 · 灵感分享 · 作品展示</p>
         <span class="hp-banner-btn" onclick="document.getElementById('gallery').scrollIntoView({behavior:'smooth'})">🔍 开始探索</span>
@@ -2190,6 +2208,8 @@
 
     <!-- ========== Categories ========== -->
     <div class="categories" id="categories"></div>
+    <!-- 多维筛选标签 -->
+    <div class="filter-groups" id="filterGroups"></div>
     <div class="type-filters" id="typeFilters">
         <button class="type-filter-btn active" data-type="">全部</button>
         <button class="type-filter-btn" data-type="image">🖼 图片</button>
@@ -2199,7 +2219,6 @@
         <button class="type-filter-btn" data-sort="likes">❤ 最高赞</button>
         <button class="type-filter-btn" data-sort="bookmarks">🔖 最多收藏</button>
     </div>
-    <div class="sub-categories" id="subCategories"></div>
 
     <!-- ========== Gallery ========== -->
     <main class="gallery" id="gallery">
@@ -2460,12 +2479,6 @@
                         <select id="uploadCategory"></select>
                     </div>
                 </div>
-                <div class="form-row" id="uploadSubCatRow" style="display:none;">
-                    <div>
-                        <label>子分类</label>
-                        <select id="uploadSubCategory"></select>
-                    </div>
-                </div>
                 <!-- Cover image for 3D models -->
                 <div class="cover-upload-row" id="coverUploadRow">
                     <button type="button" class="cover-upload-btn" id="btnCoverUpload">🖼 选择封面图</button>
@@ -2509,52 +2522,54 @@
         }
 
         // ============================================================
-        //  📦 资源数据 — 所有文件默认归入「作者作品」
+        //  📦 资源数据 — 全部归属「灵感来源」
         // ============================================================
         const modelData = [
-            // ======== 灵感相册 — 角色作品 ========
-            { file: "11b1f0934f6411a6a900968d9eb7e5d1.png", thumb: "optimized/thumb/11b1f0934f6411a6a900968d9eb7e5d1.webp", optimized: "optimized/11b1f0934f6411a6a900968d9eb7e5d1.webp", type: "image", cat: "灵感相册", title: "角色模型 01" },
-            { file: "1c7581fd597696e2d22a8be3b841db23.png", thumb: "optimized/thumb/1c7581fd597696e2d22a8be3b841db23.webp", optimized: "optimized/1c7581fd597696e2d22a8be3b841db23.webp", type: "image", cat: "灵感相册", title: "角色模型 02" },
-            { file: "3236882f9afea685bfa12ea409e35b42.png", thumb: "optimized/thumb/3236882f9afea685bfa12ea409e35b42.webp", optimized: "optimized/3236882f9afea685bfa12ea409e35b42.webp", type: "image", cat: "灵感相册", title: "角色模型 03" },
-            { file: "33e3836a5377a5fb7dc090e8e75dbbb6.png", thumb: "optimized/thumb/33e3836a5377a5fb7dc090e8e75dbbb6.webp", optimized: "optimized/33e3836a5377a5fb7dc090e8e75dbbb6.webp", type: "image", cat: "灵感相册", title: "角色模型 04" },
-            // ======== 灵感相册 — 场景作品 ========
-            { file: "39a32cebd13fe01bef6ea71d0108b201.png", thumb: "optimized/thumb/39a32cebd13fe01bef6ea71d0108b201.webp", optimized: "optimized/39a32cebd13fe01bef6ea71d0108b201.webp", type: "image", cat: "灵感相册", title: "场景模型 01" },
-            { file: "6b88850ec2d131d87ea08fbc3278aaff.png", thumb: "optimized/thumb/6b88850ec2d131d87ea08fbc3278aaff.webp", optimized: "optimized/6b88850ec2d131d87ea08fbc3278aaff.webp", type: "image", cat: "灵感相册", title: "场景模型 02" },
-            // ======== 灵感相册 — 载具作品 ========
-            { file: "9bceb61c1feb5ab8835f85a96ecb6a94.png", thumb: "optimized/thumb/9bceb61c1feb5ab8835f85a96ecb6a94.webp", optimized: "optimized/9bceb61c1feb5ab8835f85a96ecb6a94.webp", type: "image", cat: "灵感相册", title: "载具模型 01" },
-            { file: "9bdce1922faf135de9f42f43f6801085.png", thumb: "optimized/thumb/9bdce1922faf135de9f42f43f6801085.webp", optimized: "optimized/9bdce1922faf135de9f42f43f6801085.webp", type: "image", cat: "灵感相册", title: "载具模型 02" },
-            // ======== 灵感相册 — 建筑作品 ========
-            { file: "aa25c7b82a76e401b9329bb4acad8a03.png", thumb: "optimized/thumb/aa25c7b82a76e401b9329bb4acad8a03.webp", optimized: "optimized/aa25c7b82a76e401b9329bb4acad8a03.webp", type: "image", cat: "灵感相册", title: "建筑模型 01" },
-            { file: "cb5f2b6482f1bda0c2c786cfb14ccb9a.png", thumb: "optimized/thumb/cb5f2b6482f1bda0c2c786cfb14ccb9a.webp", optimized: "optimized/cb5f2b6482f1bda0c2c786cfb14ccb9a.webp", type: "image", cat: "灵感相册", title: "建筑模型 02" },
-            // ======== 灵感相册 — 游戏素材 ========
-            { file: "de1fdff896e1bb71884769c28b9dfcfb.png", thumb: "optimized/thumb/de1fdff896e1bb71884769c28b9dfcfb.webp", optimized: "optimized/de1fdff896e1bb71884769c28b9dfcfb.webp", type: "image", cat: "灵感相册", title: "游戏素材 01" },
-            { file: "8076e51aa7c29ab6a8a5e44ed45721dc.png", thumb: "optimized/thumb/8076e51aa7c29ab6a8a5e44ed45721dc.webp", optimized: "optimized/8076e51aa7c29ab6a8a5e44ed45721dc.webp", type: "image", cat: "灵感相册", title: "游戏素材 02" },
-            // ======== 灵感相册 — 视频 ========
-            { file: "33ea4677255dc34cda1604eb32c008f5_raw.mp4", thumb: "optimized/thumb/33ea4677255dc34cda1604eb32c008f5_raw.webp", optimized: "optimized/33ea4677255dc34cda1604eb32c008f5_raw.webp", type: "video", cat: "灵感相册", title: "角色动画预览 01" },
-            { file: "b4b52e12fd2c3a3cdc54697412a85b8d_raw.mp4", thumb: "optimized/thumb/b4b52e12fd2c3a3cdc54697412a85b8d_raw.webp", optimized: "optimized/b4b52e12fd2c3a3cdc54697412a85b8d_raw.webp", type: "video", cat: "灵感相册", title: "角色动画预览 02" },
-            { file: "ca190fed84a363048cfe469a48f11a05_raw.mp4", thumb: "optimized/thumb/ca190fed84a363048cfe469a48f11a05_raw.webp", optimized: "optimized/ca190fed84a363048cfe469a48f11a05_raw.webp", type: "video", cat: "灵感相册", title: "场景漫游预览" },
-            // ======== 灵感相册 — 参考 ========
-            { file: "c69a3d92c57f26f51ee39517a782b3e5.png", thumb: "optimized/thumb/c69a3d92c57f26f51ee39517a782b3e5.webp", optimized: "optimized/c69a3d92c57f26f51ee39517a782b3e5.webp", type: "image", cat: "灵感相册", title: "灵感参考 01" },
-            { file: "ee8797bdd9a0b86d56e7f263616dd550.png", thumb: "optimized/thumb/ee8797bdd9a0b86d56e7f263616dd550.webp", optimized: "optimized/ee8797bdd9a0b86d56e7f263616dd550.webp", type: "image", cat: "灵感相册", title: "灵感参考 02" },
-            { file: "face80389bc00e495648859b46b9aa7e.png", thumb: "optimized/thumb/face80389bc00e495648859b46b9aa7e.webp", optimized: "optimized/face80389bc00e495648859b46b9aa7e.webp", type: "image", cat: "灵感相册", title: "灵感参考 03" },
-            // ======== 贴图 ========
-            { file: "2e889ef86bf246d8ab479842400bf294.jpg", thumb: "optimized/thumb/2e889ef86bf246d8ab479842400bf294.webp", optimized: "optimized/2e889ef86bf246d8ab479842400bf294.webp", type: "image", cat: "贴图", title: "材质贴图 01" },
-            { file: "7dbbc228f02eac0b0388fc468741d65e.jpg", thumb: "optimized/thumb/7dbbc228f02eac0b0388fc468741d65e.webp", optimized: "optimized/7dbbc228f02eac0b0388fc468741d65e.webp", type: "image", cat: "贴图", title: "材质贴图 02" },
-            { file: "e6ae0978d10e6c6cf99927a39244c5cc.png", thumb: "optimized/thumb/e6ae0978d10e6c6cf99927a39244c5cc.webp", optimized: "optimized/e6ae0978d10e6c6cf99927a39244c5cc.webp", type: "image", cat: "贴图", title: "材质贴图 03" },
-            { file: "3eeb38378e22d2e2b06d24ebc1a6229a.png", thumb: "optimized/thumb/3eeb38378e22d2e2b06d24ebc1a6229a.webp", optimized: "optimized/3eeb38378e22d2e2b06d24ebc1a6229a.webp", type: "image", cat: "贴图", title: "材质贴图 04" },
+            { file: "11b1f0934f6411a6a900968d9eb7e5d1.png", thumb: "optimized/thumb/11b1f0934f6411a6a900968d9eb7e5d1.webp", optimized: "optimized/11b1f0934f6411a6a900968d9eb7e5d1.webp", type: "image", cat: "灵感来源", title: "角色模型 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "1c7581fd597696e2d22a8be3b841db23.png", thumb: "optimized/thumb/1c7581fd597696e2d22a8be3b841db23.webp", optimized: "optimized/1c7581fd597696e2d22a8be3b841db23.webp", type: "image", cat: "灵感来源", title: "角色模型 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "3236882f9afea685bfa12ea409e35b42.png", thumb: "optimized/thumb/3236882f9afea685bfa12ea409e35b42.webp", optimized: "optimized/3236882f9afea685bfa12ea409e35b42.webp", type: "image", cat: "灵感来源", title: "角色模型 03", format: "", polyCount: "", license: "free", software: "" },
+            { file: "33e3836a5377a5fb7dc090e8e75dbbb6.png", thumb: "optimized/thumb/33e3836a5377a5fb7dc090e8e75dbbb6.webp", optimized: "optimized/33e3836a5377a5fb7dc090e8e75dbbb6.webp", type: "image", cat: "灵感来源", title: "角色模型 04", format: "", polyCount: "", license: "free", software: "" },
+            { file: "39a32cebd13fe01bef6ea71d0108b201.png", thumb: "optimized/thumb/39a32cebd13fe01bef6ea71d0108b201.webp", optimized: "optimized/39a32cebd13fe01bef6ea71d0108b201.webp", type: "image", cat: "灵感来源", title: "场景模型 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "6b88850ec2d131d87ea08fbc3278aaff.png", thumb: "optimized/thumb/6b88850ec2d131d87ea08fbc3278aaff.webp", optimized: "optimized/6b88850ec2d131d87ea08fbc3278aaff.webp", type: "image", cat: "灵感来源", title: "场景模型 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "9bceb61c1feb5ab8835f85a96ecb6a94.png", thumb: "optimized/thumb/9bceb61c1feb5ab8835f85a96ecb6a94.webp", optimized: "optimized/9bceb61c1feb5ab8835f85a96ecb6a94.webp", type: "image", cat: "灵感来源", title: "载具模型 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "9bdce1922faf135de9f42f43f6801085.png", thumb: "optimized/thumb/9bdce1922faf135de9f42f43f6801085.webp", optimized: "optimized/9bdce1922faf135de9f42f43f6801085.webp", type: "image", cat: "灵感来源", title: "载具模型 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "aa25c7b82a76e401b9329bb4acad8a03.png", thumb: "optimized/thumb/aa25c7b82a76e401b9329bb4acad8a03.webp", optimized: "optimized/aa25c7b82a76e401b9329bb4acad8a03.webp", type: "image", cat: "灵感来源", title: "建筑模型 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "cb5f2b6482f1bda0c2c786cfb14ccb9a.png", thumb: "optimized/thumb/cb5f2b6482f1bda0c2c786cfb14ccb9a.webp", optimized: "optimized/cb5f2b6482f1bda0c2c786cfb14ccb9a.webp", type: "image", cat: "灵感来源", title: "建筑模型 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "de1fdff896e1bb71884769c28b9dfcfb.png", thumb: "optimized/thumb/de1fdff896e1bb71884769c28b9dfcfb.webp", optimized: "optimized/de1fdff896e1bb71884769c28b9dfcfb.webp", type: "image", cat: "灵感来源", title: "游戏素材 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "8076e51aa7c29ab6a8a5e44ed45721dc.png", thumb: "optimized/thumb/8076e51aa7c29ab6a8a5e44ed45721dc.webp", optimized: "optimized/8076e51aa7c29ab6a8a5e44ed45721dc.webp", type: "image", cat: "灵感来源", title: "游戏素材 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "33ea4677255dc34cda1604eb32c008f5_raw.mp4", thumb: "optimized/thumb/33ea4677255dc34cda1604eb32c008f5_raw.webp", optimized: "optimized/33ea4677255dc34cda1604eb32c008f5_raw.webp", type: "video", cat: "灵感来源", title: "角色动画预览 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "b4b52e12fd2c3a3cdc54697412a85b8d_raw.mp4", thumb: "optimized/thumb/b4b52e12fd2c3a3cdc54697412a85b8d_raw.webp", optimized: "optimized/b4b52e12fd2c3a3cdc54697412a85b8d_raw.webp", type: "video", cat: "灵感来源", title: "角色动画预览 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "ca190fed84a363048cfe469a48f11a05_raw.mp4", thumb: "optimized/thumb/ca190fed84a363048cfe469a48f11a05_raw.webp", optimized: "optimized/ca190fed84a363048cfe469a48f11a05_raw.webp", type: "video", cat: "灵感来源", title: "场景漫游预览", format: "", polyCount: "", license: "free", software: "" },
+            { file: "c69a3d92c57f26f51ee39517a782b3e5.png", thumb: "optimized/thumb/c69a3d92c57f26f51ee39517a782b3e5.webp", optimized: "optimized/c69a3d92c57f26f51ee39517a782b3e5.webp", type: "image", cat: "灵感来源", title: "灵感参考 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "ee8797bdd9a0b86d56e7f263616dd550.png", thumb: "optimized/thumb/ee8797bdd9a0b86d56e7f263616dd550.webp", optimized: "optimized/ee8797bdd9a0b86d56e7f263616dd550.webp", type: "image", cat: "灵感来源", title: "灵感参考 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "face80389bc00e495648859b46b9aa7e.png", thumb: "optimized/thumb/face80389bc00e495648859b46b9aa7e.webp", optimized: "optimized/face80389bc00e495648859b46b9aa7e.webp", type: "image", cat: "灵感来源", title: "灵感参考 03", format: "", polyCount: "", license: "free", software: "" },
+            { file: "2e889ef86bf246d8ab479842400bf294.jpg", thumb: "optimized/thumb/2e889ef86bf246d8ab479842400bf294.webp", optimized: "optimized/2e889ef86bf246d8ab479842400bf294.webp", type: "image", cat: "灵感来源", title: "材质贴图 01", format: "", polyCount: "", license: "free", software: "" },
+            { file: "7dbbc228f02eac0b0388fc468741d65e.jpg", thumb: "optimized/thumb/7dbbc228f02eac0b0388fc468741d65e.webp", optimized: "optimized/7dbbc228f02eac0b0388fc468741d65e.webp", type: "image", cat: "灵感来源", title: "材质贴图 02", format: "", polyCount: "", license: "free", software: "" },
+            { file: "e6ae0978d10e6c6cf99927a39244c5cc.png", thumb: "optimized/thumb/e6ae0978d10e6c6cf99927a39244c5cc.webp", optimized: "optimized/e6ae0978d10e6c6cf99927a39244c5cc.webp", type: "image", cat: "灵感来源", title: "材质贴图 03", format: "", polyCount: "", license: "free", software: "" },
+            { file: "3eeb38378e22d2e2b06d24ebc1a6229a.png", thumb: "optimized/thumb/3eeb38378e22d2e2b06d24ebc1a6229a.webp", optimized: "optimized/3eeb38378e22d2e2b06d24ebc1a6229a.webp", type: "image", cat: "灵感来源", title: "材质贴图 04", format: "", polyCount: "", license: "free", software: "" },
         ];
 
         // Assign unique IDs
         modelData.forEach((m, i) => { m.id = i; });
 
-        // ========== Build category list (全部 4 个分类，空分类也显示) ==========
-        const ALL_CATEGORIES = ['3D模型', '灵感相册', '作者作品', '贴图', 'UE5专区'];
-        const SUB_CATEGORIES_3D = ['人物', '建筑', '场景', '小模型', '工业', '汽车', '家具', '游戏素材'];
+        // ========== 垂直分类体系（7类） ==========
+        const ALL_CATEGORIES = ['灵感来源', '角色模型', '场景建筑', '道具物件', '材质贴图', '绑定动画', '工程源文件'];
         const CATEGORIES = ['全部', ...ALL_CATEGORIES];
+        // 筛选标签
+        const FORMATS = ['FBX', 'BLEND', 'OBJ', 'GLB'];
+        const POLY_COUNTS = ['低面', '中面', '高面'];
+        const LICENSES = [{v:'free',t:'免费个人'},{v:'restricted',t:'需授权'}];
+        const SOFTWARES = ['Blender', 'UE', 'C4D'];
+        const FILTER_GROUPS = [
+            { label:'📦 格式', key:'fmt', options: FORMATS.map(f=>({v:f,t:f})) },
+            { label:'📐 面数', key:'poly', options: POLY_COUNTS.map(p=>({v:p,t:p})) },
+            { label:'📋 授权', key:'lic', options: LICENSES },
+            { label:'💻 软件', key:'sw', options: SOFTWARES.map(s=>({v:s,t:s})) },
+        ];
 
         // ========== State ==========
-        let activeCat = '全部';
-        let activeSubCat = '';
+        let activeCat = '灵感来源';
+        let activeFilters = { fmt: new Set(), poly: new Set(), lic: new Set(), sw: new Set() };
         let typeFilter = ''; // '' | 'image' | 'video'
         let sortBy = ''; // '' | 'views' | 'likes' | 'bookmarks'
         let searchQ = '';
@@ -2592,10 +2607,18 @@
             let items = allItems().filter(m => {
                 const matchCat = activeCat === '全部' || m.cat === activeCat;
                 const matchType = !typeFilter || m.type === typeFilter;
-                const matchSub = !activeSubCat || (m.subCat === activeSubCat);
                 const q = searchQ.toLowerCase().trim();
                 const matchSearch = !q || m.title.toLowerCase().includes(q) || m.cat.toLowerCase().includes(q) || (m.file||'').toLowerCase().includes(q) || (m.author||'').toLowerCase().includes(q);
-                return matchCat && matchType && matchSub && matchSearch;
+                // 多维筛选（交集）
+                const fmtSet = activeFilters.fmt;
+                const polySet = activeFilters.poly;
+                const licSet = activeFilters.lic;
+                const swSet = activeFilters.sw;
+                const matchFmt = fmtSet.size === 0 || fmtSet.has(m.format||'');
+                const matchPoly = polySet.size === 0 || polySet.has(m.polyCount||'');
+                const matchLic = licSet.size === 0 || licSet.has(m.license||'free');
+                const matchSw = swSet.size === 0 || swSet.has(m.software||'');
+                return matchCat && matchType && matchSearch && matchFmt && matchPoly && matchLic && matchSw;
             });
             // 排序
             if (sortBy === 'views') items.sort((a,b) => (viewCounts[String(b.id)]||0) - (viewCounts[String(a.id)]||0));
@@ -2613,7 +2636,6 @@
         }
 
         // ========== Render categories ==========
-        const subCategoriesEl = document.getElementById('subCategories');
 
         function renderCategories() {
             const all = allItems();
@@ -2626,9 +2648,8 @@
             categoriesEl.querySelectorAll('.cat-btn').forEach(b => {
                 b.addEventListener('click', () => {
                     activeCat = b.dataset.cat;
-                    activeSubCat = '';
                     renderCategories();
-                    renderSubCategories();
+                    renderFilterGroups();
                     renderGallery();
                     updateStats();
                 });
@@ -2651,30 +2672,29 @@
                 });
             });
 
-            renderSubCategories();
+            renderFilterGroups();
         }
 
-        function renderSubCategories() {
-            if (activeCat === '3D模型') {
-                const all = allItems().filter(m => m.cat === '3D模型');
-                subCategoriesEl.innerHTML = SUB_CATEGORIES_3D.map(s => {
-                    const cnt = all.filter(m => m.subCat === s).length;
-                    const act = activeSubCat === s ? ' active' : '';
-                    return `<button class="sub-cat-btn${act}" data-sub="${s}">${s}<span class="count">(${cnt})</span></button>`;
+        function renderFilterGroups() {
+            const el = document.getElementById('filterGroups');
+            el.innerHTML = FILTER_GROUPS.map(g => {
+                const tags = g.options.map(o => {
+                    const sel = activeFilters[g.key].has(o.v);
+                    return `<button class="filt-tag${sel?' active':''}" data-group="${g.key}" data-val="${o.v}">${o.t}</button>`;
                 }).join('');
-                subCategoriesEl.classList.add('show');
-                subCategoriesEl.querySelectorAll('.sub-cat-btn').forEach(b => {
-                    b.addEventListener('click', () => {
-                        activeSubCat = activeSubCat === b.dataset.sub ? '' : b.dataset.sub;
-                        renderSubCategories();
-                        renderGallery();
-                        updateStats();
-                    });
+                return `<div class="filt-group"><span class="filt-label">${g.label}</span>${tags}</div>`;
+            }).join('');
+            el.querySelectorAll('.filt-tag').forEach(b => {
+                b.addEventListener('click', () => {
+                    const grp = b.dataset.group;
+                    const val = b.dataset.val;
+                    const set = activeFilters[grp];
+                    if (set.has(val)) set.delete(val); else set.add(val);
+                    renderFilterGroups();
+                    renderGallery();
+                    updateStats();
                 });
-            } else {
-                subCategoriesEl.classList.remove('show');
-                activeSubCat = '';
-            }
+            });
         }
 
         // ========== Render gallery ==========
@@ -4313,8 +4333,6 @@ function updateNav(items) {
         const previewRemove = document.getElementById('previewRemove');
         const uploadTitle = document.getElementById('uploadTitle');
         const uploadCategory = document.getElementById('uploadCategory');
-        const uploadSubCategory = document.getElementById('uploadSubCategory');
-        const uploadSubCatRow = document.getElementById('uploadSubCatRow');
         const btnSubmitUpload = document.getElementById('btnSubmitUpload');
 
         let pendingFile = null;
@@ -4349,21 +4367,13 @@ function updateNav(items) {
             coverRemove.classList.remove('show');
         });
 
-        // Populate category select
+        // Populate category select（使用新的垂直分类）
         function populateUploadCategories() {
             uploadCategory.innerHTML = ALL_CATEGORIES.map(c =>
                 `<option value="${c}">${c}</option>`
             ).join('');
-            uploadCategory.value = '作者作品';
-            uploadSubCategory.innerHTML = SUB_CATEGORIES_3D.map(s =>
-                `<option value="${s}">${s}</option>`
-            ).join('');
-            updateSubCatVisibility();
+            uploadCategory.value = '灵感来源';
         }
-        function updateSubCatVisibility() {
-            uploadSubCatRow.style.display = uploadCategory.value === '3D模型' ? 'grid' : 'none';
-        }
-        uploadCategory.addEventListener('change', updateSubCatVisibility);
         populateUploadCategories();
 
         // Open / close modal
@@ -4400,9 +4410,7 @@ function updateNav(items) {
             previewName.textContent = '';
             previewSize.textContent = '';
             uploadTitle.value = '';
-            uploadCategory.value = '作者作品';
-            uploadSubCategory.value = SUB_CATEGORIES_3D[0];
-            updateSubCatVisibility();
+            uploadCategory.value = '灵感来源';
             btnSubmitUpload.disabled = true;
             fileInput.value = '';
             coverInput.value = '';
@@ -4491,18 +4499,17 @@ function updateNav(items) {
             const isVideo = /\.(mp4|webm|mov)$/i.test(pendingFile.name);
             const is3D = /\.(glb|fbx|obj|gltf)$/i.test(pendingFile.name);
             const isImage = !isVideo && !is3D;
-            const subCat = uploadCategory.value === '3D模型' ? uploadSubCategory.value : '';
             const newItem = {
                 id: 'upload_' + Date.now(),
                 file: pendingObjectURL,
                 cover: pendingCoverURL || null,
                 type: isVideo ? 'video' : is3D ? 'model' : 'image',
-                cat: uploadCategory.value,
-                subCat: subCat,
+                cat: uploadCategory.value || '灵感来源',
                 title: uploadTitle.value.trim(),
                 author: currentUser ? currentUser.username : '风之旅人',
                 fileName: pendingFile.name,
-                isUpload: true,
+                isUpload: true, persisted: false,
+                format: '', polyCount: '', license: 'free', software: '',
             };
 
             btnSubmitUpload.textContent = '⏳ 上传中...';
@@ -4555,7 +4562,7 @@ function updateNav(items) {
                     user_id: currentUserId,
                     title: newItem.title,
                     category: newItem.cat,
-                    sub_category: newItem.subCat,
+                    sub_category: '',
                     file_type: newItem.type,
                     file_url: fileUrl,
                     cover_url: coverUrl || '',
@@ -5093,14 +5100,16 @@ function updateNav(items) {
                         file: item.file_url,
                         cover: item.cover_url || null,
                         type: item.file_type,
-                        cat: item.category,
-                        subCat: item.sub_category || '',
+                        cat: item.category || '灵感来源',
                         title: item.title,
                         author: nameMap[item.user_id] || '用户',
                         authorBadge: badgeMap[item.user_id] || '',
                         fileName: item.file_name,
-                        isUpload: true,
-                        persisted: true,
+                        isUpload: true, persisted: true,
+                        format: item.format || '',
+                        polyCount: item.poly_count || '',
+                        license: item.license || 'free',
+                        software: item.software || '',
                     });
                 });
             } catch(e) { /* No uploads or error */ }
@@ -5161,6 +5170,56 @@ function updateNav(items) {
                     banner.style.setProperty('--my', '0.5');
                 });
             }
+
+            // 🌸 Banner 花瓣粒子
+            (function setupBannerPetals() {
+                const cvs = document.getElementById('bannerPetalCanvas');
+                if (!cvs) return;
+                const bnr = document.getElementById('hpBanner');
+                cvs.width = bnr.offsetWidth; cvs.height = bnr.offsetHeight;
+                const bctx = cvs.getContext('2d');
+                const bpts = [];
+                const bcolors = ['255,180,200','245,170,190','255,200,215','240,160,185'];
+                for (let i = 0; i < 16; i++) {
+                    bpts.push({
+                        x: Math.random() * cvs.width, y: Math.random() * cvs.height,
+                        r: 3 + Math.random() * 4, vy: 0.15 + Math.random() * 0.35,
+                        vx: (Math.random() - 0.5) * 0.3, rot: Math.random() * 360,
+                        vrot: (Math.random() - 0.5) * 1.5, o: 0.2 + Math.random() * 0.35,
+                        c: bcolors[Math.floor(Math.random() * bcolors.length)]
+                    });
+                }
+                let bmx = 0.5, bmy = 0.5;
+                bnr.addEventListener('mousemove', e => {
+                    const r = bnr.getBoundingClientRect();
+                    bmx = (e.clientX - r.left) / r.width;
+                    bmy = (e.clientY - r.top) / r.height;
+                });
+                (function bLoop() {
+                    if (!document.getElementById('bannerPetalCanvas')) return;
+                    const w = cvs.width, h = cvs.height;
+                    bctx.clearRect(0, 0, w, h);
+                    for (const p of bpts) {
+                        // 风力：鼠标位置影响花瓣偏移
+                        const windX = (bmx - 0.5) * 0.4;
+                        const windY = (bmy - 0.5) * 0.25;
+                        p.y += p.vy + windY; p.x += p.vx + windX;
+                        p.rot += p.vrot;
+                        if (p.y > h + 20) { p.y = -20; p.x = Math.random() * w; }
+                        if (p.x < -20) p.x = w + 20;
+                        if (p.x > w + 20) p.x = -20;
+                        bctx.save(); bctx.translate(p.x, p.y); bctx.rotate(p.rot * Math.PI / 180);
+                        bctx.globalAlpha = p.o;
+                        bctx.fillStyle = `rgba(${p.c},1)`;
+                        // 花瓣形状
+                        bctx.beginPath();
+                        bctx.ellipse(0, 0, p.r, p.r * 0.35, 0, 0, Math.PI * 2);
+                        bctx.fill();
+                        bctx.restore();
+                    }
+                    requestAnimationFrame(bLoop);
+                })();
+            })();
         }
 
         // Auto-sync removed — Supabase handles persistence directly
