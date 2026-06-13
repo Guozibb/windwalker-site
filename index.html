@@ -2129,12 +2129,34 @@
         .creator-v-badge {
             position: absolute; bottom: 0; right: 0;
             width: 18px; height: 18px; border-radius: 50%;
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
             border: 2px solid #fff;
             display: flex; align-items: center; justify-content: center;
             font-size: 9px; color: #fff; font-weight: 900;
             box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-            pointer-events: none;
+            pointer-events: none; z-index: 2;
+            transition: background 0.4s;
+        }
+        .v-blue { background: linear-gradient(135deg, #3b82f6, #6366f1); }
+        .v-gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); animation: vPulse 2s infinite; }
+        .v-red { background: linear-gradient(135deg, #ef4444, #f87171); animation: vPulse 1.5s infinite; }
+        .v-purple { background: linear-gradient(135deg, #8b5cf6, #a78bfa); animation: vPulse 1s infinite; }
+        .v-black { background: linear-gradient(135deg, #1f2937, #4b5563); animation: vPulse 0.7s infinite; box-shadow: 0 0 14px rgba(139,92,246,0.5); }
+        @keyframes vPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.3); }
+            50% { box-shadow: 0 0 8px 3px rgba(255,255,255,0.15); }
+        }
+        .v-gold::after, .v-red::after, .v-purple::after, .v-black::after {
+            content: ''; position: absolute; border-radius: 50%; pointer-events: none; z-index: -1;
+            background: radial-gradient(circle, currentColor 0%, transparent 70%);
+            opacity: 0.25; animation: vSparkle 1.5s infinite;
+        }
+        .v-gold::after { inset: -5px; }
+        .v-red::after { inset: -7px; opacity: 0.35; animation-duration: 1s; }
+        .v-purple::after { inset: -9px; opacity: 0.45; animation-duration: 0.7s; }
+        .v-black::after { inset: -12px; opacity: 0.55; animation-duration: 0.5s; }
+        @keyframes vSparkle {
+            0%,100% { transform: scale(0.8); opacity: 0.15; }
+            50% { transform: scale(1.4); opacity: 0.4; }
         }
         .avatar-has-v { position: relative; }
 
@@ -2472,6 +2494,13 @@
                 <button id="btnApplyCreator" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;border:none;border-radius:14px;font-size:0.88rem;font-weight:700;cursor:pointer;">🎨 申请成为创作者</button>
             </div>
             <button class="btn-cc-open" id="btnOpenCreatorCenter" style="display:none;">📊 创作者中心</button>
+            <!-- 创作者个人信息展示 -->
+            <div id="creatorProfileDisplay" style="display:none;margin-top:8px;text-align:left;">
+                <div id="creatorDisplayTitle" style="font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:4px;"></div>
+                <div id="creatorDisplayBio" style="font-size:0.75rem;color:var(--text);line-height:1.5;margin-bottom:4px;"></div>
+                <div id="creatorDisplayContacts" style="font-size:0.7rem;color:var(--text-muted);"></div>
+            </div>
+            <button id="btnEditCreator" style="display:none;width:100%;margin-top:8px;padding:6px;background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:8px;font-size:0.75rem;cursor:pointer;">⚙ 编辑资料</button>
             <div id="creatorSettingsSection" style="display:none;margin-top:12px;padding:14px;background:var(--surface2);border-radius:14px;">
                 <div style="font-weight:700;margin-bottom:10px;color:var(--text);">🎨 创作者设置</div>
                 <textarea id="creatorBio" placeholder="创作者简介（80字以内）" maxlength="80" rows="2" style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.82rem;font-family:inherit;resize:vertical;margin-bottom:8px;"></textarea>
@@ -2610,6 +2639,21 @@
             if (!badge) return '';
             return `<span class="user-badge">${badge}</span>`;
         }
+        function getVLevelClass(points) {
+            if (points >= 5000) return 'v-black';
+            if (points >= 1000) return 'v-purple';
+            if (points >= 200) return 'v-red';
+            if (points >= 50) return 'v-gold';
+            return 'v-blue';
+        }
+        function getVLevelName(points) {
+            if (points >= 5000) return '黑V·至尊';
+            if (points >= 1000) return '紫V·大师';
+            if (points >= 200) return '红V·专家';
+            if (points >= 50) return '黄V·进阶';
+            return '蓝V·创作者';
+        }
+
         function renderCreatorBadge(username, certTitle) {
             if (creatorSet.has(username)) {
                 const label = certTitle || '创作者';
@@ -3120,10 +3164,25 @@ function updateNav(items) {
             // 创作者入驻 UI
             const isCreator = currentUser.is_creator || false;
             document.getElementById('creatorApplySection').style.display = isCreator ? 'none' : 'block';
-            document.getElementById('creatorSettingsSection').style.display = isCreator ? 'block' : 'none';
             document.getElementById('drawerVBadge').style.display = isCreator ? 'flex' : 'none';
+            if (isCreator) {
+                const vbadge = document.getElementById('drawerVBadge');
+                vbadge.className = 'creator-v-badge ' + getVLevelClass(currentUser.points || 0);
+                vbadge.title = getVLevelName(currentUser.points || 0) + ' (' + (currentUser.points||0) + '积分)';
+            }
             document.getElementById('btnOpenCreatorCenter').style.display = isCreator ? 'block' : 'none';
             if (isCreator) {
+                // 显示个人信息 + 编辑按钮（默认折叠设置面板）
+                document.getElementById('creatorProfileDisplay').style.display = 'block';
+                document.getElementById('btnEditCreator').style.display = 'block';
+                document.getElementById('creatorSettingsSection').style.display = 'none';
+                document.getElementById('creatorDisplayTitle').textContent = currentUser.certified_title || '创作者';
+                document.getElementById('creatorDisplayBio').textContent = currentUser.creator_bio || '';
+                const contactParts = [];
+                if (currentUser.wechat) contactParts.push('💚 ' + currentUser.wechat);
+                if (currentUser.qq) contactParts.push('🐧 ' + currentUser.qq);
+                document.getElementById('creatorDisplayContacts').textContent = contactParts.join(' · ') || '';
+                // 预填设置表单（备用）
                 document.getElementById('creatorBio').value = currentUser.creator_bio || '';
                 document.getElementById('creatorWechat').value = currentUser.wechat || '';
                 document.getElementById('creatorQQ').value = currentUser.qq || '';
@@ -3132,6 +3191,9 @@ function updateNav(items) {
                     document.getElementById('creatorCoverPreview').src = currentUser.cover_url;
                     document.getElementById('creatorCoverPreview').style.display = 'block';
                 }
+            } else {
+                document.getElementById('creatorProfileDisplay').style.display = 'none';
+                document.getElementById('btnEditCreator').style.display = 'none';
             }
             if (currentUser.avatar_url) {
                 avatarImg.src = currentUser.avatar_url;
@@ -3343,6 +3405,12 @@ function updateNav(items) {
             drawerBio.style.height = drawerBio.scrollHeight + 'px';
         });
 
+        // 编辑资料按钮（切换设置面板）
+        document.getElementById('btnEditCreator').addEventListener('click', () => {
+            const panel = document.getElementById('creatorSettingsSection');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+
         // 🎨 创作者入驻
         document.getElementById('btnApplyCreator').addEventListener('click', async () => {
             if (!currentUserId) return;
@@ -3357,6 +3425,18 @@ function updateNav(items) {
             const btn = document.getElementById('btnSaveCreator');
             btn.disabled = true; btn.textContent = '⏳ 保存中...';
             try {
+                // 冷却检查（24小时）
+                const { data: pf } = await supabase.from('profiles').select('last_profile_edit').eq('id', currentUserId).single();
+                if (pf?.last_profile_edit) {
+                    const lastEdit = new Date(pf.last_profile_edit).getTime();
+                    const hoursSince = (Date.now() - lastEdit) / 3600000;
+                    if (hoursSince < 24) {
+                        const remainH = Math.ceil(24 - hoursSince);
+                        showToast(`请间隔24小时后再修改（还需等待约${remainH}小时）`, true);
+                        btn.disabled = false; btn.textContent = '💾 保存';
+                        return;
+                    }
+                }
                 // 上传封面（如有选择）
                 let coverUrl = currentUser.cover_url || '';
                 const coverFile = document.getElementById('creatorCoverInput').files[0];
@@ -3371,12 +3451,21 @@ function updateNav(items) {
                     qq: document.getElementById('creatorQQ').value.trim(),
                     certified_title: document.getElementById('creatorCertTitle').value,
                     cover_url: coverUrl,
+                    last_profile_edit: new Date().toISOString(),
                 };
                 const { error } = await supabase.from('profiles').update(updates).eq('id', currentUserId);
                 if (error) throw error;
                 Object.assign(currentUser, updates);
                 if (coverUrl) { document.getElementById('creatorCoverPreview').src = coverUrl; document.getElementById('creatorCoverPreview').style.display = 'block'; }
                 document.getElementById('creatorCoverInput').value = '';
+                // 更新展示区 + 折叠设置面板
+                document.getElementById('creatorDisplayTitle').textContent = updates.certified_title || '创作者';
+                document.getElementById('creatorDisplayBio').textContent = updates.creator_bio || '';
+                const cts = [];
+                if (updates.wechat) cts.push('💚 ' + updates.wechat);
+                if (updates.qq) cts.push('🐧 ' + updates.qq);
+                document.getElementById('creatorDisplayContacts').textContent = cts.join(' · ') || '';
+                document.getElementById('creatorSettingsSection').style.display = 'none';
                 showToast('✅ 创作者信息已保存');
             } catch(err) {
                 showToast('保存失败: ' + (err.message || '未知错误'), true);
@@ -5116,7 +5205,7 @@ function updateNav(items) {
                     <div class="hp-creator-card" onclick="showCreatorProfile('${name}')">
                         <div class="avatar-has-v" style="position:relative;display:inline-block;">
                             ${av ? `<div class="hp-cc-avatar" style="background-image:url(${av});background-size:cover;"></div>` : `<div class="hp-cc-avatar">${initChar}</div>`}
-                            <span class="creator-v-badge">✓</span>
+                            <span class="creator-v-badge v-blue">✓</span>
                         </div>
                         <div class="hp-cc-name">${name}${info.badge?renderBadge(info.badge):''}</div>
                         <div class="hp-cc-count">${info.count} 个作品</div>
@@ -5216,9 +5305,9 @@ function updateNav(items) {
                 // Avatar
                 const avEl = document.getElementById('creatorModalAvatar');
                 if (pf.avatar_url) {
-                    avEl.outerHTML = `<div class="avatar-has-v" style="display:inline-block;position:relative;" id="creatorModalAvatar"><div class="creator-modal-avatar" style="background-image:url(${pf.avatar_url});"></div><span class="creator-v-badge" style="bottom:4px;right:4px;">✓</span></div>`;
+                    avEl.outerHTML = `<div class="avatar-has-v" style="display:inline-block;position:relative;" id="creatorModalAvatar"><div class="creator-modal-avatar" style="background-image:url(${pf.avatar_url});"></div><span class="creator-v-badge ${getVLevelClass(pf.points||0)}" style="bottom:4px;right:4px;" title="${getVLevelName(pf.points||0)}">✓</span></div>`;
                 } else {
-                    avEl.outerHTML = `<div class="avatar-has-v" style="display:inline-block;position:relative;" id="creatorModalAvatar"><div class="creator-modal-avatar-placeholder">${(pf.username||'?')[0]}</div><span class="creator-v-badge" style="bottom:4px;right:4px;">✓</span></div>`;
+                    avEl.outerHTML = `<div class="avatar-has-v" style="display:inline-block;position:relative;" id="creatorModalAvatar"><div class="creator-modal-avatar-placeholder">${(pf.username||'?')[0]}</div><span class="creator-v-badge ${getVLevelClass(pf.points||0)}" style="bottom:4px;right:4px;" title="${getVLevelName(pf.points||0)}">✓</span></div>`;
                 }
                 // Bio
                 const bioEl = document.getElementById('creatorModalBio');
