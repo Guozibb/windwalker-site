@@ -11,12 +11,12 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;
 -- 2. 确保 is_creator 列存在
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_creator BOOLEAN DEFAULT false;
 
--- 3. 积分操作函数（安全定义者，绕过 RLS）
+-- 3. 积分操作函数（安全定义者，绕过 RLS，防刷分：积分不低于0）
 CREATE OR REPLACE FUNCTION add_points(p_username TEXT, p_amount INT)
 RETURNS VOID AS $$
 BEGIN
     UPDATE profiles
-    SET points = COALESCE(points, 0) + p_amount
+    SET points = GREATEST(0, COALESCE(points, 0) + p_amount)
     WHERE username = p_username;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
