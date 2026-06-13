@@ -2190,6 +2190,34 @@
         body[data-theme="dark"] .hp-banner { background:linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4338ca 100%); }
         #themeToggle { background:none;border:1px solid var(--border);border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:var(--transition);color:var(--text); }
         #themeToggle:hover { border-color:var(--accent); }
+
+        /* Notification Panel */
+        .notify-panel { position:fixed; top:0; right:-420px; width:400px; max-width:92vw; height:100vh; z-index:5000; background:var(--surface); border-left:1px solid var(--border); transition:right 0.35s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; box-shadow:-4px 0 30px rgba(0,0,0,0.2); }
+        .notify-panel.open { right:0; }
+        .notify-panel-header { padding:18px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+        .notify-panel-header h3 { font-size:1.05rem; }
+        .notify-panel-tabs { display:flex; gap:4px; padding:8px 16px; border-bottom:1px solid var(--border); overflow-x:auto; }
+        .notify-panel-tab { padding:5px 14px; border-radius:14px; border:none; background:transparent; cursor:pointer; font-size:0.75rem; color:var(--text-muted); white-space:nowrap; }
+        .notify-panel-tab.active { background:var(--accent); color:#fff; }
+        .notify-panel-list { flex:1; overflow-y:auto; padding:8px 16px; }
+        .notify-item-new { display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.2s; }
+        .notify-item-new:hover { background:var(--surface2); margin:0 -16px; padding:12px 16px; border-radius:0; }
+        .notify-item-new.unread { background:rgba(99,102,241,0.06); }
+        .notify-item-new .ni-icon { width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;background:var(--surface2); }
+        .notify-item-new .ni-body { flex:1;min-width:0; }
+        .notify-item-new .ni-text { font-size:0.82rem;color:var(--text); }
+        .notify-item-new .ni-time { font-size:0.7rem;color:var(--text-muted);margin-top:2px; }
+        .notify-panel-actions { padding:10px 16px; border-top:1px solid var(--border); }
+        .btn-all-read { width:100%; padding:8px; background:transparent; border:1px solid var(--border); border-radius:10px; cursor:pointer; font-size:0.78rem; color:var(--text); }
+
+        /* Admin Dashboard */
+        .admin-dash { padding:20px 24px; }
+        .admin-dash h3 { margin-bottom:14px; }
+        .admin-stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+        @media(max-width:480px){ .admin-stat-row { grid-template-columns:repeat(2,1fr); } }
+        .admin-stat-card { padding:14px; background:var(--surface2); border-radius:12px; text-align:center; }
+        .admin-stat-card .val { font-size:1.4rem; font-weight:800; color:var(--accent); }
+        .admin-stat-card .lbl { font-size:0.7rem; color:var(--text-muted); margin-top:2px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -2237,7 +2265,40 @@
         </div>
     </header>
 
-    <div class="notify-dropdown" id="notifyDropdown"></div>
+    <!-- 通知面板 -->
+    <div class="notify-panel" id="notifyPanel">
+        <div class="notify-panel-header">
+            <h3>🔔 通知中心</h3>
+            <button id="notifyPanelClose" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1.3rem;">✕</button>
+        </div>
+        <div class="notify-panel-tabs" id="notifyPanelTabs">
+            <button class="notify-panel-tab active" data-filter="all">全部</button>
+            <button class="notify-panel-tab" data-filter="like">❤ 点赞</button>
+            <button class="notify-panel-tab" data-filter="comment">💬 评论</button>
+            <button class="notify-panel-tab" data-filter="follow">👥 关注</button>
+            <button class="notify-panel-tab" data-filter="system">📢 系统</button>
+        </div>
+        <div class="notify-panel-list" id="notifyPanelList"></div>
+        <div class="notify-panel-actions">
+            <button class="btn-all-read" id="btnAllRead">✓ 全部已读</button>
+        </div>
+    </div>
+
+    <!-- 管理后台看板 -->
+    <div class="cc-overlay" id="adminDashOverlay">
+        <div class="cc-panel" id="adminDashPanel">
+            <div class="cc-header">
+                <button class="cc-close" id="adminDashClose">✕</button>
+                <h2>📊 管理后台</h2>
+                <div class="cc-points-label">站点数据看板</div>
+            </div>
+            <div class="admin-dash" id="adminDashContent">
+                <div style="text-align:center;padding:40px;color:var(--text-muted);">⏳ 加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="notify-dropdown" id="notifyDropdown" style="display:none;"></div>
 
     <!-- ========== 🏠 Homepage Hero Banner ========== -->
     <div class="hp-banner" id="hpBanner">
@@ -2501,6 +2562,7 @@
             <div id="creatorApplySection" style="display:none;margin-top:12px;">
                 <button id="btnApplyCreator" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff;border:none;border-radius:14px;font-size:0.88rem;font-weight:700;cursor:pointer;">🎨 申请成为创作者</button>
             </div>
+            <button class="btn-cc-open" id="btnOpenAdminDash" style="display:none;background:linear-gradient(135deg,#f59e0b,#ef4444);">📊 管理后台</button>
             <button class="btn-cc-open" id="btnOpenCreatorCenter" style="display:none;">📊 创作者中心</button>
             <!-- 创作者个人信息展示 -->
             <div id="creatorProfileDisplay" style="display:none;margin-top:8px;text-align:left;">
@@ -3189,6 +3251,7 @@ function updateNav(items) {
                 vbadge.title = getVLevelName(currentUser.points || 0) + ' (' + (currentUser.points||0) + '积分)';
             }
             document.getElementById('btnOpenCreatorCenter').style.display = isCreator ? 'block' : 'none';
+            document.getElementById('btnOpenAdminDash').style.display = isAdmin ? 'block' : 'none';
             if (isCreator) {
                 // 显示个人信息 + 编辑按钮（默认折叠设置面板）
                 document.getElementById('creatorProfileDisplay').style.display = 'block';
@@ -3594,41 +3657,41 @@ function updateNav(items) {
 
         async function renderNotifs() {
             if (!currentUserId) return;
-            const { data: ns } = await supabase.from('notifications').select('*, from_user:from_user_id(username,badge)').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(50);
-            const dd = document.getElementById('notifyDropdown');
-            if (!ns || !ns.length) {
-                dd.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">暂无通知</div>';
+            const { data: ns } = await supabase.from('notifications').select('*, from_user:from_user_id(username,badge)').eq('user_id', currentUserId).order('created_at', { ascending: false }).limit(100);
+            const list = document.getElementById('notifyPanelList');
+            const filtered = notifyFilter === 'all' ? ns : (ns||[]).filter(n => n.type === notifyFilter);
+            if (!filtered || !filtered.length) {
+                list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">暂无通知</div>';
                 return;
             }
-            const icons = { follow:'🔔', like:'❤', comment:'💬', message:'✉', friend:'👥' };
-            dd.innerHTML = ns.map(n => {
+            const icons = { follow:'👥', like:'❤', comment:'💬', message:'✉', friend:'👥', system:'📢' };
+            list.innerHTML = filtered.map(n => {
                 const time = new Date(n.created_at).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-                const fromName = n.from_user ? n.from_user.username : '未知';
-                const fromBadge = n.from_user?.badge || '';
-                return `<div class="notify-item${n.read?'':' unread'}" data-id="${n.id}">
-                    <strong>${icons[n.type]||'📢'} ${fromName}${renderBadge(fromBadge)}</strong> ${n.text}
-                    <div class="notify-time">${time}</div>
+                const fromName = n.from_user?.username || '系统';
+                return `<div class="notify-item-new${n.read?'':' unread'}" data-id="${n.id}">
+                    <div class="ni-icon">${icons[n.type]||'📢'}</div>
+                    <div class="ni-body"><div class="ni-text"><strong>${fromName}</strong> ${n.text}</div><div class="ni-time">${time}</div></div>
                 </div>`;
             }).join('');
-            dd.querySelectorAll('.notify-item').forEach(item => {
+            list.querySelectorAll('.notify-item-new').forEach(item => {
                 item.addEventListener('click', async () => {
                     await supabase.from('notifications').update({ read: true }).eq('id', item.dataset.id);
-                    renderNotifs();
-                    updateNotifyBadge();
+                    renderNotifs(); updateNotifyBadge();
                 });
             });
         }
 
-        // Notification bell toggle
+        // Notification panel
         const btnNotify = document.getElementById('btnNotify');
-        const notifyDropdown = document.getElementById('notifyDropdown');
-        btnNotify.addEventListener('click', e => {
-            e.stopPropagation();
-            const show = !notifyDropdown.classList.contains('show');
-            notifyDropdown.classList.toggle('show', show);
-            if (show) renderNotifs();
-        });
-        document.addEventListener('click', () => notifyDropdown.classList.remove('show'));
+        const notifyPanel = document.getElementById('notifyPanel');
+        let notifyFilter = 'all';
+        btnNotify.addEventListener('click', e => { e.stopPropagation(); notifyPanel.classList.toggle('open'); if(notifyPanel.classList.contains('open')) renderNotifs(); });
+        document.getElementById('notifyPanelClose').addEventListener('click', () => notifyPanel.classList.remove('open'));
+        document.getElementById('btnAllRead').addEventListener('click', async () => { await supabase.from('notifications').update({read:true}).eq('user_id',currentUserId).eq('read',false); renderNotifs(); });
+        document.querySelectorAll('.notify-panel-tab').forEach(tab => tab.addEventListener('click', () => {
+            document.querySelectorAll('.notify-panel-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active'); notifyFilter = tab.dataset.filter; renderNotifs();
+        }));
 
         updateNotifyBadge();
 
@@ -5285,6 +5348,43 @@ function updateNav(items) {
         // Close handlers
         document.getElementById('ccClose').addEventListener('click', () => document.getElementById('ccOverlay').classList.remove('open'));
         document.getElementById('ccOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) document.getElementById('ccOverlay').classList.remove('open'); });
+        // 管理后台
+        document.getElementById('btnOpenAdminDash').addEventListener('click', async () => {
+            if (!isAdmin) return;
+            document.getElementById('adminDashOverlay').classList.add('open');
+            try {
+                const { count: users } = await supabase.from('profiles').select('*',{count:'exact',head:true});
+                const { count: works } = await supabase.from('uploads').select('*',{count:'exact',head:true});
+                const { count: likes } = await supabase.from('item_likes').select('*',{count:'exact',head:true});
+                const { count: comments } = await supabase.from('item_comments').select('*',{count:'exact',head:true});
+                const { count: bookmarks } = await supabase.from('item_bookmarks').select('*',{count:'exact',head:true});
+                const { data: views } = await supabase.from('item_views').select('views');
+                const totalViews = (views||[]).reduce((s,v)=>s+(v.views||0),0);
+                // 近7天新增
+                const d7 = new Date(Date.now()-7*86400000).toISOString();
+                const { count: newUsers } = await supabase.from('profiles').select('*',{count:'exact',head:true}).gte('created_at',d7);
+                const { count: newWorks } = await supabase.from('uploads').select('*',{count:'exact',head:true}).gte('created_at',d7);
+                document.getElementById('adminDashContent').innerHTML = `
+                    <div class="admin-stat-row">
+                        <div class="admin-stat-card"><div class="val">${users||0}</div><div class="lbl">总用户</div></div>
+                        <div class="admin-stat-card"><div class="val">${works||0}</div><div class="lbl">总作品</div></div>
+                        <div class="admin-stat-card"><div class="val">${totalViews}</div><div class="lbl">总浏览</div></div>
+                    </div>
+                    <div class="admin-stat-row">
+                        <div class="admin-stat-card"><div class="val">${likes||0}</div><div class="lbl">总点赞</div></div>
+                        <div class="admin-stat-card"><div class="val">${comments||0}</div><div class="lbl">总评论</div></div>
+                        <div class="admin-stat-card"><div class="val">${bookmarks||0}</div><div class="lbl">总收藏</div></div>
+                    </div>
+                    <div class="admin-stat-row">
+                        <div class="admin-stat-card"><div class="val">+${newUsers||0}</div><div class="lbl">7天新用户</div></div>
+                        <div class="admin-stat-card"><div class="val">+${newWorks||0}</div><div class="lbl">7天新作品</div></div>
+                        <div class="admin-stat-card"><div class="val">${(works||0)?Math.round(totalViews/(works||1)):0}</div><div class="lbl">均浏览/作品</div></div>
+                    </div>`;
+            } catch(e) { document.getElementById('adminDashContent').innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;">加载失败</div>'; }
+        });
+        document.getElementById('adminDashClose').addEventListener('click', () => document.getElementById('adminDashOverlay').classList.remove('open'));
+        document.getElementById('adminDashOverlay').addEventListener('click', e => { if(e.target===e.currentTarget) document.getElementById('adminDashOverlay').classList.remove('open'); });
+
         document.getElementById('btnOpenCreatorCenter').addEventListener('click', openCreatorCenter);
 
         // ========== 🎨 Creator Profile Modal ==========
