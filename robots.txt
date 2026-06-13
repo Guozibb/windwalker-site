@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://guozibb.github.io/windwalker-site/sitemap.xml
