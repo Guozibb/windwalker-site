@@ -3192,7 +3192,12 @@
             const cmts = UserActions.getComments(id);
             const lbComments = document.getElementById('lbComments');
             lbComments.innerHTML = cmts.length
-                ? cmts.map((c,i) => `<div class="lb-comment-item" style="display:flex;justify-content:space-between;align-items:center;"><span><strong>${c.name}${renderBadge(c.badge)}${renderCreatorBadge(c.name)}:</strong> ${c.text} <button onclick="document.getElementById('lbCommentInput').value='@${c.name} ';document.getElementById('lbCommentInput').focus();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.7rem;">回复</button></span>${isAdmin && c.id ? `<button onclick="UserActions.deleteComment('${id}',${c.id},${i});event.stopPropagation();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem;flex-shrink:0;margin-left:8px;" title="管理员删除">🗑</button>` : ''}</div>`).join('')
+                ? cmts.map((c,i) => {
+                    const t = new Date(c.time).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                    const pinLabel = c.isPinned ? '📌 ' : '';
+                    const pinBtn = isAdmin && c.id ? `<button onclick="togglePinComment('${id}',${c.id},${i});event.stopPropagation();" style="background:none;border:none;cursor:pointer;font-size:0.7rem;flex-shrink:0;margin-left:4px;" title="${c.isPinned?'取消置顶':'置顶'}">${c.isPinned?'📌':'📍'}</button>` : '';
+                    return `<div class="lb-comment-item" style="display:flex;justify-content:space-between;align-items:center;${c.isPinned?'background:rgba(245,158,11,0.08);border-radius:8px;padding:6px 8px;':''}"><span>${pinLabel}<strong>${c.name}${renderBadge(c.badge)}${renderCreatorBadge(c.name)}:</strong> ${c.text}<span style="font-size:0.65rem;color:var(--text-muted);margin-left:8px;">${t}</span> <button onclick="document.getElementById('lbCommentInput').value='@${c.name} ';document.getElementById('lbCommentInput').focus();" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:0.7rem;">回复</button></span><span>${pinBtn}${isAdmin && c.id ? `<button onclick="UserActions.deleteComment('${id}',${c.id},${i});event.stopPropagation();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem;flex-shrink:0;" title="管理员删除">🗑</button>` : ''}</span></div>`;
+                }).join('')
                 : '<div style="color:#888;font-size:0.78rem;">暂无回复，来发表第一条吧</div>';
         }
 
@@ -4156,6 +4161,7 @@ function updateNav(items) {
                     const { data: b } = await supabase.from('item_bookmarks').select('item_id').eq('user_id', currentUserId);
                     bookmarks = new Set((b || []).map(x => String(x.item_id)));
                     const { data: c } = await supabase.from('item_comments').select('*').order('created_at', { ascending: true });
+                    // 加载 is_pinned 字段（兼容旧数据无此字段）
                     // 单独查出所有评论者的用户名映射
                     const authorIds = [...new Set((c||[]).map(cmt => cmt.author_id))];
                     const nameMap = {};
@@ -4168,7 +4174,11 @@ function updateNav(items) {
                     (c || []).forEach(cmt => {
                         const sid = String(cmt.item_id);
                         if (!itemComments[sid]) itemComments[sid] = [];
-                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', badge: badgeMap[cmt.author_id] || '', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id });
+                        itemComments[sid].push({ name: nameMap[cmt.author_id] || '用户', badge: badgeMap[cmt.author_id] || '', text: cmt.text, time: new Date(cmt.created_at).getTime(), id: cmt.id, isPinned: cmt.is_pinned || false });
+                    });
+                    // 排序：置顶优先，再按时间
+                    Object.keys(itemComments).forEach(k => {
+                        itemComments[k].sort((a,b) => (b.isPinned?1:0) - (a.isPinned?1:0) || a.time - b.time);
                     });
                 } catch(e) { likes = new Set(); bookmarks = new Set(); itemComments = {}; }
             }
@@ -4425,7 +4435,8 @@ function updateNav(items) {
                 const { data: likes } = await supabase.from('post_likes').select('user_id').eq('post_id', p.id);
                 const { data: cmts } = await supabase.from('post_comments').select('*, author:author_id(username,badge)').eq('post_id', p.id).order('created_at', true);
                 posts.push({
-                    id: p.id, // use numeric ID directly
+                    id: p.id,
+                    isPinned: p.is_pinned || false,
                     name: p.author?.username || '未知',
                     avatar: p.author?.avatar_url || '',
                     badge: p.author?.badge || '',
@@ -4529,6 +4540,7 @@ function updateNav(items) {
         // 渲染广场
         async function renderPlaza() {
             plazaPosts = await loadPlazaPosts();
+            plazaPosts.sort((a,b) => (b.isPinned?1:0) - (a.isPinned?1:0) || b.time - a.time);
             if (!plazaPosts.length) {
                 communityFeed.innerHTML = '<div class="community-empty">🏛 广场暂无动态<br><span style="font-size:0.75rem;">来分享你的作品吧！</span></div>';
                 return;
@@ -4544,6 +4556,7 @@ function updateNav(items) {
                         <div class="post-meta"><div class="post-name">${p.name}${renderBadge(p.badge)}${renderCreatorBadge(p.name)}</div><div class="post-time">${t}</div></div>
                         ${!isMine?`<button class="post-follow-btn" data-follow="${p.name}">+关注</button>`:''}
                         ${(isMine||isAdmin)?`<button class="post-delete" data-pid="${p.id}" title="${isAdmin&&!isMine?'管理员删除':'删除'}">✕</button>`:''}
+                        ${isAdmin?`<button onclick="event.stopPropagation();window.togglePinPost(${p.id});" style="background:none;border:none;cursor:pointer;font-size:0.8rem;" title="${p.isPinned?'取消置顶':'置顶'}">${p.isPinned?'📌':'📍'}</button>`:''}
                         ${!isMine?`<button class="post-report-btn" data-pid="${p.id}" title="举报" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.75rem;">🚩</button>`:''}
                     </div>
                     ${p.text?`<div class="post-content">${p.text}</div>`:''}
@@ -5413,6 +5426,35 @@ function updateNav(items) {
                 }).join('');
             } catch(e) {}
         }
+
+        // ========== 📌 置顶管理 ==========
+        async function togglePinComment(itemId, cmtId, cmtIdx) {
+            if (!isAdmin) return;
+            const sid = String(itemId);
+            const cmts = UserActions.getComments(sid);
+            const cmt = cmts[cmtIdx];
+            if (!cmt) return;
+            const newPinned = !cmt.isPinned;
+            await supabase.from('item_comments').update({ is_pinned: newPinned }).eq('id', cmtId);
+            cmt.isPinned = newPinned;
+            // 重新排序
+            cmts.sort((a,b) => (b.isPinned?1:0) - (a.isPinned?1:0) || a.time - b.time);
+            document.getElementById('lbComments').style.display = 'block';
+            renderItemComments(itemId);
+            showToast(newPinned ? '📌 已置顶' : '已取消置顶');
+        }
+        async function togglePinPost(postId) {
+            if (!isAdmin) return;
+            const post = plazaPosts.find(p => p.id === postId);
+            if (!post) return;
+            const newPinned = !post.isPinned;
+            await supabase.from('community_posts').update({ is_pinned: newPinned }).eq('id', postId);
+            post.isPinned = newPinned;
+            renderPlaza();
+            showToast(newPinned ? '📌 帖子已置顶' : '已取消置顶');
+        }
+        window.togglePinComment = togglePinComment;
+        window.togglePinPost = togglePinPost;
 
         // ========== ⭐ 积分系统 ==========
         async function addPointsToCreator(authorUsername, amount) {

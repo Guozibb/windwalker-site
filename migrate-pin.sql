@@ -1,0 +1,3 @@
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false;
+ALTER TABLE item_comments ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false;
+ALTER TABLE post_comments ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT false;
