@@ -3040,6 +3040,7 @@
                 updateStats();
             };
         }
+        window.openLightbox = openLightbox; // 确保 onclick 可访问
 
         function renderItemComments(id) {
             const cmts = UserActions.getComments(id);
@@ -5397,7 +5398,6 @@ function updateNav(items) {
 
         // 立即挂载到 window，确保 onclick 能访问
         window.showCreatorProfile = showCreatorProfile;
-        window.openLightbox = openLightbox;
         window.openLightboxFromModal = function(id) {
             document.getElementById('creatorModalOverlay').classList.remove('open');
             setTimeout(() => openLightbox(id), 150);
