@@ -32,30 +32,26 @@
             --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 四季主题色 — 春夏秋冬每个季节色彩鲜明 */
+        /* 四季主题色 — 背景随季节变化，其余保持低饱和度 */
         body.spring {
-            --accent: #e8697f; --accent2: #f5a0b5;
-            --bg: #fff0f3; --surface: #fff; --surface2: #ffe8ed; --border: #f5c5d0;
-            --text: #5c3040; --text-muted: #c08090;
-            --accent-glow: rgba(232,105,127,0.18);
+            --accent: #f5a0b5; --accent2: #f8c5d0;
+            --bg: #fff0f3; --surface: #fff; --surface2: #ffe8ed; --border: #f0d5dd;
+            --text: #5c4050; --text-muted: #b890a0;
         }
         body.summer {
-            --accent: #3da85c; --accent2: #7ccf95;
-            --bg: #edf7f0; --surface: #fff; --surface2: #e6f4ea; --border: #c0e0c8;
-            --text: #2a4a35; --text-muted: #78a885;
-            --accent-glow: rgba(61,168,92,0.16);
+            --accent: #6bc48a; --accent2: #a0d8b0;
+            --bg: #edf7f0; --surface: #fff; --surface2: #e6f4ea; --border: #d0e8d5;
+            --text: #3a5c45; --text-muted: #80a88a;
         }
         body.autumn {
-            --accent: #e07830; --accent2: #f0b860;
-            --bg: #fdf3e8; --surface: #fff; --surface2: #fbe8d0; --border: #f0d0a8;
-            --text: #5c3a20; --text-muted: #c09068;
-            --accent-glow: rgba(224,120,48,0.18);
+            --accent: #e89850; --accent2: #f0c890;
+            --bg: #fdf3e8; --surface: #fff; --surface2: #fbe8d0; --border: #f0dcc5;
+            --text: #5c4535; --text-muted: #b89878;
         }
         body.winter {
-            --accent: #5b9dd9; --accent2: #a0c8f0;
-            --bg: #f0f5fc; --surface: #fff; --surface2: #e8eff8; --border: #c8d8f0;
-            --text: #304058; --text-muted: #8098b8;
-            --accent-glow: rgba(91,157,217,0.16);
+            --accent: #90bce8; --accent2: #b8d4f5;
+            --bg: #f0f5fc; --surface: #fff; --surface2: #e8eff8; --border: #d5e0f0;
+            --text: #405068; --text-muted: #8098b8;
         }
 
         html { scroll-behavior: smooth; }
@@ -6173,7 +6169,7 @@ function updateNav(items) {
                 if(btn) btn.textContent = icons[season];
                 document.body.className = season;
 
-                const colors = { spring:'232,105,127', summer:'61,168,92', autumn:'224,120,48', winter:'91,157,217' };
+                const colors = { spring:'245,160,180', summer:'120,185,140', autumn:'220,140,60', winter:'160,200,240' };
                 function mkPetal() {
                     const s = season;
                     return { x:Math.random()*W, y:-30, r:Math.random()*4+2, vy:Math.random()*1+0.3, vx:(Math.random()-0.5)*0.8, o:Math.random()*0.45+0.15, rot:Math.random()*360, vrot:(Math.random()-0.5)*2, shape:s };
