@@ -2271,6 +2271,9 @@
         .msg-retract-btn { font-size:0.7rem; color:var(--text-muted); cursor:pointer; background:none; border:none; margin-left:6px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script type="importmap">
+        {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+    </script>
 </head>
 <body>
 
@@ -3141,7 +3144,13 @@
             if (m.type === 'video') {
                 lightboxContent.innerHTML = `<video src="${m.file}" controls autoplay poster="${m.optimized || ''}" style="max-width:90vw;max-height:75vh;border-radius:6px;" id="lbVideo"></video>`;
             } else if (m.type === 'model') {
-                lightboxContent.innerHTML = `<div style="text-align:center;font-size:5rem;padding:60px;">🧊<p style="font-size:1rem;color:var(--text-muted);margin-top:16px;">3D 模型文件<br>${m.fileName||''}</p><p style="font-size:0.8rem;color:var(--text-muted);">可在本地 3D 软件中打开</p></div>`;
+                const ext = (m.fileName||m.file||'').toLowerCase().split('.').pop();
+                if (['glb','gltf'].includes(ext)) {
+                    lightboxContent.innerHTML = `<div id="model3DViewer" style="width:80vw;max-width:700px;height:60vh;max-height:500px;position:relative;border-radius:12px;overflow:hidden;background:radial-gradient(circle,#1e293b,#0f172a);"></div>`;
+                    setTimeout(() => initModel3DViewer(m.file), 200);
+                } else {
+                    lightboxContent.innerHTML = `<div style="text-align:center;font-size:5rem;padding:60px;">🧊<p style="font-size:1rem;color:var(--text-muted);margin-top:16px;">3D 模型文件<br>${m.fileName||''}</p><p style="font-size:0.8rem;color:var(--text-muted);">${ext.toUpperCase()} 格式，可在本地 3D 软件中打开<br>或转为 GLB 格式上传以在线预览</p></div>`;
+                }
             } else {
                 lightboxContent.innerHTML = `<img src="${m.optimized || m.file}" alt="${m.title}">`;
             }
@@ -3204,6 +3213,13 @@
         function closeLightbox() {
             const vid = document.getElementById('lbVideo');
             if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); }
+            // 清理 3D viewer
+            if (model3DViewerActive) {
+                model3DViewerActive.controls.dispose();
+                model3DViewerActive.renderer.dispose();
+                if (model3DViewerActive.animationFrame) cancelAnimationFrame(model3DViewerActive.animationFrame);
+                model3DViewerActive = null;
+            }
             lightboxContent.innerHTML = '';
             lightbox.classList.remove('open');
             document.getElementById('lightboxSocial').style.display = 'none';
@@ -3968,6 +3984,85 @@ function updateNav(items) {
 
         // ========== Horizontal Chat Panel ==========
         let chatPartner = '';
+        // ========== 🧊 3D Model Viewer ==========
+        let model3DViewerActive = null;
+        async function initModel3DViewer(url) {
+            const container = document.getElementById('model3DViewer');
+            if (!container || !url) return;
+            // 清理旧 viewer
+            if (model3DViewerActive) {
+                model3DViewerActive.controls.dispose();
+                model3DViewerActive.renderer.dispose();
+                if (model3DViewerActive.animationFrame) cancelAnimationFrame(model3DViewerActive.animationFrame);
+                model3DViewerActive = null;
+            }
+            container.innerHTML = '<div style="color:#fff;text-align:center;padding-top:40%;">⏳ 加载模型中...</div>';
+            try {
+                const [THREE, { GLTFLoader }, { OrbitControls }] = await Promise.all([
+                    import('three'),
+                    import('three/addons/loaders/GLTFLoader.js'),
+                    import('three/addons/controls/OrbitControls.js')
+                ]);
+                container.innerHTML = '';
+                const w = container.clientWidth, h = container.clientHeight;
+                const scene = new THREE.Scene();
+                scene.background = null;
+                // 灯光
+                scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+                const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+                dir.position.set(5, 10, 7); scene.add(dir);
+                const dir2 = new THREE.DirectionalLight(0x8888ff, 0.5);
+                dir2.position.set(-5, -2, -3); scene.add(dir2);
+                // 相机
+                const camera = new THREE.PerspectiveCamera(45, w/h, 0.1, 100);
+                camera.position.set(3, 2, 5);
+                // 渲染器
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(w, h); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                container.appendChild(renderer.domElement);
+                // 控制器
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true; controls.dampingFactor = 0.08;
+                controls.autoRotate = true; controls.autoRotateSpeed = 1.5;
+                controls.target.set(0, 0.3, 0); controls.update();
+                // 加载模型
+                const loader = new GLTFLoader();
+                const gltf = await loader.loadAsync(url);
+                const model = gltf.scene;
+                // 居中模型
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                model.position.sub(center);
+                const maxDim = Math.max(size.x, size.y, size.z);
+                camera.position.set(maxDim*1.5, maxDim*1.2, maxDim*2);
+                controls.target.set(0, size.y*0.3, 0);
+                controls.update();
+                scene.add(model);
+                // 地面网格
+                const grid = new THREE.GridHelper(maxDim*2, 20, 0x444466, 0x222233);
+                grid.position.y = -size.y/2 - center.y;
+                scene.add(grid);
+                // 渲染循环
+                function animate() {
+                    const animFrame = requestAnimationFrame(animate);
+                    controls.update();
+                    renderer.render(scene, camera);
+                    model3DViewerActive = { controls, renderer, animationFrame: animFrame };
+                }
+                animate();
+                // resize
+                new ResizeObserver(() => {
+                    const w2 = container.clientWidth, h2 = container.clientHeight;
+                    if (w2 > 0 && h2 > 0) { camera.aspect = w2/h2; camera.updateProjectionMatrix(); renderer.setSize(w2, h2); }
+                }).observe(container);
+            } catch(e) {
+                container.innerHTML = '<div style="color:var(--red);text-align:center;padding-top:40%;">模型加载失败<br><span style="font-size:0.8rem;">请确认文件为有效 GLB/GLTF 格式</span></div>';
+            }
+        }
+        window.initModel3DViewer = initModel3DViewer;
+
         // ========== 🚫 违禁词过滤 ==========
         const FORBIDDEN_WORDS = [
             // 英文
