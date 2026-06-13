@@ -288,52 +288,50 @@ document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()
 document.querySelector(`.theme-btn[data-theme="${theme}"]`)?.classList.add('active');
 
 // === 晴空絮语 ===
-// ☁ 可爱云朵数据（持久位置，左飘循环）
+// ☁ 半透明软云朵（径向渐变，无硬边缘）
 const skyClouds=[
-    {x:0.12,y:0.10,w:200,h:80},{x:0.35,y:0.18,w:250,h:95},{x:0.58,y:0.07,w:220,h:85},
-    {x:0.78,y:0.22,w:190,h:75},{x:0.92,y:0.13,w:210,h:82},{x:0.22,y:0.30,w:180,h:70},
+    {x:0.15,y:0.08,w:280,h:100,spd:0.00012,phase:0},
+    {x:0.42,y:0.16,w:350,h:130,spd:0.00018,phase:1.5},
+    {x:0.72,y:0.10,w:310,h:115,spd:0.00014,phase:3},
+    {x:0.55,y:0.24,w:240,h:90,spd:0.00016,phase:5},
+    {x:0.88,y:0.18,w:260,h:100,spd:0.00013,phase:2},
 ];
-function drawCuteCloud(cx,cy,w,h){
-    const r=h*0.5;
-    // 主体：大圆
-    ctx.beginPath();ctx.arc(cx,cy,r*0.75,0,Math.PI*2);ctx.fill();
-    // 左右泡泡
-    ctx.beginPath();ctx.arc(cx-w*0.22,cy+r*0.1,r*0.55,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx+w*0.22,cy+r*0.1,r*0.55,0,Math.PI*2);ctx.fill();
-    // 头顶三个小圆
-    ctx.beginPath();ctx.arc(cx-w*0.1,cy-r*0.5,r*0.45,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx+w*0.1,cy-r*0.5,r*0.45,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx,cy-r*0.6,r*0.5,0,Math.PI*2);ctx.fill();
-    // 😊腮红
-    ctx.fillStyle='rgba(255,180,180,0.35)';
-    ctx.beginPath();ctx.arc(cx-w*0.12,cy+r*0.05,r*0.2,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx+w*0.12,cy+r*0.05,r*0.2,0,Math.PI*2);ctx.fill();
+function drawSoftCloud(cx,cy,w,h){
+    // 径向渐变绘制云朵，无硬边缘
+    const parts=[
+        {x:cx,y:cy,r:w*0.22},{x:cx-w*0.18,y:cy-h*0.05,r:w*0.15},{x:cx+w*0.18,y:cy-h*0.05,r:w*0.15},
+        {x:cx-w*0.08,y:cy-h*0.18,r:w*0.13},{x:cx+w*0.08,y:cy-h*0.18,r:w*0.13},{x:cx,y:cy-h*0.22,r:w*0.14},
+    ];
+    parts.forEach(p=>{
+        const grad=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+        grad.addColorStop(0,'rgba(255,255,255,0.7)');
+        grad.addColorStop(0.5,'rgba(255,255,255,0.35)');
+        grad.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=grad;
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    });
 }
 function drawSky(){
     const g=ctx.createLinearGradient(0,0,0,H);
     const isDark=document.body.classList.contains('dark');
     if(isDark){g.addColorStop(0,'#1a2a40');g.addColorStop(0.5,'#1e3348');g.addColorStop(1,'#243750');}
-    else{g.addColorStop(0,'#e0f0ff');g.addColorStop(0.5,'#f8fafc');g.addColorStop(1,'#ffffff');}
+    else{g.addColorStop(0,'#a8c8e0');g.addColorStop(0.5,'#c8ddec');g.addColorStop(1,'#e8f0f6');}
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     if(isDark){
         const moonX=W*0.78,moonY=H*0.15,mr=55;
-        ctx.fillStyle='rgba(255,250,220,0.9)';
-        ctx.beginPath();ctx.arc(moonX,moonY,mr,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='rgba(255,255,200,0.3)';
-        ctx.beginPath();ctx.arc(moonX,moonY,mr*2,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(255,250,220,0.9)';ctx.beginPath();ctx.arc(moonX,moonY,mr,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(255,255,200,0.3)';ctx.beginPath();ctx.arc(moonX,moonY,mr*2,0,Math.PI*2);ctx.fill();
         ctx.fillStyle='rgba(220,210,170,0.4)';
         ctx.beginPath();ctx.arc(moonX-15,moonY-10,mr*0.18,0,Math.PI*2);ctx.fill();
         ctx.beginPath();ctx.arc(moonX+10,moonY+15,mr*0.25,0,Math.PI*2);ctx.fill();
         ctx.beginPath();ctx.arc(moonX-5,moonY+20,mr*0.12,0,Math.PI*2);ctx.fill();
     }else{
-        // ☁ 白天：可爱云朵左飘循环
-        ctx.fillStyle='rgba(255,255,255,0.92)';
+        // 白天：5朵软云朵从左向右飘
         skyClouds.forEach(c=>{
-            // 持续左飘
-            c.x-=0.00015;
-            if(c.x*W+c.w<-50){c.x=(W+100)/W;} // 左出右进
-            const cx=c.x*W,cy=c.y*H;
-            drawCuteCloud(cx,cy,c.w,c.h);
+            c.x+=c.spd;
+            if(c.x*W-c.w>W+100){c.x=(-c.w-50)/W;}
+            const cx=c.x*W,cy=c.y*H+Math.sin(time*0.008+c.phase)*8;
+            drawSoftCloud(cx,cy,c.w,c.h);
         });
     }
     // 光斑粒子
