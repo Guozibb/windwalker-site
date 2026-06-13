@@ -67,6 +67,22 @@ body{
 .toast.err{background:#f87171;color:#fff;}
 
 @media(max-width:440px){.login-card{padding:32px 20px 24px;border-radius:24px;}}
+
+/* 暗黑模式 */
+body.dark{background:#0f172a;}
+body.dark .login-card{background:rgba(15,23,42,0.92);box-shadow:0 8px 40px rgba(0,0,0,0.3);}
+body.dark .login-logo h2{color:#e2e8f0;}
+body.dark .login-logo p{color:#94a3b8;}
+body.dark .login-tabs{background:#1e293b;}
+body.dark .login-tab{color:#94a3b8;}
+body.dark .login-tab.active,body.dark .login-tabs.register-active .login-tab:last-child{color:#e2e8f0;}
+body.dark .tab-slider{background:#334155;}
+body.dark .input-wrap{background:#1e293b;border-color:#334155;}
+body.dark .input-wrap input{color:#e2e8f0;}
+body.dark .input-wrap input::placeholder{color:#64748b;}
+body.dark .input-wrap:focus-within{border-color:#6366f1;background:#1e293b;}
+body.dark .agreement{color:#64748b;}
+body.dark .dark-toggle{border-color:rgba(255,255,255,0.2);}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -223,6 +239,8 @@ document.getElementById('motionToggle').addEventListener('click',()=>{
     document.getElementById('motionToggle').textContent=motionEnabled?'✨':'🚫';
     if(!motionEnabled){particles=[];ripples=[];}
 });
+// 预初始化音频上下文（用户首次点击后激活）
+document.addEventListener('click',function initAudio(){if(!audioCtx){audioCtx=new(window.AudioContext||window.webkitAudioContext)();}if(audioCtx.state==='suspended')audioCtx.resume();},{once:true});
 // 初始化音乐
 setTimeout(()=>{if(musicEnabled)startMusic();},1500);
 applyTheme(theme);
@@ -325,13 +343,24 @@ bgLoop();
 // ======== 暗黑模式 ========
 const darkBtn=document.getElementById('darkToggle');
 const savedDark=localStorage.getItem('ww_theme')||'light';
-if(savedDark==='dark'){document.body.style.background='#0f172a';darkBtn.textContent='☀';}
+if(savedDark==='dark'){document.body.classList.add('dark');darkBtn.textContent='☀';}
 darkBtn.addEventListener('click',()=>{
-    const isDark=document.body.style.background==='rgb(15, 23, 42)';
-    document.body.style.background=isDark?'':'#0f172a';
-    localStorage.setItem('ww_theme',isDark?'light':'dark');
-    darkBtn.textContent=isDark?'🌙':'☀';
+    const isDark=document.body.classList.toggle('dark');
+    localStorage.setItem('ww_theme',isDark?'dark':'light');
+    darkBtn.textContent=isDark?'☀':'🌙';
 });
+
+// ======== 🔊 点击音效 ========
+function playClickSfx(){
+    if(!sfxEnabled||!audioCtx)return;
+    const t=audioCtx.currentTime;
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(800,t);o.frequency.exponentialRampToValueAtTime(400,t+0.06);
+    g.gain.setValueAtTime(0.04,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.06);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t);o.stop(t+0.06);
+}
+document.addEventListener('click',e=>{if(e.target.closest('button')||e.target.closest('a'))playClickSfx();});
 
 // ======== 登录/注册 ========
 const tabs=document.querySelectorAll('.login-tab');
