@@ -1423,6 +1423,107 @@
         .lb-prev { left: 20px; }
         .lb-next { right: 20px; }
 
+        /* ========== Homepage Sections ========== */
+        .hp-section { max-width: 1440px; margin: 0 auto; padding: 0 24px 40px; }
+        .hp-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .hp-section-header h3 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+        .hp-section-header a { font-size: 0.8rem; color: var(--accent); text-decoration: none; font-weight: 500; }
+        .hp-section-header a:hover { text-decoration: underline; }
+
+        /* Hero Banner */
+        .hp-banner {
+            position: relative;
+            margin: 12px 24px 24px;
+            max-width: 1440px;
+            padding: 60px 40px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, var(--accent2) 0%, var(--accent) 50%, #6366f1 100%);
+            text-align: center;
+            color: #fff;
+            overflow: hidden;
+        }
+        @media (min-width: 1024px) { .hp-banner { margin-left: auto; margin-right: auto; } }
+        .hp-banner::before {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(circle at 30% 70%, rgba(255,255,255,0.12) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 20%, rgba(255,255,255,0.08) 0%, transparent 40%);
+            pointer-events: none;
+        }
+        .hp-banner h1 { position: relative; font-size: 2rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; text-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .hp-banner p { position: relative; font-size: 0.95rem; opacity: 0.92; max-width: 500px; margin: 0 auto 20px; line-height: 1.6; }
+        .hp-banner .hp-banner-btn {
+            position: relative; display: inline-block; padding: 12px 32px;
+            background: rgba(255,255,255,0.95); color: #334155; border-radius: 24px;
+            font-size: 0.9rem; font-weight: 700; text-decoration: none;
+            cursor: pointer; border: none; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .hp-banner .hp-banner-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+        @media (max-width: 640px) {
+            .hp-banner { padding: 40px 20px; border-radius: 18px; margin: 8px 12px 16px; }
+            .hp-banner h1 { font-size: 1.4rem; }
+            .hp-banner p { font-size: 0.82rem; }
+        }
+
+        /* Featured cards */
+        .hp-featured-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        @media (max-width: 900px) { .hp-featured-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .hp-featured-grid { grid-template-columns: 1fr; } }
+        .hp-featured-card {
+            position: relative; border-radius: 16px; overflow: hidden;
+            cursor: pointer; aspect-ratio: 4/3; background: var(--surface2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .hp-featured-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+        .hp-featured-card img { width: 100%; height: 100%; object-fit: cover; }
+        .hp-featured-card .hp-fc-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(transparent 50%, rgba(0,0,0,0.6));
+        }
+        .hp-featured-card .hp-fc-label {
+            position: absolute; bottom: 12px; left: 12px; right: 12px;
+            color: #fff; font-weight: 700; font-size: 0.9rem;
+        }
+        .hp-featured-card .hp-fc-badge {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.5); color: #fff; padding: 3px 10px;
+            border-radius: 10px; font-size: 0.7rem; backdrop-filter: blur(4px);
+        }
+
+        /* Latest uploads — horizontal scroll */
+        .hp-latest-scroll { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+        .hp-latest-scroll::-webkit-scrollbar { height: 4px; }
+        .hp-latest-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .hp-latest-card {
+            flex: 0 0 180px; scroll-snap-align: start;
+            border-radius: 14px; overflow: hidden; cursor: pointer;
+            background: var(--surface); border: 1px solid var(--border);
+            transition: transform 0.2s;
+        }
+        .hp-latest-card:hover { transform: translateY(-2px); }
+        .hp-latest-card img { width: 100%; height: 120px; object-fit: cover; }
+        .hp-latest-card .hp-lc-info { padding: 10px 12px; }
+        .hp-latest-card .hp-lc-title { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hp-latest-card .hp-lc-meta { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Top creators */
+        .hp-creators-row { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 4px; }
+        .hp-creators-row::-webkit-scrollbar { height: 4px; }
+        .hp-creators-row::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .hp-creator-card {
+            flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+            gap: 6px; cursor: pointer; min-width: 80px;
+        }
+        .hp-creator-card .hp-cc-avatar {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; color: #fff; flex-shrink: 0;
+            transition: transform 0.2s;
+        }
+        .hp-creator-card:hover .hp-cc-avatar { transform: scale(1.08); }
+        .hp-creator-card .hp-cc-name { font-size: 0.78rem; font-weight: 600; color: var(--text); text-align: center; }
+        .hp-creator-card .hp-cc-count { font-size: 0.65rem; color: var(--text-muted); }
+
         /* ========== Footer ========== */
         .site-footer {
             text-align: center;
@@ -1977,6 +2078,40 @@
     </header>
 
     <div class="notify-dropdown" id="notifyDropdown"></div>
+
+    <!-- ========== 🏠 Homepage Hero Banner ========== -->
+    <div class="hp-banner" id="hpBanner">
+        <h1>🎨 风之旅人 · 3D模型资源库</h1>
+        <p>探索高质量 3D 模型、材质贴图、角色动画<br>创作者社区 · 灵感分享 · 作品展示</p>
+        <span class="hp-banner-btn" onclick="document.getElementById('gallery').scrollIntoView({behavior:'smooth'})">🔍 开始探索</span>
+    </div>
+
+    <!-- ========== ⭐ 精选推荐 ========== -->
+    <div class="hp-section" id="hpFeaturedSection">
+        <div class="hp-section-header">
+            <h3>⭐ 精选推荐</h3>
+            <a href="#gallery">查看全部 →</a>
+        </div>
+        <div class="hp-featured-grid" id="hpFeaturedGrid"></div>
+    </div>
+
+    <!-- ========== 📌 最新上传 ========== -->
+    <div class="hp-section" id="hpLatestSection">
+        <div class="hp-section-header">
+            <h3>📌 最新上传</h3>
+            <a href="#gallery">查看全部 →</a>
+        </div>
+        <div class="hp-latest-scroll" id="hpLatestScroll"></div>
+    </div>
+
+    <!-- ========== 👥 热门创作者 ========== -->
+    <div class="hp-section" id="hpCreatorsSection">
+        <div class="hp-section-header">
+            <h3>👥 热门创作者</h3>
+            <a href="#gallery">探索更多 →</a>
+        </div>
+        <div class="hp-creators-row" id="hpCreatorsRow"></div>
+    </div>
 
     <!-- ========== Stats Bar ========== -->
     <div class="stats-bar" id="statsBar">
@@ -4637,6 +4772,76 @@ function updateNav(items) {
             }
         });
 
+        // ========== 🏠 Homepage Renderers ==========
+        function renderFeatured() {
+            // 精选 4 个代表作：角色01(id=0) / 场景01(id=4) / 建筑01(id=12) / 载具01(id=7)
+            const featuredIds = [0, 4, 8, 6]; // 角色01 / 场景01 / 建筑01 / 载具01
+            const items = featuredIds.map(id => modelData.find(m => m.id === id)).filter(Boolean);
+            const grid = document.getElementById('hpFeaturedGrid');
+            grid.innerHTML = items.map(m => `
+                <div class="hp-featured-card" data-wid="${m.id}" onclick="openLightbox(${m.id})">
+                    <img src="${m.thumb || m.file}" alt="${m.title}" loading="lazy">
+                    <div class="hp-fc-overlay"></div>
+                    <span class="hp-fc-badge">🔥 精选</span>
+                    <span class="hp-fc-label">${m.title}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderLatestUploads() {
+            // 最新 8 个用户上传
+            const latest = uploadedItems.slice(-8).reverse();
+            const container = document.getElementById('hpLatestScroll');
+            if (!latest.length) {
+                container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">还没有人上传作品，成为第一个！</div>';
+                return;
+            }
+            container.innerHTML = latest.map(m => `
+                <div class="hp-latest-card" onclick="openLightbox('${m.id}')">
+                    <img src="${m.thumb || m.cover || m.file}" alt="${m.title}" loading="lazy">
+                    <div class="hp-lc-info">
+                        <div class="hp-lc-title">${m.title}</div>
+                        <div class="hp-lc-meta">${m.author||'未知'} · ${m.cat}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function renderTopCreators() {
+            const container = document.getElementById('hpCreatorsRow');
+            try {
+                // 聚合每个用户的上传数量
+                const creatorMap = {};
+                for (const m of uploadedItems) {
+                    const key = m.author || '未知';
+                    if (!creatorMap[key]) creatorMap[key] = { count: 0, badge: m.authorBadge };
+                    creatorMap[key].count++;
+                }
+                const sorted = Object.entries(creatorMap)
+                    .sort((a,b) => b[1].count - a[1].count)
+                    .slice(0, 6);
+                if (!sorted.length) {
+                    container.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">还没有创作者入驻</div>';
+                    return;
+                }
+                // 查头像
+                const names = sorted.map(s => s[0]);
+                const { data: pfs } = await supabase.from('profiles').select('username,avatar_url').in('username', names);
+                const avMap = {};
+                (pfs||[]).forEach(p => { avMap[p.username] = p.avatar_url; });
+                container.innerHTML = sorted.map(([name, info]) => {
+                    const av = avMap[name];
+                    const initChar = name[0];
+                    return `
+                    <div class="hp-creator-card" onclick="searchInput.value='${name}';searchInput.dispatchEvent(new Event('input'));document.getElementById('gallery').scrollIntoView({behavior:'smooth'});">
+                        ${av ? `<div class="hp-cc-avatar" style="background-image:url(${av});background-size:cover;"></div>` : `<div class="hp-cc-avatar">${initChar}</div>`}
+                        <div class="hp-cc-name">${name}${info.badge?renderBadge(info.badge):''}</div>
+                        <div class="hp-cc-count">${info.count} 个作品</div>
+                    </div>`;
+                }).join('');
+            } catch(e) {}
+        }
+
         // ========== Init ==========
         async function init() {
             // 1. Check auth
@@ -4703,6 +4908,10 @@ function updateNav(items) {
             renderCategories();
             renderGallery();
             updateStats();
+            // 填充首页区块
+            renderFeatured();
+            renderLatestUploads();
+            renderTopCreators();
             // notifications load on bell click (lazy)
 
             // 隐藏入场 Canvas（轻量化：跳过动画）
