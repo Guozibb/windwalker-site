@@ -3787,10 +3787,16 @@ function updateNav(items) {
 
             let mediaUrl = '', mediaType = composerPendingType;
             if (composerPendingFile) {
-                const path = Date.now() + '.' + composerPendingFile.name.split('.').pop();
-                const { error } = await supabase.storage.from('community-media').upload(path, composerPendingFile);
+                let fileToUpload = composerPendingFile;
+                // 🖼 图片自动压缩（同画廊：1600px / quality 0.75）
+                if (mediaType === 'image') {
+                    try { fileToUpload = await compressImage(composerPendingFile, 1600, 0.75); } catch(e) {}
+                }
+                const ext = fileToUpload.name.split('.').pop();
+                const filePath = Date.now() + '_' + Math.random().toString(36).slice(2,6) + '.' + ext;
+                const { error } = await supabase.storage.from('community-media').upload(filePath, fileToUpload);
                 if (error) { showToast('图片上传失败: '+error.message, true); composerSubmit.disabled=false; composerSubmit.textContent='发布'; return; }
-                const { data } = supabase.storage.from('community-media').getPublicUrl(path);
+                const { data } = supabase.storage.from('community-media').getPublicUrl(filePath);
                 mediaUrl = data.publicUrl;
             }
 
