@@ -3525,10 +3525,16 @@ function updateNav(items) {
                 thumb.addEventListener('click', e => {
                     if (e.target.closest('.drawer-work-delete')) return;
                     const wid = thumb.dataset.wid;
+                    console.log('🖱 drawer click, wid:', wid);
                     const id = wid && wid.startsWith('upload_') ? wid : parseInt(wid);
+                    console.log('  resolved id:', id, typeof id);
                     const item = allItems().find(m => String(m.id) === String(id));
+                    console.log('  found item:', !!item, item?.title);
                     if (item) {
+                        console.log('  calling openLightbox...');
                         openLightbox(id);
+                    } else {
+                        console.log('  ❌ item not found in allItems!');
                     }
                 });
             });
