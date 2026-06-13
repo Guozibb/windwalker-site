@@ -2183,6 +2183,13 @@
             background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
             border: none; border-radius: 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
         }
+
+        /* ========== Dark Mode ========== */
+        body[data-theme="dark"] { --bg:#0f172a;--surface:#1e293b;--surface2:#172033;--border:#334155;--text:#e2e8f0;--text-muted:#94a3b8; }
+        body[data-theme="dark"] .header { background:rgba(15,23,42,0.92); }
+        body[data-theme="dark"] .hp-banner { background:linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#4338ca 100%); }
+        #themeToggle { background:none;border:1px solid var(--border);border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:var(--transition);color:var(--text); }
+        #themeToggle:hover { border-color:var(--accent); }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -2219,6 +2226,7 @@
                 <button class="btn-music" id="btnMusicToggle" title="音乐开关">🎵</button>
                 <button class="btn-sfx" id="btnSfxToggle" title="音效开关">🔔</button>
                 <button class="btn-music" id="btnSeason" title="切换季节" style="font-size:0.9rem;">🌸</button>
+                <button id="themeToggle" title="暗黑/亮色模式">🌙</button>
                 <button class="btn-community" id="btnOpenFollowing" style="background:linear-gradient(135deg,#f97316,#ec4899);">👁 关注</button>
                 <button class="btn-community" id="btnOpenCommunity">🏛 广场</button>
                 <button class="btn-upload" id="btnOpenUpload">
@@ -2697,16 +2705,14 @@
         const ALL_CATEGORIES = ['灵感来源', '角色模型', '场景建筑', '道具物件', '材质贴图', '绑定动画', '工程源文件'];
         const CATEGORIES = ['全部', ...ALL_CATEGORIES];
         // 筛选标签
-        const FORMATS = ['FBX', 'BLEND', 'OBJ', 'GLB'];
-        const POLY_COUNTS = ['低面', '中面', '高面'];
         const LICENSES = [{v:'free',t:'免费个人'},{v:'restricted',t:'需授权'}];
         const SOFTWARES = ['Blender', 'UE', 'C4D'];
         const FILTER_GROUPS = [
-            { label:'📦 格式', key:'fmt', options: FORMATS.map(f=>({v:f,t:f})) },
-            { label:'📐 面数', key:'poly', options: POLY_COUNTS.map(p=>({v:p,t:p})) },
+            { label:'📦 格式', key:'fmt', options: ['FBX','BLEND','OBJ','GLB'].map(f=>({v:f,t:f})) },
             { label:'📋 授权', key:'lic', options: LICENSES },
             { label:'💻 软件', key:'sw', options: SOFTWARES.map(s=>({v:s,t:s})) },
         ];
+        const POLY_COUNTS = [];
 
         // ========== State ==========
         let activeCat = '灵感来源';
@@ -4353,6 +4359,7 @@ function updateNav(items) {
                         <div class="post-meta"><div class="post-name">${p.name}${renderBadge(p.badge)}${renderCreatorBadge(p.name)}</div><div class="post-time">${t}</div></div>
                         ${!isMine?`<button class="post-follow-btn" data-follow="${p.name}">+关注</button>`:''}
                         ${(isMine||isAdmin)?`<button class="post-delete" data-pid="${p.id}" title="${isAdmin&&!isMine?'管理员删除':'删除'}">✕</button>`:''}
+                        ${!isMine?`<button class="post-report-btn" data-pid="${p.id}" title="举报" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.75rem;">🚩</button>`:''}
                     </div>
                     ${p.text?`<div class="post-content">${p.text}</div>`:''}
                     ${p.media?(p.mediaType==='video'?`<div class="post-media"><video src="${p.media}" controls></video></div>`:`<div class="post-media"><img src="${p.media}"></div>`):''}
@@ -4412,6 +4419,11 @@ function updateNav(items) {
                 await supabase.from('community_posts').delete().eq('id',pid);
                 plazaPosts=plazaPosts.filter(p=>p.id!==pid);
                 renderPlaza(); showToast('已删除');
+            }));
+            // 举报帖子
+            communityFeed.querySelectorAll('.post-report-btn').forEach(b=>b.addEventListener('click',async e=>{
+                e.stopPropagation(); const pid=b.dataset.pid;
+                submitReport('post', pid, '');
             }));
             // 管理员删除评论
             communityFeed.querySelectorAll('.plaza-comment-admin-del').forEach(b=>b.addEventListener('click',async e=>{
@@ -5401,6 +5413,32 @@ function updateNav(items) {
         document.getElementById('creatorModalOverlay').addEventListener('click', e => {
             if (e.target === e.currentTarget) document.getElementById('creatorModalOverlay').classList.remove('open');
         });
+
+        // ========== 🚩 举报系统 ==========
+        async function submitReport(targetType, targetId, reason) {
+            if (!currentUserId) { showToast('请先登录', true); return; }
+            if (!reason) reason = prompt('请简述举报原因：');
+            if (!reason) return;
+            try {
+                await supabase.from('reports').insert({ reporter_id: currentUserId, target_type: targetType, target_id: String(targetId), reason });
+                showToast('✅ 举报已提交，我们会尽快处理');
+            } catch(e) { showToast('举报失败: ' + e.message, true); }
+        }
+
+        // ========== 🌙 主题切换 ==========
+        (function(){
+            const saved = localStorage.getItem('ww_theme') || 'light';
+            document.body.setAttribute('data-theme', saved);
+            const btn = document.getElementById('themeToggle');
+            btn.textContent = saved === 'dark' ? '☀' : '🌙';
+            btn.addEventListener('click', () => {
+                const cur = document.body.getAttribute('data-theme');
+                const next = cur === 'dark' ? 'light' : 'dark';
+                document.body.setAttribute('data-theme', next);
+                localStorage.setItem('ww_theme', next);
+                btn.textContent = next === 'dark' ? '☀' : '🌙';
+            });
+        })();
 
         // ========== Init ==========
         async function init() {
