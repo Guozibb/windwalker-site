@@ -5407,6 +5407,9 @@ function updateNav(items) {
             } catch(e) { showToast('加载创作者信息失败', true); }
         }
 
+        // 立即挂载到 window，确保 onclick 能访问
+        window.showCreatorProfile = showCreatorProfile;
+
         // Close handler
         document.getElementById('creatorModalClose').addEventListener('click', () => {
             document.getElementById('creatorModalOverlay').classList.remove('open');
@@ -5520,9 +5523,6 @@ function updateNav(items) {
             renderTopCreators();
             // notifications load on bell click (lazy)
 
-            // 暴露全局函数确保 onclick 可用
-            window.showCreatorProfile = showCreatorProfile;
-            window.submitReport = submitReport;
             // 隐藏入场 Canvas（轻量化：跳过动画）
             entranceCanvas.style.display = 'none';
 
