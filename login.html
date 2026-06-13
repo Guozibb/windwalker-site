@@ -207,7 +207,7 @@ function startMusic(){
     try{
         if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
         if(audioCtx.state==='suspended')audioCtx.resume();
-        musicGain=audioCtx.createGain();musicGain.gain.value=0.025;musicGain.connect(audioCtx.destination);
+        musicGain=audioCtx.createGain();musicGain.gain.value=0.08;musicGain.connect(audioCtx.destination);
         const notes=getMusicNotes(theme);
         function playNote(){
             if(!musicEnabled||!audioCtx||!musicGain)return;
@@ -215,7 +215,7 @@ function startMusic(){
             const o=audioCtx.createOscillator(),g=audioCtx.createGain();
             o.type='triangle';o.frequency.value=n;
             const dur=d*0.7,t=audioCtx.currentTime;
-            g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.025,t+0.05);
+            g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.08,t+0.05);
             g.gain.exponentialRampToValueAtTime(0.001,t+dur);
             const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;f.Q.value=2;
             o.connect(g).connect(f);f.connect(musicGain);
@@ -232,6 +232,16 @@ document.getElementById('musicToggle').addEventListener('click',()=>{
     musicEnabled=!musicEnabled;
     document.getElementById('musicToggle').textContent=musicEnabled?'🎵':'🔇';
     if(musicEnabled)startMusic();else stopMusic();
+});
+// 🔊 音效开关（已有按钮 darkToggle，作为音效切换）
+const sfxToggleBtn=document.createElement('button');
+sfxToggleBtn.className='dark-toggle';sfxToggleBtn.id='sfxToggle';sfxToggleBtn.title='音效开关';
+sfxToggleBtn.textContent='🔔';sfxToggleBtn.style.cssText='position:fixed;top:16px;right:160px;z-index:100;';
+document.body.appendChild(sfxToggleBtn);
+sfxToggleBtn.addEventListener('click',()=>{
+    sfxEnabled=!sfxEnabled;
+    sfxToggleBtn.textContent=sfxEnabled?'🔔':'🔕';
+    sfxToggleBtn.style.opacity=sfxEnabled?'1':'0.5';
 });
 // ✨ 动态效果开关
 document.getElementById('motionToggle').addEventListener('click',()=>{
@@ -263,7 +273,9 @@ document.querySelector(`.theme-btn[data-theme="${theme}"]`)?.classList.add('acti
 // === 晴空絮语 ===
 function drawSky(){
     const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#e0f0ff');g.addColorStop(0.5,'#f8fafc');g.addColorStop(1,'#ffffff');
+    const isDark=document.body.classList.contains('dark');
+    if(isDark){g.addColorStop(0,'#1a2a40');g.addColorStop(0.5,'#1e3348');g.addColorStop(1,'#243750');}
+    else{g.addColorStop(0,'#e0f0ff');g.addColorStop(0.5,'#f8fafc');g.addColorStop(1,'#ffffff');}
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     const clouds=[{x:W*0.12,y:H*0.1,w:260,h:100},{x:W*0.45,y:H*0.18,w:340,h:120},{x:W*0.78,y:H*0.08,w:280,h:105},{x:W*0.3,y:H*0.35,w:220,h:85},{x:W*0.65,y:H*0.3,w:240,h:90}];
     clouds.forEach((c,i)=>{
@@ -279,7 +291,9 @@ function drawSky(){
 // === 浅海涟漪 ===
 function drawOcean(){
     const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#e0f7fa');g.addColorStop(0.5,'#b2ebf2');g.addColorStop(1,'#80deea');
+    const isDark=document.body.classList.contains('dark');
+    if(isDark){g.addColorStop(0,'#0d2137');g.addColorStop(0.5,'#143652');g.addColorStop(1,'#1a4060');}
+    else{g.addColorStop(0,'#e0f7fa');g.addColorStop(0.5,'#b2ebf2');g.addColorStop(1,'#80deea');}
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     for(let layer=0;layer<3;layer++){
         ctx.strokeStyle=`rgba(255,255,255,${0.25-layer*0.07})`;ctx.lineWidth=2+layer;
@@ -298,7 +312,9 @@ function drawOcean(){
 let duneOff1=0,duneOff2=0;
 function drawDesert(){
     const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,'#fff3e0');g.addColorStop(0.5,'#ffe0b2');g.addColorStop(1,'#ffcc80');
+    const isDark=document.body.classList.contains('dark');
+    if(isDark){g.addColorStop(0,'#1a1208');g.addColorStop(0.5,'#2d1f0e');g.addColorStop(1,'#3d2a14');}
+    else{g.addColorStop(0,'#fff3e0');g.addColorStop(0.5,'#ffe0b2');g.addColorStop(1,'#ffcc80');}
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     duneOff1+=0.2;duneOff2+=0.4;
     ctx.fillStyle='rgba(255,204,128,0.4)';
