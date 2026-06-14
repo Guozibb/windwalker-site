@@ -2,7 +2,6 @@
 const CACHE_NAME = 'windwalker-v3';
 const STATIC_ASSETS = [
     '/windwalker-site/',
-    '/windwalker-site/index.html',
     '/windwalker-site/login.html',
 ];
 
