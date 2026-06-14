@@ -5154,7 +5154,6 @@ function updateNav(items) {
             pendingFile = file;
             pendingObjectURL = URL.createObjectURL(file);
 
-            const isVideo = /\.(mp4|webm|mov)$/i.test(file.name);
             const is3D = /\.(glb|fbx|obj|gltf|stl|dae)$/i.test(file.name);
 
             uploadPreview.classList.add('show');
