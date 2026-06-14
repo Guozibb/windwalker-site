@@ -63,10 +63,11 @@ async function compressAll() {
         const beforeSize = fs.statSync(srcPath).size;
         totalBefore += beforeSize;
 
-        // 大图：保持原分辨率，WebP quality 60（高压缩）
+        // 大图：1920px 宽（全屏 lightbox 够用），WebP quality 55
         const optOut = path.join(OUT_DIR, name + '.webp');
         await sharp(srcPath)
-            .webp({ quality: 60, effort: 6 })
+            .resize(1920, undefined, { withoutEnlargement: true, fit: 'inside' })
+            .webp({ quality: 55, effort: 6 })
             .toFile(optOut);
         const optSize = fs.statSync(optOut).size;
 
@@ -74,7 +75,7 @@ async function compressAll() {
         const thumbOut = path.join(THUMB_DIR, name + '.webp');
         await sharp(srcPath)
             .resize(800, undefined, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality: 65, effort: 6 })
+            .webp({ quality: 60, effort: 6 })
             .toFile(thumbOut);
         const thumbSize = fs.statSync(thumbOut).size;
 
