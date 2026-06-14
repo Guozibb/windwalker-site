@@ -4834,7 +4834,7 @@ function updateNav(items) {
                 const liked = currentUserId && p.likedBy?.includes(currentUserId);
                 const isMine = p.name === currentUser?.username;
                 const t = new Date(p.time).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-                return `<div class="post-card">
+                return `<div class="post-card plaza-post-card" data-pid="${p.id}">
                     <div class="post-header">
                         ${p.avatar?`<div class="post-avatar" style="background-image:url(${p.avatar});background-size:cover;"></div>`:`<div class="post-avatar">${p.name[0]}</div>`}
                         <div class="post-meta"><div class="post-name">${p.name}${renderBadge(p.badge)}${renderCreatorBadge(p.name)}</div><div class="post-time">${t}</div></div>
