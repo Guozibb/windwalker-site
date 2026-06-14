@@ -4882,7 +4882,8 @@ function updateNav(items) {
             }));
             // 发送回复
             communityFeed.querySelectorAll('.comment-submit').forEach(b=>b.addEventListener('click',async()=>{
-                const commentText = filterText(input.value.trim());
+                const input = communityFeed.querySelector(`.comment-input[data-pid="${b.dataset.pid}"]`);
+                const commentText = filterText(input?.value?.trim() || '');
                 if(!commentText||!currentUserId) return;
                 const pid=parseInt(b.dataset.pid); if(!pid) return;
                 const {error}=await supabase.from('post_comments').insert({post_id:pid,author_id:currentUserId,text:commentText});
