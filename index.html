@@ -3249,6 +3249,14 @@
                 renderItemComments(m.id);
                 updateStats();
             };
+
+            // 如果来自通知点击，自动展开评论区
+            if (window._autoOpenComments) {
+                window._autoOpenComments = false;
+                setTimeout(() => {
+                    document.getElementById('lbCommentToggle').click();
+                }, 400);
+            }
         }
         window.openLightbox = openLightbox; // 确保 onclick 可访问
 
@@ -3831,7 +3839,8 @@ function updateNav(items) {
             list.innerHTML = filtered.map(n => {
                 const time = new Date(n.created_at).toLocaleString('zh-CN', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
                 const fromName = n.from_user?.username || '系统';
-                return `<div class="notify-item-new${n.read?'':' unread'}" data-id="${n.id}">
+                const clickable = (n.type === 'comment' && n.target_item) ? ' notif-clickable' : '';
+                return `<div class="notify-item-new${n.read?'':' unread'}${clickable}" data-id="${n.id}" data-target="${n.target_item||''}">
                     <div class="ni-icon">${icons[n.type]||'📢'}</div>
                     <div class="ni-body"><div class="ni-text"><strong>${fromName}</strong> ${n.text}</div><div class="ni-time">${time}</div></div>
                 </div>`;
@@ -3839,6 +3848,24 @@ function updateNav(items) {
             list.querySelectorAll('.notify-item-new').forEach(item => {
                 item.addEventListener('click', async () => {
                     await supabase.from('notifications').update({ read: true }).eq('id', item.dataset.id);
+                    const target = item.dataset.target;
+                    if (target) {
+                        // 🔗 评论通知：跳转到对应作品的 lightbox 并展开评论区
+                        notifyPanel.classList.remove('open');
+                        if (target.startsWith('plaza_')) {
+                            const pid = parseInt(target.replace('plaza_', ''));
+                            // 切换到社区 tab 并滚动到帖子
+                            const communityTab = document.querySelector('[data-tab="community"]');
+                            if (communityTab) communityTab.click();
+                            setTimeout(() => {
+                                const el = document.querySelector(`.plaza-post-card[data-pid="${pid}"]`);
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 400);
+                        } else {
+                            window._autoOpenComments = true;
+                            openLightbox(target.startsWith('upload_') ? target : parseInt(target));
+                        }
+                    }
                     renderNotifs(); updateNotifyBadge();
                 });
             });
@@ -4485,7 +4512,8 @@ function updateNav(items) {
                         if (pf && pf.id !== currentUserId) {
                             supabase.from('notifications').insert({
                                 user_id: pf.id, type: 'comment', from_user_id: currentUserId,
-                                text: `评论了你的作品「${item.title}」`, read: false
+                                text: `评论了你的作品「${item.title}」`, read: false,
+                                target_item: String(id), target_comment: cmt.id || null
                             }).then();
                         }
                     });
@@ -4860,7 +4888,7 @@ function updateNav(items) {
                 // 通知帖主
                 const { data: cp } = await supabase.from('community_posts').select('author_id').eq('id',pid).single();
                 if (cp && cp.author_id !== currentUserId) {
-                    await supabase.from('notifications').insert({user_id:cp.author_id,type:'comment',from_user_id:currentUserId,text:'回复了你的帖子',read:false});
+                    await supabase.from('notifications').insert({user_id:cp.author_id,type:'comment',from_user_id:currentUserId,text:'回复了你的帖子',read:false,target_item:'plaza_'+pid,target_comment:null});
                 }
                 renderPlaza();
             }));
