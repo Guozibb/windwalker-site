@@ -4512,9 +4512,10 @@ function updateNav(items) {
                 if (item?.author) {
                     supabase.from('profiles').select('id').eq('username', item.author).single().then(({ data: pf }) => {
                         if (pf && pf.id !== currentUserId) {
+                            const preview = text.length > 60 ? text.slice(0, 60) + '…' : text;
                             supabase.from('notifications').insert({
                                 user_id: pf.id, type: 'comment', from_user_id: currentUserId,
-                                text: `评论了你的作品「${item.title}」`, read: false,
+                                text: `评论了你的作品「${item.title}」: "${preview}"`, read: false,
                                 target_item: String(id), target_comment: cmt.id || null
                             }).then();
                         }
@@ -4882,15 +4883,16 @@ function updateNav(items) {
             }));
             // 发送回复
             communityFeed.querySelectorAll('.comment-submit').forEach(b=>b.addEventListener('click',async()=>{
-                const input=communityFeed.querySelector(`.comment-input[data-pid="${b.dataset.pid}"]`);
-                if(!input?.value.trim()||!currentUserId) return;
+                const commentText = filterText(input.value.trim());
+                if(!commentText||!currentUserId) return;
                 const pid=parseInt(b.dataset.pid); if(!pid) return;
-                const {error}=await supabase.from('post_comments').insert({post_id:pid,author_id:currentUserId,text:filterText(input.value.trim())});
+                const {error}=await supabase.from('post_comments').insert({post_id:pid,author_id:currentUserId,text:commentText});
                 if(error){showToast('回复失败: '+error.message,true);return;}
-                // 通知帖主
-                const { data: cp } = await supabase.from('community_posts').select('author_id').eq('id',pid).single();
+                // 通知帖主（附评论预览）
+                const { data: cp } = await supabase.from('community_posts').select('author_id,title').eq('id',pid).single();
                 if (cp && cp.author_id !== currentUserId) {
-                    await supabase.from('notifications').insert({user_id:cp.author_id,type:'comment',from_user_id:currentUserId,text:'回复了你的帖子',read:false,target_item:'plaza_'+pid,target_comment:null});
+                    const preview = commentText.length > 50 ? commentText.slice(0, 50) + '…' : commentText;
+                    await supabase.from('notifications').insert({user_id:cp.author_id,type:'comment',from_user_id:currentUserId,text:`回复了你的帖子: "${preview}"`,read:false,target_item:'plaza_'+pid,target_comment:null});
                 }
                 renderPlaza();
             }));
