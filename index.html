@@ -3180,7 +3180,6 @@
                 }
             }
             if (!item) { console.log('openLightbox: item not found, id=' + sid); return; }
-            console.log('openLightbox: found', item.title);
             // 👁 浏览量+1
             try {
                 const { data: row } = await supabase.from('item_views').select('views').eq('item_id', sid).maybeSingle();
@@ -3877,7 +3876,7 @@ function updateNav(items) {
         const btnNotify = document.getElementById('btnNotify');
         const notifyPanel = document.getElementById('notifyPanel');
         let notifyFilter = 'all';
-        btnNotify.addEventListener('click', e => { e.stopPropagation(); notifyPanel.classList.toggle('open'); if(notifyPanel.classList.contains('open')) renderNotifs(); });
+        btnNotify.addEventListener('click', e => { e.stopPropagation(); notifyPanel.classList.toggle('open'); if(notifyPanel.classList.contains('open')) { notifyFilter = 'all'; document.querySelectorAll('.notify-panel-tab').forEach(t => { t.classList.remove('active'); if(t.dataset.filter==='all') t.classList.add('active'); }); renderNotifs(); } });
         document.getElementById('notifyPanelClose').addEventListener('click', () => notifyPanel.classList.remove('open'));
         document.getElementById('btnAllRead').addEventListener('click', async () => { await supabase.from('notifications').update({read:true}).eq('user_id',currentUserId).eq('read',false); renderNotifs(); });
         document.querySelectorAll('.notify-panel-tab').forEach(tab => tab.addEventListener('click', () => {
